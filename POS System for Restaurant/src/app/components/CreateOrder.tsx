@@ -1,0 +1,2111 @@
+import { useState, useEffect, useRef } from 'react';
+import { Sidebar } from './Sidebar';
+import { Page } from '../App';
+import { Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users } from 'lucide-react';
+import { useOrders } from '../context/OrderContext';
+import { useTables } from '../context/TableContext';
+import { ThermalReceipt } from './ThermalReceipt';
+import wagyuSteakImg from '../../imports/image-4.png';
+import trufflePastaImg from '../../imports/image-5.png';
+import lobsterThermidorImg from '../../imports/image-6.png';
+import freshLemonadeImg from '../../imports/image-7.png';
+
+interface CreateOrderProps {
+  onNavigate: (page: Page) => void;
+  onOrderCreated: (order: any) => void;
+}
+
+interface Ingredient {
+  name: string;
+  quantity: number;
+  unit: string;
+}
+
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
+  orderType: 'dine-in' | 'takeout';
+  notes: string;
+  ingredients: Ingredient[];
+  originalIngredients: Ingredient[];
+}
+
+const menuCategories = [
+  { id: 'all', name: 'All' },
+  { id: 'snacks', name: 'Snacks' },
+  { id: 'meal', name: 'Meal' },
+  { id: 'beverages', name: 'Beverages' },
+  { id: 'dessert', name: 'Dessert' },
+];
+
+const products = [
+  {
+    id: 1,
+    name: 'Wagyu Steak',
+    description: 'Premium Japanese beef, grilled to perfection',
+    price: 250,
+    category: 'meal',
+    image: wagyuSteakImg,
+    ingredients: [
+      { name: 'Wagyu Beef', quantity: 200, unit: 'g' },
+      { name: 'Salt', quantity: 5, unit: 'g' },
+      { name: 'Pepper', quantity: 3, unit: 'g' },
+      { name: 'Butter', quantity: 20, unit: 'g' },
+      { name: 'Garlic', quantity: 10, unit: 'g' }
+    ]
+  },
+  {
+    id: 2,
+    name: 'Truffle Pasta',
+    description: 'Creamy pasta with aromatic truffle oil',
+    price: 180,
+    category: 'meal',
+    image: trufflePastaImg,
+    ingredients: [
+      { name: 'Pasta', quantity: 150, unit: 'g' },
+      { name: 'Truffle Oil', quantity: 15, unit: 'ml' },
+      { name: 'Parmesan', quantity: 30, unit: 'g' },
+      { name: 'Cream', quantity: 50, unit: 'ml' },
+      { name: 'Mushrooms', quantity: 40, unit: 'g' }
+    ]
+  },
+  {
+    id: 3,
+    name: 'Grilled Salmon',
+    description: 'Fresh Atlantic salmon with herbs and lemon',
+    price: 220,
+    category: 'meal',
+    image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Salmon Fillet', quantity: 180, unit: 'g' },
+      { name: 'Lemon', quantity: 20, unit: 'g' },
+      { name: 'Olive Oil', quantity: 10, unit: 'ml' },
+      { name: 'Herbs', quantity: 5, unit: 'g' },
+      { name: 'Salt', quantity: 3, unit: 'g' }
+    ]
+  },
+  {
+    id: 4,
+    name: 'Lobster Thermidor',
+    description: 'Classic French lobster in creamy sauce',
+    price: 350,
+    category: 'meal',
+    image: lobsterThermidorImg,
+    ingredients: [
+      { name: 'Lobster', quantity: 300, unit: 'g' },
+      { name: 'Cream', quantity: 60, unit: 'ml' },
+      { name: 'Cheese', quantity: 40, unit: 'g' },
+      { name: 'Butter', quantity: 25, unit: 'g' },
+      { name: 'Brandy', quantity: 30, unit: 'ml' }
+    ]
+  },
+  {
+    id: 5,
+    name: 'Beef Wellington',
+    description: 'Tender beef wrapped in flaky pastry',
+    price: 380,
+    category: 'meal',
+    image: 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Beef Tenderloin', quantity: 250, unit: 'g' },
+      { name: 'Puff Pastry', quantity: 100, unit: 'g' },
+      { name: 'Mushrooms', quantity: 60, unit: 'g' },
+      { name: 'Pate', quantity: 40, unit: 'g' },
+      { name: 'Egg Wash', quantity: 1, unit: 'pc' }
+    ]
+  },
+  {
+    id: 6,
+    name: 'Burger Deluxe',
+    description: 'Juicy beef patty with fresh toppings',
+    price: 150,
+    category: 'snacks',
+    image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Beef Patty', quantity: 150, unit: 'g' },
+      { name: 'Burger Bun', quantity: 1, unit: 'pc' },
+      { name: 'Cheese', quantity: 30, unit: 'g' },
+      { name: 'Lettuce', quantity: 20, unit: 'g' },
+      { name: 'Tomato', quantity: 30, unit: 'g' },
+      { name: 'Onions', quantity: 15, unit: 'g' },
+      { name: 'Sauce', quantity: 25, unit: 'ml' }
+    ]
+  },
+  {
+    id: 7,
+    name: 'Spring Rolls',
+    description: 'Crispy rolls filled with vegetables and pork',
+    price: 80,
+    category: 'snacks',
+    image: 'https://images.unsplash.com/photo-1534674343483-e7df7f1c69c3?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Spring Roll Wrapper', quantity: 3, unit: 'pcs' },
+      { name: 'Vegetables', quantity: 80, unit: 'g' },
+      { name: 'Ground Pork', quantity: 50, unit: 'g' },
+      { name: 'Soy Sauce', quantity: 10, unit: 'ml' }
+    ]
+  },
+  {
+    id: 8,
+    name: 'Fresh Lemonade',
+    description: 'Refreshing homemade lemonade',
+    price: 80,
+    category: 'beverages',
+    image: freshLemonadeImg,
+    ingredients: [
+      { name: 'Lemon Juice', quantity: 60, unit: 'ml' },
+      { name: 'Water', quantity: 200, unit: 'ml' },
+      { name: 'Sugar', quantity: 30, unit: 'g' },
+      { name: 'Ice', quantity: 100, unit: 'g' }
+    ]
+  },
+  {
+    id: 9,
+    name: 'Iced Coffee',
+    description: 'Cold brewed coffee with milk',
+    price: 95,
+    category: 'beverages',
+    image: 'https://images.unsplash.com/photo-1517487881594-2787fef5ebf7?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Coffee', quantity: 60, unit: 'ml' },
+      { name: 'Milk', quantity: 100, unit: 'ml' },
+      { name: 'Sugar', quantity: 15, unit: 'g' },
+      { name: 'Ice', quantity: 120, unit: 'g' }
+    ]
+  },
+  {
+    id: 10,
+    name: 'Tiramisu',
+    description: 'Classic Italian coffee-flavored dessert',
+    price: 120,
+    category: 'dessert',
+    image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Ladyfingers', quantity: 80, unit: 'g' },
+      { name: 'Mascarpone', quantity: 100, unit: 'g' },
+      { name: 'Coffee', quantity: 50, unit: 'ml' },
+      { name: 'Cocoa Powder', quantity: 10, unit: 'g' },
+      { name: 'Sugar', quantity: 30, unit: 'g' }
+    ]
+  },
+  {
+    id: 11,
+    name: 'Cheesecake',
+    description: 'Rich and creamy New York-style cheesecake',
+    price: 110,
+    category: 'dessert',
+    image: 'https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=200&h=200&fit=crop',
+    ingredients: [
+      { name: 'Cream Cheese', quantity: 120, unit: 'g' },
+      { name: 'Graham Crust', quantity: 60, unit: 'g' },
+      { name: 'Sugar', quantity: 40, unit: 'g' },
+      { name: 'Eggs', quantity: 2, unit: 'pcs' },
+      { name: 'Vanilla', quantity: 5, unit: 'ml' }
+    ]
+  },
+];
+
+// Customer history is now derived from actual orders
+
+function toOrderListFormat(order: any, paid: boolean) {
+  const hasDineIn = order.items.some((i: CartItem) => i.orderType === 'dine-in');
+  const hasTakeout = order.items.some((i: CartItem) => i.orderType === 'takeout');
+  const type: 'Dine-In' | 'Takeout' | 'Mixed' =
+    hasDineIn && hasTakeout ? 'Mixed' : hasDineIn ? 'Dine-In' : 'Takeout';
+  const now: Date = order.timestamp instanceof Date ? order.timestamp : new Date();
+  const discountTypeLabel =
+    order.discountType === 'senior' ? 'Senior Citizen' :
+    order.discountType === 'pwd' ? 'PWD' :
+    order.discountType === 'promo' ? 'Promo Discount' :
+    order.discountType === 'custom' ? 'Custom Discount' : undefined;
+
+  return {
+    orderNumber: order.orderNumber,
+    customer: order.customerName,
+    type,
+    table: order.tableNumber ? `Table ${order.tableNumber}` : order.isQueued ? 'Queue' : '—',
+    amountNumber: order.total,
+    subtotal: order.subtotal,
+    serviceFee: order.serviceFee,
+    tax: order.tax,
+    discount: order.discount,
+    discountType: discountTypeLabel,
+    paymentStatus: paid ? 'Paid' as const : 'Not Paid' as const,
+    orderStatus: 'Pending' as const,
+    date: now.toISOString().split('T')[0],
+    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    items: order.items.map((item: CartItem) => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price * item.quantity,
+      itemType: item.orderType,
+    })),
+    isQueued: order.isQueued || false,
+    queuePosition: order.queuePosition,
+    partySize: order.partySize,
+    tableNumbers: order.tableNumbers,
+  };
+}
+
+export function CreateOrder({ onNavigate, onOrderCreated }: CreateOrderProps) {
+  const { addOrder, orders } = useOrders();
+  const { tables } = useTables();
+  const orderNumberRef = useRef(100001); // Start from 100001
+  const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
+  const [customerName, setCustomerName] = useState('');
+  const [hasHistory, setHasHistory] = useState(false);
+  const [recommendedProducts, setRecommendedProducts] = useState<typeof products>([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [diningOption, setDiningOption] = useState<'' | 'dine-in' | 'takeout'>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [customizeItemIndex, setCustomizeItemIndex] = useState<number | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showTakeoutMode, setShowTakeoutMode] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [changeAmount, setChangeAmount] = useState(0);
+  const [successOrderDetails, setSuccessOrderDetails] = useState<any>(null);
+  const [showTableSelection, setShowTableSelection] = useState(false);
+  const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
+  const [selectedTables, setSelectedTables] = useState<number[]>([]);
+  const [partySize, setPartySize] = useState<string>('');
+  const [discountType, setDiscountType] = useState<'none' | 'senior' | 'pwd' | 'promo' | 'custom'>('none');
+  const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
+  const [discountIdNumber, setDiscountIdNumber] = useState<string>('');
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [validationError, setValidationError] = useState<string>('');
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const receiptRef = useRef<HTMLDivElement>(null);
+  const [isInQueue, setIsInQueue] = useState(false);
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const queueCounterRef = useRef(1);
+
+  // Autocomplete for customer name
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const customerInputRef = useRef<HTMLDivElement>(null);
+
+  // Autocomplete: Get unique customer names and filter based on input
+  useEffect(() => {
+    if (!customerName.trim()) {
+      setShowCustomerSuggestions(false);
+      setCustomerSuggestions([]);
+      return;
+    }
+
+    // Get unique customer names from orders
+    const uniqueCustomers = Array.from(new Set(
+      orders.map(order => order.customer)
+    ));
+
+    // Filter based on input (case-insensitive)
+    const filtered = uniqueCustomers.filter(name =>
+      name.toLowerCase().includes(customerName.toLowerCase())
+    );
+
+    // Only show suggestions if there are matches and input is not exact match
+    const exactMatch = filtered.some(name => name.toLowerCase() === customerName.toLowerCase());
+
+    if (filtered.length > 0 && !exactMatch) {
+      setCustomerSuggestions(filtered.slice(0, 5)); // Limit to 5 suggestions
+      setShowCustomerSuggestions(true);
+    } else {
+      setShowCustomerSuggestions(false);
+      setCustomerSuggestions([]);
+    }
+
+    setSelectedSuggestionIndex(-1);
+  }, [customerName, orders]);
+
+  // Close suggestions dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (customerInputRef.current && !customerInputRef.current.contains(event.target as Node)) {
+        setShowCustomerSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle customer suggestion selection
+  const handleSelectCustomer = (name: string) => {
+    setCustomerName(name);
+    setShowCustomerSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  // Handle keyboard navigation in customer suggestions
+  const handleCustomerKeyDown = (e: React.KeyboardEvent) => {
+    if (!showCustomerSuggestions || customerSuggestions.length === 0) {
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev =>
+          prev < customerSuggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => (prev > 0 ? prev - 1 : -1));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleSelectCustomer(customerSuggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setShowCustomerSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  };
+
+  // Auto-check customer history from actual orders
+  useEffect(() => {
+    if (!customerName.trim()) {
+      setHasHistory(false);
+      setRecommendedProducts([]);
+      return;
+    }
+
+    const nameLower = customerName.toLowerCase();
+    console.log('Checking history for:', nameLower);
+
+    // Find all past orders for this customer
+    const customerOrders = orders.filter(order =>
+      order.customer.toLowerCase() === nameLower
+    );
+
+    console.log('Found customer orders:', customerOrders.length);
+
+    if (customerOrders.length > 0) {
+      setHasHistory(true);
+
+      // Count frequency of each item ordered
+      const itemFrequency: Record<string, number> = {};
+      customerOrders.forEach(order => {
+        order.items.forEach(item => {
+          itemFrequency[item.name] = (itemFrequency[item.name] || 0) + item.quantity;
+        });
+      });
+
+      console.log('Item frequency:', itemFrequency);
+
+      // Get top 4 most frequently ordered items
+      const topItems = Object.entries(itemFrequency)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([name]) => name);
+
+      console.log('Top items:', topItems);
+
+      // Find matching products
+      const recommended = products.filter(p => topItems.includes(p.name));
+      console.log('Recommended products:', recommended.length);
+      setRecommendedProducts(recommended);
+    } else {
+      setHasHistory(false);
+      setRecommendedProducts([]);
+    }
+  }, [customerName, orders]);
+
+  const addToCart = (product: typeof products[0], orderType?: 'dine-in' | 'takeout') => {
+    const typeToUse = orderType || (diningOption === 'dine-in' || diningOption === 'takeout' ? diningOption : 'dine-in');
+
+    // Check if item already exists in cart with same id and orderType
+    const existingItemIndex = cart.findIndex(item =>
+      item.id === product.id &&
+      item.orderType === typeToUse &&
+      item.notes === '' && // Only merge if no customization
+      JSON.stringify(item.ingredients) === JSON.stringify(product.ingredients) // Same ingredients
+    );
+
+    if (existingItemIndex !== -1) {
+      // Item exists, increment quantity
+      setCart(cart.map((item, index) =>
+        index === existingItemIndex
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      // Item doesn't exist, add new
+      const newItem: CartItem = {
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+        quantity: 1,
+        orderType: typeToUse,
+        notes: '',
+        ingredients: JSON.parse(JSON.stringify(product.ingredients)),
+        originalIngredients: JSON.parse(JSON.stringify(product.ingredients))
+      };
+      setCart([...cart, newItem]);
+    }
+  };
+
+  const updateQuantity = (index: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      setCart(cart.filter((_, i) => i !== index));
+    } else {
+      setCart(cart.map((item, i) =>
+        i === index ? { ...item, quantity: newQuantity } : item
+      ));
+    }
+  };
+
+  const updateNotes = (index: number, notes: string) => {
+    setCart(cart.map((item, i) =>
+      i === index ? { ...item, notes } : item
+    ));
+  };
+
+  const updateIngredientQuantity = (index: number, ingredientName: string, newQuantity: number) => {
+    setCart(cart.map((item, i) => {
+      if (i === index) {
+        return {
+          ...item,
+          ingredients: item.ingredients.map(ing =>
+            ing.name === ingredientName ? { ...ing, quantity: Math.max(0, newQuantity) } : ing
+          )
+        };
+      }
+      return item;
+    }));
+  };
+
+  const deleteIngredient = (index: number, ingredientName: string) => {
+    setCart(cart.map((item, i) => {
+      if (i === index) {
+        return {
+          ...item,
+          ingredients: item.ingredients.filter(ing => ing.name !== ingredientName)
+        };
+      }
+      return item;
+    }));
+  };
+
+  const removeItem = (index: number) => {
+    setCart(cart.filter((_, i) => i !== index));
+    if (customizeItemIndex === index) {
+      setCustomizeItemIndex(null);
+    }
+  };
+
+  const filteredProducts = products.filter(p => {
+    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const serviceFee = subtotal * 0.01; // 1% service fee
+  const tax = subtotal * 0.12; // 12% tax calculated on subtotal
+
+  // Calculate discount based on type
+  let discountRate = 0;
+  if (discountType === 'senior' || discountType === 'pwd') {
+    discountRate = 0.20; // 20%
+  } else if (discountType === 'promo') {
+    discountRate = 0.10; // 10%
+  } else if (discountType === 'custom') {
+    discountRate = customDiscountPercent / 100;
+  }
+  const discount = subtotal * discountRate;
+
+  const total = subtotal + serviceFee + tax - discount;
+
+  const validateOrder = (): boolean => {
+    if (!customerName.trim()) {
+      setValidationError('Please enter customer name.');
+      return false;
+    }
+    if (!diningOption) {
+      setValidationError('Please select a dining option.');
+      return false;
+    }
+    if (cart.length === 0) {
+      setValidationError('Cart is empty.');
+      return false;
+    }
+
+    // Only validate party size and table for dine-in orders
+    const hasDineIn = cart.some(item => item.orderType === 'dine-in');
+    if (hasDineIn) {
+      if (!partySize || parseInt(partySize) < 1) {
+        setValidationError('Please enter the number of customers.');
+        return false;
+      }
+      if (selectedTables.length === 0 && !isInQueue) {
+        setValidationError('Please select a table or join the queue.');
+        return false;
+      }
+    }
+
+    setValidationError('');
+    return true;
+  };
+
+  const handlePreviewOrder = () => {
+    if (validateOrder()) {
+      // Generate order number when opening preview
+      const orderNum = String(orderNumberRef.current).padStart(6, '0');
+      setCurrentOrderNumber(orderNum);
+      setShowPreview(true);
+    }
+  };
+
+  const handleConfirmOrder = () => {
+    console.log('Confirm Order clicked'); // Debug log
+
+    const hasDineIn = cart.some(item => item.orderType === 'dine-in');
+    const hasTakeout = cart.some(item => item.orderType === 'takeout');
+
+    const order = {
+      orderNumber: currentOrderNumber,
+      customerName,
+      items: cart,
+      subtotal,
+      discount,
+      discountType,
+      customDiscountPercent: discountType === 'custom' ? customDiscountPercent : undefined,
+      serviceFee,
+      tax,
+      total,
+      timestamp: new Date(),
+      paid: false,
+      tableNumber: selectedTables.length === 1 ? selectedTables[0] : null,
+      tableNumbers: selectedTables.length > 0 ? selectedTables : undefined,
+      partySize: parseInt(partySize) || undefined,
+      isQueued: isInQueue,
+      queuePosition,
+    };
+
+    console.log('Order data:', order); // Debug log
+
+    // Increment order number for next order
+    orderNumberRef.current += 1;
+
+    // Close preview first
+    setShowPreview(false);
+
+    // Small delay to ensure state updates properly
+    setTimeout(() => {
+      if (hasTakeout && !hasDineIn) {
+        // Pure takeout - pay now
+        console.log('Opening payment modal for takeout');
+        setSuccessOrderDetails(order);
+        setShowPayment(true);
+      } else if (hasDineIn) {
+        // Has dine-in - pay later
+        console.log('Creating dine-in order');
+        const orderForList = toOrderListFormat(order, false);
+        // Add queue info to order
+        if (isInQueue && queuePosition) {
+          addOrder({ ...orderForList, isQueued: true, queuePosition });
+        } else {
+          addOrder(orderForList);
+        }
+        onOrderCreated(order);
+        setSuccessOrderDetails(order);
+        setShowSuccess(true);
+      }
+    }, 100);
+  };
+
+  const handlePaymentSubmit = () => {
+    const cash = parseFloat(cashAmount);
+    if (cash >= total) {
+      const change = cash - total;
+      setChangeAmount(change);
+      if (successOrderDetails) {
+        const paidOrder = { ...successOrderDetails, paid: true, cashReceived: cash, changeGiven: change };
+        addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: cash, changeGiven: change });
+        onOrderCreated(paidOrder);
+        setSuccessOrderDetails(paidOrder);
+      }
+      setCashAmount('');
+      setShowPayment(false);
+      // Show receipt preview first for takeout orders
+      setShowReceiptPreview(true);
+    }
+  };
+
+  const handleSuccessClose = () => {
+    setShowSuccess(false);
+    setSuccessOrderDetails(null);
+    setChangeAmount(0);
+    setCart([]);
+    setCustomerName('');
+    setDiningOption('');
+    setSelectedTableNumber(null);
+    setSelectedTables([]);
+    setPartySize('');
+    setDiscountType('none');
+    setCustomDiscountPercent(0);
+    setDiscountIdNumber('');
+    setValidationError('');
+    setCurrentOrderNumber('');
+    setIsInQueue(false);
+    setQueuePosition(null);
+    setShowReceiptPreview(false);
+    onNavigate('create-order');
+  };
+
+  const handleTakeTable = () => {
+    if (selectedTables.length > 0) {
+      const party = parseInt(partySize) || 0;
+      const totalCapacity = selectedTables.reduce((sum, tableNum) => {
+        const table = tables.find(t => t.number === tableNum);
+        return sum + (table?.seats || 0);
+      }, 0);
+
+      if (party > totalCapacity) {
+        alert(`Selected tables have ${totalCapacity} seats total, but you need ${party} seats. Please select more tables or reduce party size.`);
+        return;
+      }
+
+      setShowTableSelection(false);
+      setIsInQueue(false);
+      setQueuePosition(null);
+    }
+  };
+
+  const handleAddToQueue = () => {
+    if (!partySize || parseInt(partySize) < 1) {
+      alert('Please enter the number of customers');
+      return;
+    }
+
+    const position = queueCounterRef.current;
+    queueCounterRef.current += 1;
+    setQueuePosition(position);
+    setIsInQueue(true);
+    setShowTableSelection(false);
+
+    // Add to queue with party size info (would be handled by context in full implementation)
+    // For now we're just tracking the position
+  };
+
+  const getTableColor = (status: string) => {
+    switch (status) {
+      case 'available': return 'bg-gradient-to-br from-green-400 to-green-600';
+      case 'occupied': return 'bg-gradient-to-br from-orange-400 to-orange-600';
+      case 'reserved': return 'bg-gradient-to-br from-blue-400 to-blue-600';
+      case 'maintenance': return 'bg-gradient-to-br from-gray-400 to-gray-600';
+      default: return 'bg-gradient-to-br from-gray-400 to-gray-600';
+    }
+  };
+
+  const availableTables = tables.filter(t => t.status === 'available');
+
+  const dineInItems = cart.filter(item => item.orderType === 'dine-in');
+  const takeoutItems = cart.filter(item => item.orderType === 'takeout');
+
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+
+      <div className="flex-1 overflow-auto bg-gray-50">
+        <div className="p-5">
+          <h2 className="text-lg mb-4">Menu</h2>
+
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search Products"
+              className="w-full pl-9 pr-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            />
+          </div>
+
+          {hasHistory && recommendedProducts.length > 0 && (
+            <div className="mb-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border-2 border-blue-200 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <p className="text-sm font-medium text-blue-900">
+                  ⭐ Recommended for {customerName}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {recommendedProducts.map(product => (
+                  <button
+                    key={product.id}
+                    onClick={() => addToCart(product)}
+                    className="bg-white rounded-lg p-3 text-left hover:shadow-lg transition-all border border-blue-200 hover:border-blue-400"
+                  >
+                    <div className="w-20 h-20 rounded-full overflow-hidden mx-auto mb-2 bg-muted ring-2 ring-blue-300">
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <h3 className="text-xs text-center mb-1">{product.name}</h3>
+                    <p className="text-xs text-center text-primary">₱ {product.price.toFixed(2)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg p-1 mb-4 inline-flex gap-1">
+            {menuCategories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-4 py-1.5 rounded-lg text-xs transition-colors ${
+                  selectedCategory === cat.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {filteredProducts.map(product => (
+              <button
+                key={product.id}
+                onClick={() => addToCart(product)}
+                className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left"
+              >
+                <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <h3 className="text-xs font-medium mb-0.5 line-clamp-1">{product.name}</h3>
+                <p className="text-xs text-muted-foreground mb-1 line-clamp-2">{product.description}</p>
+                <p className="text-xs text-primary font-medium">₱ {product.price.toFixed(2)}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Right sidebar - Order Summary */}
+      <div className="w-80 bg-white border-l border-border p-5 flex flex-col">
+        <div className="mb-4">
+          <label className="block text-xs text-muted-foreground mb-1.5">Customer Name:</label>
+          <div ref={customerInputRef} className="relative">
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              onKeyDown={handleCustomerKeyDown}
+              placeholder="Enter customer name"
+              className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-gray-50"
+              autoComplete="off"
+            />
+
+            {/* Autocomplete Dropdown */}
+            {showCustomerSuggestions && customerSuggestions.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {customerSuggestions.map((name, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSelectCustomer(name)}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-primary/10 transition-colors flex items-center gap-2 ${
+                      index === selectedSuggestionIndex ? 'bg-primary/10' : ''
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-primary font-medium text-xs">
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{name}</p>
+                      <p className="text-xs text-gray-500">
+                        {orders.filter(o => o.customer.toLowerCase() === name.toLowerCase()).length} previous orders
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Dining Option Dropdown */}
+        <div className="mb-4">
+          <label className="block text-xs text-muted-foreground mb-1.5">Select Dining Option:</label>
+          <select
+            value={diningOption || ''}
+            onChange={(e) => {
+              const newOption = e.target.value as 'dine-in' | 'takeout' | '';
+              setDiningOption(newOption);
+
+              if (newOption === 'takeout') {
+                // Clear dine-in specific data
+                setSelectedTableNumber(null);
+                setSelectedTables([]);
+                setPartySize('');
+                setIsInQueue(false);
+                setQueuePosition(null);
+
+                // Update all cart items to takeout
+                setCart(cart.map(item => ({ ...item, orderType: 'takeout' as const })));
+              } else if (newOption === 'dine-in') {
+                // Update all cart items to dine-in
+                setCart(cart.map(item => ({ ...item, orderType: 'dine-in' as const })));
+              }
+            }}
+            className={`w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+              !diningOption ? 'text-gray-400' : 'bg-white'
+            }`}
+          >
+            <option value="" disabled hidden>Select Dining Option</option>
+            <option value="dine-in">Dine-In</option>
+            <option value="takeout">Takeout</option>
+          </select>
+        </div>
+
+        {/* Show party size and table selection when Dine-In is selected */}
+        {diningOption === 'dine-in' && (
+          <div className="mb-4 space-y-2">
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1.5">Number of Customers (Pila mo kabuok?):</label>
+              <input
+                type="number"
+                value={partySize}
+                onChange={(e) => setPartySize(e.target.value)}
+                placeholder="Enter number of customers"
+                min="1"
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (!partySize || parseInt(partySize) < 1) {
+                  alert('Please enter number of customers first');
+                  return;
+                }
+                setShowTableSelection(true);
+              }}
+              className={`w-full px-3 py-2 ${selectedTables.length > 0 ? 'bg-primary text-primary-foreground' : isInQueue ? 'bg-orange-500 text-white' : 'bg-secondary text-secondary-foreground'} rounded-lg hover:opacity-90 transition-colors text-xs`}
+            >
+              {selectedTables.length > 0
+                ? selectedTables.length === 1
+                  ? `Table #${selectedTables[0]}`
+                  : `Tables: ${selectedTables.map(t => `#${t}`).join(' + ')}`
+                : isInQueue
+                ? `Queue #${queuePosition}`
+                : 'Select Available Table'}
+            </button>
+            {isInQueue && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-2">
+                <p className="text-xs text-orange-800">
+                  <strong>In Queue:</strong> No tables currently available. Position #{queuePosition}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={() => setShowTakeoutMode(true)}
+              className="w-full text-xs bg-muted text-foreground px-3 py-2 rounded-lg hover:bg-muted/80 transition-colors"
+            >
+              + Add Takeout Order
+            </button>
+          </div>
+        )}
+
+        <div className="mb-3">
+          <h3 className="text-sm mb-2">Order Summary</h3>
+        </div>
+
+        {/* Order cart display - conditional dividers */}
+        <div className="flex-1 overflow-auto mb-4">
+          {cart.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">No items in cart</p>
+          ) : (
+            <div className="space-y-3">
+              {/* Show separate sections ONLY when order contains BOTH types */}
+              {dineInItems.length > 0 && takeoutItems.length > 0 ? (
+                <>
+                  {/* Dine-In Order List */}
+                  <div className="border border-primary/30 rounded-lg p-2 bg-primary/5">
+                    <h4 className="text-xs font-medium text-primary mb-2">Dine-In Orders</h4>
+                    <div className="space-y-2">
+                      {cart.map((item, index) => item.orderType === 'dine-in' && (
+                        <div key={`cart-${index}`} className="border border-border rounded-lg p-2 bg-white">
+                          <div className="flex items-start gap-2">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs truncate">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">₱ {item.price.toFixed(2)} each</p>
+                              <p className="text-xs text-primary font-medium">₱ {(item.price * item.quantity).toFixed(2)}</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => updateQuantity(index, item.quantity - 1)}
+                                className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-xs w-6 text-center">{item.quantity}</span>
+                              <button
+                                onClick={() => updateQuantity(index, item.quantity + 1)}
+                                className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => removeItem(index)}
+                              className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setCustomizeItemIndex(index)}
+                            className="text-xs text-primary hover:underline mt-2 flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            Customize
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Takeout Order List */}
+                  <div className="border border-secondary/30 rounded-lg p-2 bg-secondary/5">
+                    <h4 className="text-xs font-medium text-secondary mb-2">Takeout Orders</h4>
+                    <div className="space-y-2">
+                      {cart.map((item, index) => item.orderType === 'takeout' && (
+                        <div key={`cart-${index}`} className="border border-border rounded-lg p-2 bg-white">
+                          <div className="flex items-start gap-2">
+                            <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs truncate">{item.name}</p>
+                              <p className="text-xs text-muted-foreground">₱ {item.price.toFixed(2)} each</p>
+                              <p className="text-xs text-secondary font-medium">₱ {(item.price * item.quantity).toFixed(2)}</p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => updateQuantity(index, item.quantity - 1)}
+                                className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="text-xs w-6 text-center">{item.quantity}</span>
+                              <button
+                                onClick={() => updateQuantity(index, item.quantity + 1)}
+                                className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <button
+                              onClick={() => removeItem(index)}
+                              className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setCustomizeItemIndex(index)}
+                            className="text-xs text-secondary hover:underline mt-2 flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                            Customize
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Single unified list when order contains ONLY one type */
+                <div className="space-y-2">
+                  {cart.map((item, index) => (
+                    <div key={`cart-${index}`} className="border border-border rounded-lg p-2 bg-white">
+                      <div className="flex items-start gap-2">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">₱ {item.price.toFixed(2)} each</p>
+                          <p className="text-xs font-medium">₱ {(item.price * item.quantity).toFixed(2)}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => updateQuantity(index, item.quantity - 1)}
+                            className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-xs w-6 text-center">{item.quantity}</span>
+                          <button
+                            onClick={() => updateQuantity(index, item.quantity + 1)}
+                            className="w-5 h-5 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => removeItem(index)}
+                          className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setCustomizeItemIndex(index)}
+                        className="text-xs text-primary hover:underline mt-2 flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        Customize
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Order totals - reorganized: Subtotal, Service Fee, Tax, Add Discount, Total */}
+        <div className="space-y-1.5 mb-4 text-xs border-t border-border pt-3">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Subtotal:</span>
+            <span>₱ {subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Service Fee (1%):</span>
+            <span>₱ {serviceFee.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Tax (12%):</span>
+            <span>₱ {tax.toFixed(2)}</span>
+          </div>
+
+          {/* Discount section with Edit button */}
+          <div className="border-t border-border pt-2 mt-2">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-muted-foreground">Discount:</span>
+              <button
+                onClick={() => setShowDiscountModal(true)}
+                className="text-xs text-primary hover:underline flex items-center gap-1"
+              >
+                <Edit2 className="w-3 h-3" />
+                Edit
+              </button>
+            </div>
+            {discount > 0 ? (
+              <div className="flex justify-between text-destructive text-xs">
+                <span>
+                  {discountType === 'senior' ? 'Senior Citizen (20%)' :
+                   discountType === 'pwd' ? 'PWD (20%)' :
+                   discountType === 'promo' ? 'Promo Discount (10%)' :
+                   `Custom (${customDiscountPercent}%)`}
+                  {discountIdNumber && ` - ID: ${discountIdNumber}`}
+                </span>
+                <span>- ₱ {discount.toFixed(2)}</span>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No discount applied</p>
+            )}
+          </div>
+
+          <div className="flex justify-between pt-2 border-t border-border font-medium">
+            <span>TOTAL:</span>
+            <span className="text-primary">₱ {total.toFixed(2)}</span>
+          </div>
+        </div>
+
+        {validationError && (
+          <div className="mb-3 bg-destructive/10 border border-destructive/20 rounded-lg p-2 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+            <p className="text-xs text-destructive">{validationError}</p>
+          </div>
+        )}
+
+        <button
+          onClick={handlePreviewOrder}
+          className="w-full bg-primary text-primary-foreground py-2.5 rounded-lg hover:bg-primary/90 transition-colors text-sm"
+        >
+          PREVIEW ORDER
+        </button>
+      </div>
+
+      {/* Order Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-2xl my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <h2 className="text-lg text-primary">Order Preview</h2>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5">
+              <div className="mb-4 space-y-1">
+                <p className="text-sm"><strong>Order Number:</strong> {currentOrderNumber}</p>
+                <p className="text-sm"><strong>Customer Name:</strong> {customerName}</p>
+                <p className="text-sm"><strong>Dining Type:</strong> {diningOption === 'dine-in' ? 'Dine-In' : 'Takeout'}</p>
+                {partySize && parseInt(partySize) > 0 && (
+                  <p className="text-sm"><strong>Party Size:</strong> {partySize} {parseInt(partySize) === 1 ? 'person' : 'people'}</p>
+                )}
+                {selectedTables.length > 0 && (
+                  <p className="text-sm">
+                    <strong>Table{selectedTables.length > 1 ? 's' : ''}:</strong>{' '}
+                    {selectedTables.length === 1
+                      ? `#${selectedTables[0]}`
+                      : selectedTables.map(t => `#${t}`).join(' + ')}
+                    {selectedTables.length > 1 && (
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({selectedTables.reduce((sum, tableNum) => {
+                          const table = tables.find(t => t.number === tableNum);
+                          return sum + (table?.seats || 0);
+                        }, 0)} seats total)
+                      </span>
+                    )}
+                  </p>
+                )}
+                {isInQueue && <p className="text-sm"><strong>Queue Position:</strong> #{queuePosition}</p>}
+              </div>
+
+              {/* Dine-In Order List */}
+              {dineInItems.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium mb-2 text-primary">Dine-In Orders:</h3>
+                  <div className="space-y-2">
+                    {dineInItems.map((item, index) => {
+                      const hasCustomization = item.notes || item.ingredients.some((ing, i) =>
+                        !item.originalIngredients[i] ||
+                        ing.quantity !== item.originalIngredients[i].quantity
+                      );
+                      const removedIngredients = item.originalIngredients.filter(
+                        orig => !item.ingredients.find(ing => ing.name === orig.name)
+                      );
+
+                      return (
+                        <div key={`preview-dinein-${index}`} className="border border-border rounded-lg p-3 bg-primary/5">
+                          <div className="flex justify-between mb-1">
+                            <p className="text-sm font-medium">{item.name} x{item.quantity}</p>
+                            <p className="text-sm font-medium">₱{(item.price * item.quantity).toFixed(2)}</p>
+                          </div>
+                          {hasCustomization && (
+                            <div className="mt-2 pt-2 border-t border-primary/20 space-y-1">
+                              {removedIngredients.length > 0 && (
+                                <p className="text-xs text-red-600">
+                                  ❌ No: {removedIngredients.map(ing => ing.name).join(', ')}
+                                </p>
+                              )}
+                              {item.notes && (
+                                <p className="text-xs text-gray-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                                  📝 <strong>Note:</strong> {item.notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Takeout Order List */}
+              {takeoutItems.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-medium mb-2 text-secondary">Takeout Orders:</h3>
+                  <div className="space-y-2">
+                    {takeoutItems.map((item, index) => {
+                      const hasCustomization = item.notes || item.ingredients.some((ing, i) =>
+                        !item.originalIngredients[i] ||
+                        ing.quantity !== item.originalIngredients[i].quantity
+                      );
+                      const removedIngredients = item.originalIngredients.filter(
+                        orig => !item.ingredients.find(ing => ing.name === orig.name)
+                      );
+
+                      return (
+                        <div key={`preview-takeout-${index}`} className="border border-border rounded-lg p-3 bg-secondary/5">
+                          <div className="flex justify-between mb-1">
+                            <p className="text-sm font-medium">{item.name} x{item.quantity}</p>
+                            <p className="text-sm font-medium">₱{(item.price * item.quantity).toFixed(2)}</p>
+                          </div>
+                          {hasCustomization && (
+                            <div className="mt-2 pt-2 border-t border-secondary/20 space-y-1">
+                              {removedIngredients.length > 0 && (
+                                <p className="text-xs text-red-600">
+                                  ❌ No: {removedIngredients.map(ing => ing.name).join(', ')}
+                                </p>
+                              )}
+                              {item.notes && (
+                                <p className="text-xs text-gray-700 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                                  📝 <strong>Note:</strong> {item.notes}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="border-t border-border pt-3 mt-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>₱{subtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Service Fee (1%):</span>
+                  <span>₱{serviceFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Tax (12%):</span>
+                  <span>₱{tax.toFixed(2)}</span>
+                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-destructive">
+                    <span>Discount ({
+                      discountType === 'senior' ? 'Senior Citizen' :
+                      discountType === 'pwd' ? 'PWD' :
+                      discountType === 'promo' ? 'Promo' :
+                      `Custom ${customDiscountPercent}%`
+                    }):</span>
+                    <span>- ₱{discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg font-medium text-primary border-t border-border pt-2">
+                  <span>Total Amount:</span>
+                  <span>₱{total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-border flex gap-3 flex-shrink-0">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="flex-1 px-6 py-2.5 border border-border rounded-lg hover:bg-muted transition-colors text-sm font-medium"
+              >
+                Back to Edit
+              </button>
+              <button
+                onClick={handleConfirmOrder}
+                className="flex-1 px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 active:scale-95 transition-all text-sm font-semibold shadow-sm"
+              >
+                Confirm Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Customize Item Modal */}
+      {customizeItemIndex !== null && cart[customizeItemIndex] && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-lg my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <h2 className="text-lg text-primary">Customize - {cart[customizeItemIndex].name}</h2>
+              <button
+                onClick={() => setCustomizeItemIndex(null)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5">
+              <div className="mb-4">
+                <label className="block text-xs text-muted-foreground mb-2">Ingredients:</label>
+                <div className="space-y-2">
+                  {cart[customizeItemIndex].ingredients.map((ingredient, ingIndex) => (
+                    <div key={`ing-${ingIndex}-${ingredient.name}`} className="flex items-center gap-2 p-2 border border-border rounded-lg">
+                      <div className="flex-1">
+                        <p className="text-xs">{ingredient.name}</p>
+                        <p className="text-xs text-muted-foreground">{ingredient.quantity} {ingredient.unit}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity - (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
+                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs w-10 text-center">{ingredient.quantity}</span>
+                        <button
+                          onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity + (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
+                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => deleteIngredient(customizeItemIndex, ingredient.name)}
+                        className="text-destructive hover:bg-destructive/10 p-1.5 rounded"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs text-muted-foreground mb-1.5">Special Instructions:</label>
+                <textarea
+                  value={cart[customizeItemIndex].notes}
+                  onChange={(e) => updateNotes(customizeItemIndex, e.target.value)}
+                  placeholder="e.g., Well done, Extra sauce"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="p-5 border-t border-border flex-shrink-0">
+              <button
+                onClick={() => setCustomizeItemIndex(null)}
+                className="w-full px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Takeout Mode Modal */}
+      {showTakeoutMode && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-4xl my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <h2 className="text-lg text-secondary">Add Takeout Order</h2>
+              <button
+                onClick={() => setShowTakeoutMode(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-5">
+              <div className="mb-4">
+                <div className="bg-white rounded-lg p-1 inline-flex gap-1">
+                  {menuCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={`px-4 py-1.5 rounded-lg text-xs transition-colors ${
+                        selectedCategory === cat.id
+                          ? 'bg-secondary text-secondary-foreground'
+                          : 'text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                {filteredProducts.map(product => (
+                  <button
+                    key={product.id}
+                    onClick={() => {
+                      addToCart(product, 'takeout');
+                    }}
+                    className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left border border-border"
+                  >
+                    <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <h3 className="text-xs font-medium mb-0.5 line-clamp-1">{product.name}</h3>
+                    <p className="text-xs text-muted-foreground mb-1 line-clamp-2">{product.description}</p>
+                    <p className="text-xs text-secondary font-medium">₱ {product.price.toFixed(2)}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-5 border-t border-border flex-shrink-0">
+              <button
+                onClick={() => setShowTakeoutMode(false)}
+                className="w-full px-6 py-2.5 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors text-sm"
+              >
+                Done Adding Takeout Items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPayment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-md my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <h2 className="text-lg text-primary">Payment Summary</h2>
+              <button
+                onClick={() => setShowPayment(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1">
+              <div className="mb-4">
+                <p className="text-sm mb-2"><strong>Order Number:</strong> {currentOrderNumber}</p>
+                <p className="text-sm mb-2"><strong>Customer:</strong> {customerName}</p>
+                <div className="bg-muted rounded-lg p-3 mb-3">
+                  <h4 className="text-xs font-medium mb-2">Ordered Items:</h4>
+                  <div className="space-y-1">
+                    {cart.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-xs">
+                        <span>{item.quantity}x {item.name}</span>
+                        <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-muted rounded-lg p-4 mb-4">
+                <div className="space-y-1 text-sm mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span>₱{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Service Fee (1%):</span>
+                    <span>₱{serviceFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">Tax (12%):</span>
+                    <span>₱{tax.toFixed(2)}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-destructive text-xs">
+                      <span>Discount:</span>
+                      <span>- ₱{discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-border pt-2">
+                  <p className="text-xs text-muted-foreground mb-1">Total Amount Due</p>
+                  <p className="text-3xl text-primary font-medium">₱ {total.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Amount Received</label>
+                <input
+                  type="number"
+                  value={cashAmount}
+                  onChange={(e) => setCashAmount(e.target.value)}
+                  placeholder="Enter amount"
+                  className="w-full px-4 py-3 border border-border rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+
+              {cashAmount && parseFloat(cashAmount) >= total && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-muted-foreground mb-1">Change</p>
+                  <p className="text-2xl text-green-600 font-medium">₱ {(parseFloat(cashAmount) - total).toFixed(2)}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPayment(false)}
+                  className="flex-1 border border-border py-3 rounded-lg hover:bg-muted transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePaymentSubmit}
+                  disabled={!cashAmount || parseFloat(cashAmount) < total}
+                  className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Confirm Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccess && successOrderDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-md my-8 max-h-[calc(100vh-4rem)] overflow-y-auto">
+            <div className="p-5 text-center">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-xl text-primary mb-2">
+                {successOrderDetails.paid ? 'Payment Successful!' : 'Order Successfully Created!'}
+              </h2>
+              <div className="bg-muted rounded-lg p-4 mb-4 text-left">
+                <p className="text-sm mb-2"><strong>Order Number:</strong> {successOrderDetails.orderNumber}</p>
+                <p className="text-sm mb-2"><strong>Customer Name:</strong> {successOrderDetails.customerName}</p>
+                {successOrderDetails.tableNumber && (
+                  <p className="text-sm mb-2"><strong>Table Number:</strong> {successOrderDetails.tableNumber}</p>
+                )}
+                {isInQueue && (
+                  <p className="text-sm mb-2"><strong>Queue Position:</strong> #{queuePosition}</p>
+                )}
+                <p className="text-sm mb-2">
+                  <strong>Order Type:</strong> {
+                    successOrderDetails.items.some((i: any) => i.orderType === 'dine-in') &&
+                    successOrderDetails.items.some((i: any) => i.orderType === 'takeout')
+                      ? 'Mixed'
+                      : successOrderDetails.items.some((i: any) => i.orderType === 'dine-in')
+                      ? 'Dine-In'
+                      : 'Takeout'
+                  }
+                </p>
+                <p className="text-sm mb-2"><strong>Total Amount:</strong> ₱{successOrderDetails.total?.toFixed(2)}</p>
+                <p className="text-sm mb-2">
+                  <strong>Payment Status:</strong>{' '}
+                  <span className={successOrderDetails.paid ? 'text-green-600' : 'text-orange-600'}>
+                    {successOrderDetails.paid ? 'Paid' : 'Pending'}
+                  </span>
+                </p>
+                <p className="text-sm mb-2">
+                  <strong>Order Status:</strong>{' '}
+                  <span className="text-blue-600">Pending</span>
+                </p>
+                {successOrderDetails.paid && successOrderDetails.cashReceived && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-sm mb-1"><strong>Amount Received:</strong> ₱{successOrderDetails.cashReceived.toFixed(2)}</p>
+                    <p className="text-sm text-green-600 font-medium"><strong>Change:</strong> ₱{(successOrderDetails.changeGiven || 0).toFixed(2)}</p>
+                  </div>
+                )}
+              </div>
+
+              {successOrderDetails.paid ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSuccessClose}
+                    className="flex-1 bg-muted text-foreground py-3 rounded-lg hover:bg-muted/80 transition-colors text-sm"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={() => setShowReceiptPreview(true)}
+                    className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                  >
+                    View Receipt
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    {successOrderDetails.items.some((i: any) => i.orderType === 'dine-in')
+                      ? isInQueue
+                        ? `Order added to queue (Position #${queuePosition}). Customer will be seated when a table becomes available.`
+                        : 'Order sent to kitchen. Customer will pay after dining.'
+                      : 'Order created and ready for payment.'}
+                  </p>
+                  <button
+                    onClick={handleSuccessClose}
+                    className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Discount Modal */}
+      {showDiscountModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md">
+            <div className="flex justify-between items-center p-5 border-b border-border">
+              <h2 className="text-lg text-primary">Apply Discount</h2>
+              <button
+                onClick={() => setShowDiscountModal(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Discount Type</label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                      <input
+                        type="radio"
+                        name="discount"
+                        value="none"
+                        checked={discountType === 'none'}
+                        onChange={(e) => {
+                          setDiscountType('none');
+                          setDiscountIdNumber('');
+                          setCustomDiscountPercent(0);
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">No Discount</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                      <input
+                        type="radio"
+                        name="discount"
+                        value="senior"
+                        checked={discountType === 'senior'}
+                        onChange={(e) => setDiscountType('senior')}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Senior Citizen — 20%</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                      <input
+                        type="radio"
+                        name="discount"
+                        value="pwd"
+                        checked={discountType === 'pwd'}
+                        onChange={(e) => setDiscountType('pwd')}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">PWD — 20%</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                      <input
+                        type="radio"
+                        name="discount"
+                        value="promo"
+                        checked={discountType === 'promo'}
+                        onChange={(e) => {
+                          setDiscountType('promo');
+                          setDiscountIdNumber('');
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Promo Discount</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                      <input
+                        type="radio"
+                        name="discount"
+                        value="custom"
+                        checked={discountType === 'custom'}
+                        onChange={(e) => {
+                          setDiscountType('custom');
+                          setDiscountIdNumber('');
+                        }}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">Custom Discount</span>
+                    </label>
+                  </div>
+                </div>
+
+                {(discountType === 'senior' || discountType === 'pwd') && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {discountType === 'senior' ? 'Senior Citizen' : 'PWD'} ID Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={discountIdNumber}
+                      onChange={(e) => setDiscountIdNumber(e.target.value)}
+                      placeholder="Enter ID number"
+                      className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ID number is required for {discountType === 'senior' ? 'Senior Citizen' : 'PWD'} discount
+                    </p>
+                  </div>
+                )}
+
+                {discountType === 'custom' && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Discount Percentage *</label>
+                    <input
+                      type="number"
+                      value={customDiscountPercent}
+                      onChange={(e) => setCustomDiscountPercent(parseFloat(e.target.value) || 0)}
+                      placeholder="Enter discount %"
+                      className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      min="0"
+                      max="100"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter a percentage between 0 and 100
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setShowDiscountModal(false)}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    // Validation for Senior/PWD
+                    if ((discountType === 'senior' || discountType === 'pwd') && !discountIdNumber.trim()) {
+                      alert('Please enter ID number');
+                      return;
+                    }
+                    // Validation for Custom
+                    if (discountType === 'custom' && (customDiscountPercent <= 0 || customDiscountPercent > 100)) {
+                      alert('Please enter a valid discount percentage (1-100)');
+                      return;
+                    }
+                    setShowDiscountModal(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"
+                >
+                  Apply Discount
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Selection Modal */}
+      {showTableSelection && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl w-full max-w-3xl my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <h2 className="text-lg text-primary">Select Available Table</h2>
+              <button
+                onClick={() => setShowTableSelection(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Party Size Info */}
+              {partySize && parseInt(partySize) > 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-blue-900">Party Size: {partySize} {parseInt(partySize) === 1 ? 'person' : 'people'}</h3>
+                      <p className="text-sm text-blue-800 mt-1">
+                        {(() => {
+                          const party = parseInt(partySize);
+                          const bestTable = availableTables
+                            .filter(t => t.seats >= party)
+                            .sort((a, b) => a.seats - b.seats)[0];
+
+                          if (bestTable) {
+                            return `Recommended: Table ${bestTable.number} (${bestTable.seats} seats)`;
+                          } else {
+                            const totalAvailableSeats = availableTables.reduce((sum, t) => sum + t.seats, 0);
+                            if (totalAvailableSeats >= party) {
+                              return 'Multiple tables needed - select tables to combine';
+                            } else {
+                              return 'No available tables can accommodate this party size';
+                            }
+                          }
+                        })()}
+                      </p>
+                    </div>
+                    {selectedTables.length > 0 && (
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-blue-900">Selected Capacity</p>
+                        <p className="text-lg font-bold text-blue-700">
+                          {selectedTables.reduce((sum, tableNum) => {
+                            const table = tables.find(t => t.number === tableNum);
+                            return sum + (table?.seats || 0);
+                          }, 0)} seats
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {availableTables.length === 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="w-5 h-5 text-orange-600" />
+                    <h3 className="font-medium text-orange-900">No Tables Available</h3>
+                  </div>
+                  <p className="text-sm text-orange-800">
+                    All tables are currently occupied, reserved, or under maintenance. You can either:
+                  </p>
+                  <ul className="text-sm text-orange-800 mt-2 ml-4 list-disc space-y-1">
+                    <li>Wait in the queue and we'll assign you a table when one becomes available</li>
+                    <li>Convert your order to takeout and pay now</li>
+                  </ul>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-6">
+                {tables.map(table => {
+                  const party = parseInt(partySize) || 0;
+                  const isSelected = selectedTables.includes(table.number);
+                  const isBestMatch = table.status === 'available' && table.seats >= party &&
+                    table.seats === availableTables.filter(t => t.seats >= party).sort((a, b) => a.seats - b.seats)[0]?.seats;
+
+                  return (
+                    <div
+                      key={table.id}
+                      className={`bg-white rounded-xl shadow-sm border-2 transition-all p-4 flex flex-col items-center gap-3 relative ${
+                        isSelected
+                          ? 'border-primary ring-2 ring-primary/20'
+                          : isBestMatch
+                          ? 'border-blue-400 ring-2 ring-blue-200'
+                          : 'border-gray-200'
+                      }`}
+                    >
+                      {isBestMatch && (
+                        <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium z-10">
+                          Best Match
+                        </div>
+                      )}
+
+                      {/* Circular badge with table number - color based on status */}
+                      <button
+                        onClick={() => {
+                          if (table.status === 'available') {
+                            if (isSelected) {
+                              setSelectedTables(selectedTables.filter(t => t !== table.number));
+                            } else {
+                              setSelectedTables([...selectedTables, table.number]);
+                            }
+                          }
+                        }}
+                        disabled={table.status !== 'available'}
+                        className={`relative focus:outline-none ${
+                          table.status === 'available' ? 'cursor-pointer' : 'cursor-not-allowed'
+                        }`}
+                      >
+                        <div className={`w-20 h-20 rounded-full ${getTableColor(table.status)} shadow-lg flex items-center justify-center text-white text-2xl font-bold transition-transform ${
+                          table.status === 'available' ? 'hover:scale-105' : 'opacity-70'
+                        }`}>
+                          {table.number}
+                        </div>
+                        {isSelected && (
+                          <div className="absolute -top-1 -right-1 bg-primary rounded-full w-6 h-6 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Table label */}
+                      <div className="text-center w-full">
+                        <p className="font-semibold text-gray-800">Table {table.number}</p>
+                        <div className="flex items-center justify-center gap-1 text-xs text-gray-500 mt-1">
+                          <Users className="w-3 h-3" />
+                          <span>{table.seats} seats</span>
+                        </div>
+                      </div>
+
+                      {/* Status badge */}
+                      <div className={`w-full px-3 py-2 rounded-lg text-sm font-medium border-2 text-center ${
+                        table.status === 'available' ? 'border-green-200 bg-green-50 text-green-700' :
+                        table.status === 'occupied' ? 'border-orange-200 bg-orange-50 text-orange-700' :
+                        table.status === 'reserved' ? 'border-blue-200 bg-blue-50 text-blue-700' :
+                        'border-gray-200 bg-gray-50 text-gray-700'
+                      }`}>
+                        {table.status === 'available' ? 'Available' :
+                         table.status === 'occupied' ? 'Occupied' :
+                         table.status === 'reserved' ? 'Reserved' :
+                         'Maintenance'}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Status Legend</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      #
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Available</p>
+                      <p className="text-xs text-gray-500">Ready</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      #
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Occupied</p>
+                      <p className="text-xs text-gray-500">Has order</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      #
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Reserved</p>
+                      <p className="text-xs text-gray-500">Booked</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      #
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Maintenance</p>
+                      <p className="text-xs text-gray-500">Out of service</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-border flex-shrink-0">
+              {availableTables.length === 0 ? (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleAddToQueue}
+                    className="w-full bg-orange-500 text-white py-3 rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
+                  >
+                    WAIT IN QUEUE FOR TABLE
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Convert dine-in items to takeout
+                      setCart(cart.map(item => ({ ...item, orderType: 'takeout' })));
+                      setDiningOption('takeout');
+                      setShowTableSelection(false);
+                      setSelectedTableNumber(null);
+                      setIsInQueue(false);
+                      setQueuePosition(null);
+                    }}
+                    className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
+                  >
+                    CONVERT TO TAKEOUT ORDER
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleTakeTable}
+                  disabled={selectedTables.length === 0}
+                  className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {selectedTables.length === 0
+                    ? 'SELECT TABLE(S)'
+                    : selectedTables.length === 1
+                    ? `SELECT TABLE #${selectedTables[0]}`
+                    : `SELECT TABLES: ${selectedTables.map(t => `#${t}`).join(' + ')}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Preview Modal */}
+      {showReceiptPreview && successOrderDetails && (() => {
+        const receiptDineInItems = successOrderDetails.items.filter((i: CartItem) => i.itemType === 'dine-in');
+        const receiptTakeoutItems = successOrderDetails.items.filter((i: CartItem) => i.itemType === 'takeout');
+        const receiptIsMixed = receiptDineInItems.length > 0 && receiptTakeoutItems.length > 0;
+
+        const orderType = receiptIsMixed ? 'Mixed' : receiptDineInItems.length > 0 ? 'Dine-In' : 'Takeout';
+
+        const discountTypeLabel = successOrderDetails.discountType === 'senior' ? 'Senior Citizen' :
+          successOrderDetails.discountType === 'pwd' ? 'PWD' :
+          successOrderDetails.discountType === 'promo' ? 'Promo' :
+          successOrderDetails.discountType === 'custom' ? 'Custom' : '';
+
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col my-8">
+              <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm text-gray-700" style={{ fontWeight: 600 }}>Receipt Preview</h2>
+              </div>
+
+              <ThermalReceipt
+                ref={receiptRef}
+                orderNumber={currentOrderNumber}
+                customerName={successOrderDetails.customerName}
+                orderType={orderType as 'Dine-In' | 'Takeout' | 'Mixed'}
+                table={successOrderDetails.tableNumber ? `#${successOrderDetails.tableNumber}` : undefined}
+                items={successOrderDetails.items.map((item: CartItem) => ({
+                  name: item.name,
+                  quantity: item.quantity,
+                  price: item.price,
+                  itemType: item.itemType,
+                }))}
+                subtotal={successOrderDetails.subtotal}
+                serviceFee={successOrderDetails.serviceFee}
+                tax={successOrderDetails.tax}
+                discount={successOrderDetails.discount}
+                discountType={discountTypeLabel}
+                total={successOrderDetails.total}
+                cashReceived={successOrderDetails.cashReceived}
+                changeGiven={successOrderDetails.changeGiven}
+              />
+
+              {/* Actions */}
+              <div className="px-5 py-4 border-t border-gray-100 space-y-2">
+                <button
+                  onClick={() => {
+                    window.print();
+                  }}
+                  className="w-full py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
+                  style={{ fontWeight: 600 }}
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReceiptPreview(false);
+                    setShowSuccess(true);
+                  }}
+                  className="w-full py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}

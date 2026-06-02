@@ -1,0 +1,218 @@
+import { forwardRef } from 'react';
+
+interface ReceiptItem {
+  name: string;
+  quantity: number;
+  price: number;
+  itemType?: 'dine-in' | 'takeout';
+}
+
+interface ThermalReceiptProps {
+  orderNumber: string;
+  customerName: string;
+  orderType: 'Dine-In' | 'Takeout' | 'Mixed';
+  table?: string | null;
+  items: ReceiptItem[];
+  subtotal: number;
+  serviceFee: number;
+  tax: number;
+  discount: number;
+  discountType?: string;
+  total: number;
+  cashReceived?: number;
+  changeGiven?: number;
+  date?: string;
+  time?: string;
+  receiptId?: string;
+  paymentId?: string;
+}
+
+export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
+  (
+    {
+      orderNumber,
+      customerName,
+      orderType,
+      table,
+      items,
+      subtotal,
+      serviceFee,
+      tax,
+      discount,
+      discountType,
+      total,
+      cashReceived,
+      changeGiven,
+      date,
+      time,
+      receiptId,
+      paymentId,
+    },
+    ref
+  ) => {
+    const currentDate = date || new Date().toISOString().split('T')[0];
+    const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Separate items by type for mixed orders
+    const dineInItems = items.filter(i => i.itemType === 'dine-in');
+    const takeoutItems = items.filter(i => i.itemType === 'takeout');
+    const isMixed = dineInItems.length > 0 && takeoutItems.length > 0;
+
+    return (
+      <div
+        ref={ref}
+        className="bg-white p-5 overflow-y-auto flex-1"
+        style={{ fontFamily: "'Courier New', monospace" }}
+      >
+        {/* Header */}
+        <div className="text-center mb-4">
+          <p className="text-sm" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>N&Ns RESTAURANT</p>
+          <p className="text-xs text-gray-500">123 Restaurant Ave., Manila, PH</p>
+          <p className="text-xs text-gray-500">Tel: (02) 8123-4567</p>
+          <div className="border-t border-dashed border-gray-300 my-3" />
+          <p className="text-xs text-gray-600" style={{ fontWeight: 700 }}>OFFICIAL RECEIPT</p>
+        </div>
+
+        {/* Receipt Info */}
+        <div className="text-xs space-y-1 mb-3">
+          {receiptId && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Receipt ID:</span>
+              <span>{receiptId}</span>
+            </div>
+          )}
+          {paymentId && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Payment ID:</span>
+              <span>{paymentId}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-gray-500">Order #:</span>
+            <span>{orderNumber}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Date:</span>
+            <span>{currentDate}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Time:</span>
+            <span>{currentTime}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Customer:</span>
+            <span>{customerName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Type:</span>
+            <span>{orderType}</span>
+          </div>
+          {table && table !== '—' && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Table:</span>
+              <span>{table}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-dashed border-gray-300 my-3" />
+
+        {/* Items */}
+        {isMixed ? (
+          <>
+            {dineInItems.length > 0 && (
+              <>
+                <p className="text-xs text-center text-gray-600 mb-1.5" style={{ fontWeight: 700 }}>— DINE-IN —</p>
+                {dineInItems.map((item, i) => (
+                  <div key={i} className="flex justify-between text-xs mb-1">
+                    <span>{item.quantity}x {item.name}</span>
+                    <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs text-gray-500 mb-2">
+                  <span>Subtotal (Dine-In)</span>
+                  <span>₱{dineInItems.reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+            {takeoutItems.length > 0 && (
+              <>
+                <p className="text-xs text-center text-gray-600 mb-1.5" style={{ fontWeight: 700 }}>— TAKEOUT —</p>
+                {takeoutItems.map((item, i) => (
+                  <div key={i} className="flex justify-between text-xs mb-1">
+                    <span>{item.quantity}x {item.name}</span>
+                    <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs text-gray-500 mb-2">
+                  <span>Subtotal (Takeout)</span>
+                  <span>₱{takeoutItems.reduce((s, i) => s + i.price * i.quantity, 0).toFixed(2)}</span>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          items.map((item, i) => (
+            <div key={i} className="flex justify-between text-xs mb-1">
+              <span>{item.quantity}x {item.name}</span>
+              <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+          ))
+        )}
+
+        <div className="border-t border-dashed border-gray-300 my-3" />
+
+        {/* Totals */}
+        <div className="text-xs space-y-1">
+          <div className="flex justify-between text-gray-600">
+            <span>Subtotal</span>
+            <span>₱{subtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-gray-600">
+            <span>Service Fee (1%)</span>
+            <span>₱{serviceFee.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-gray-600">
+            <span>Tax (12%)</span>
+            <span>₱{tax.toFixed(2)}</span>
+          </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-red-500">
+              <span>Discount{discountType ? ` (${discountType} 20%)` : ''}</span>
+              <span>− ₱{discount.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-double border-gray-400 my-3" />
+
+        <div className="text-xs space-y-1">
+          <div className="flex justify-between" style={{ fontWeight: 700 }}>
+            <span>TOTAL</span>
+            <span>₱{total.toFixed(2)}</span>
+          </div>
+          {cashReceived !== undefined && cashReceived > 0 && (
+            <>
+              <div className="flex justify-between text-gray-600">
+                <span>Cash Received</span>
+                <span>₱{cashReceived.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Change</span>
+                <span>₱{(changeGiven || 0).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="border-t border-dashed border-gray-300 mt-4 pt-3 text-center">
+          <p className="text-xs text-gray-400">Thank you for dining with us!</p>
+          <p className="text-xs text-gray-400">Please come again.</p>
+          <p className="text-xs text-gray-300 mt-1">— N&Ns POS System —</p>
+        </div>
+      </div>
+    );
+  }
+);
+
+ThermalReceipt.displayName = 'ThermalReceipt';
