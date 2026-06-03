@@ -155,9 +155,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for admin listing.');
     }
 
-    const storeJoin = userColumns.storeIdColumn && storeColumns.joinable ? `LEFT JOIN stores s ON s.id = u.${this.quoteIdentifier(userColumns.storeIdColumn)}` : '';
+    const storeJoin = userColumns.storeIdColumn && storeColumns.joinable ? `LEFT JOIN stores s ON s.id = u.${this.quoteIdentifier(userColumns.storeIdColumn)} LEFT JOIN store_information si ON si.store_id = s.id` : '';
     const storeTypeSelect = storeColumns.storeTypeColumn ? `${this.normalizedStoreTypeSql(`s.${this.quoteIdentifier(storeColumns.storeTypeColumn)}`)} AS store_type` : 'NULL AS store_type';
-    const storeNameSelect = storeColumns.storeNameColumn ? `s.${this.quoteIdentifier(storeColumns.storeNameColumn)} AS store_name` : 'NULL AS store_name';
+    const storeNameSelect = storeJoin
+      ? storeColumns.storeNameColumn
+        ? `COALESCE(si.business_name, s.${this.quoteIdentifier(storeColumns.storeNameColumn)}) AS store_name`
+        : 'si.business_name AS store_name'
+      : 'NULL AS store_name';
 
     return this.query<{
       id: number;
@@ -269,6 +273,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         `,
         userInsertValues,
       );
+
+      if (storeId) {
+        await this.ensureStoreInformationRow(storeId, storeColumns.storeNameColumn ? `${input.fullName}'s Store` : input.fullName);
+      }
 
       return {
         user: { ...userRows[0], store_type: input.storeType, store_name: storeColumns.storeNameColumn ? `${input.fullName}'s Store` : null },
@@ -543,9 +551,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for store scoping.');
     }
 
-    const storeJoin = userColumns.storeIdColumn && storeColumns.joinable ? `LEFT JOIN stores s ON s.id = u.${this.quoteIdentifier(userColumns.storeIdColumn)}` : '';
+    const storeJoin = userColumns.storeIdColumn && storeColumns.joinable ? `LEFT JOIN stores s ON s.id = u.${this.quoteIdentifier(userColumns.storeIdColumn)} LEFT JOIN store_information si ON si.store_id = s.id` : '';
     const storeTypeSelect = storeColumns.storeTypeColumn ? `${this.normalizedStoreTypeSql(`s.${this.quoteIdentifier(storeColumns.storeTypeColumn)}`)} AS store_type` : 'NULL AS store_type';
-    const storeNameSelect = storeColumns.storeNameColumn ? `s.${this.quoteIdentifier(storeColumns.storeNameColumn)} AS store_name` : 'NULL AS store_name';
+    const storeNameSelect = storeJoin
+      ? storeColumns.storeNameColumn
+        ? `COALESCE(si.business_name, s.${this.quoteIdentifier(storeColumns.storeNameColumn)}) AS store_name`
+        : 'si.business_name AS store_name'
+      : 'NULL AS store_name';
 
     const rows = await this.query<AuthenticatedUser>(
       `
