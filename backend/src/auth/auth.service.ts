@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
-import { AuthenticatedUser } from '../common/types';
+import { DatabaseService } from '../shared/database/database.service';
+import { AuthenticatedUser } from '../shared/common/types';
 
 @Injectable()
 export class AuthService {
