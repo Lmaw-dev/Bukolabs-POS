@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Sidebar } from './Sidebar';
 import { UserPlus, X } from 'lucide-react';
-import { Page } from '../App';
+import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../services/auth';
 import type { AuthenticatedUser, StaffType } from '../types/auth';
 
@@ -17,11 +17,12 @@ interface StaffUser {
 
 interface AdminDashboardProps {
   currentUser: AuthenticatedUser | null;
+  storeBrand?: StoreBrand;
   onLogout: () => void;
   onNavigate: (page: Page) => void;
 }
 
-export function AdminDashboard({ currentUser, onLogout, onNavigate }: AdminDashboardProps) {
+export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }: AdminDashboardProps) {
   const [users, setUsers] = useState<StaffUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -108,7 +109,7 @@ export function AdminDashboard({ currentUser, onLogout, onNavigate }: AdminDashb
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="admin-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin />
+      <Sidebar currentPage="admin-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">

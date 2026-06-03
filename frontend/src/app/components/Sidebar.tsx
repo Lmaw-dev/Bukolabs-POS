@@ -1,18 +1,21 @@
-import { Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed } from 'lucide-react';
-import { Page } from '../App';
+import { Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed, Store, Utensils } from 'lucide-react';
+import { Page, type StoreBrand } from '../App';
 
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
   onLogout: () => void;
   isAdmin?: boolean;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
 }
 
-export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false }: SidebarProps) {
+export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, storeBrand, userName }: SidebarProps) {
   const adminMenuItems = [
     { icon: Home, label: 'Dashboard', page: 'pos-dashboard' as Page },
     { icon: List, label: 'Order List', page: 'order-list' as Page },
     { icon: BarChart3, label: 'Reports', page: 'reports' as Page },
+    { icon: Store, label: 'Store Information', page: 'store-information' as Page },
     { icon: Users, label: 'User Management', page: 'admin-dashboard' as Page },
   ];
 
@@ -25,14 +28,29 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false }: 
   ];
 
   const menuItems = isAdmin ? adminMenuItems : staffMenuItems;
+  const headerTitle = isAdmin ? storeBrand?.name || 'N&Ns POS System' : 'N&Ns POS System';
+  const headerSubtitle = isAdmin ? 'Admin Panel' : 'Staff Panel';
 
   return (
     <div className="w-64 bg-sidebar text-sidebar-foreground h-screen flex flex-col">
       <div className="p-6 border-b border-sidebar-border">
-        <h2 className="text-xl text-sidebar-foreground">N&Ns POS System</h2>
-        <p className="text-sm text-sidebar-foreground/70 mt-1">
-          {isAdmin ? 'Admin Panel' : 'Staff Panel'}
-        </p>
+        {isAdmin ? (
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-20 w-24 items-center justify-center overflow-hidden bg-transparent p-1 text-sidebar-foreground">
+              {storeBrand?.logo ? (
+                <img src={storeBrand.logo} alt={headerTitle} className="h-full w-full object-contain" />
+              ) : (
+                <Utensils className="h-12 w-12" strokeWidth={1.6} />
+              )}
+            </div>
+            <h2 className="truncate text-xl text-sidebar-foreground">{headerTitle}</h2>
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-xl text-sidebar-foreground">N&Ns POS System</h2>
+            <p className="mt-1 text-sm text-sidebar-foreground/70">{headerSubtitle}</p>
+          </div>
+        )}
       </div>
 
       <nav className="flex-1 p-4">
@@ -66,7 +84,15 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false }: 
         </ul>
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="border-t border-sidebar-border p-4">
+        {isAdmin && (
+          <div className="mb-3 px-3 py-2">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-sidebar-foreground">{userName || 'Administrator'}</p>
+              <p className="truncate text-sm text-sidebar-foreground/70">Admin</p>
+            </div>
+          </div>
+        )}
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left"

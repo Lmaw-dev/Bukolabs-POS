@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Page } from '../App';
+import { Page, type StoreBrand } from '../App';
 import { X, Search, Eye, CreditCard, Printer, RotateCcw, CheckCircle, ChevronDown, Download, Users } from 'lucide-react';
 import { useOrders, Order } from '../context/OrderContext';
 import { ThermalReceipt } from './ThermalReceipt';
@@ -9,6 +9,8 @@ interface OrderListProps {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
   isAdmin?: boolean;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
 }
 
 type ActiveModal = 'details' | 'payment' | 'payment-success' | 'receipt' | 'refund' | null;
@@ -21,7 +23,7 @@ function generateId(prefix: string) {
   return `${prefix}-${Date.now().toString().slice(-6)}`;
 }
 
-export function OrderList({ onNavigate, onLogout, isAdmin = false }: OrderListProps) {
+export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName }: OrderListProps) {
   const { orders, updateOrder, removeOrder, completePayment } = useOrders();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -131,7 +133,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false }: OrderListPr
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar currentPage="order-list" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} />
+      <Sidebar currentPage="order-list" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} />
 
       <div className="flex-1 overflow-auto p-8">
         {/* Header */}

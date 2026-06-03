@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Sidebar } from './Sidebar';
-import { Page } from '../App';
+import { Page, type StoreBrand } from '../App';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
 import { useOrders } from '../context/OrderContext';
@@ -28,9 +28,11 @@ interface ReportsProps {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
   isAdmin?: boolean;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
 }
 
-export function Reports({ onNavigate, onLogout, isAdmin = false }: ReportsProps) {
+export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName }: ReportsProps) {
   const { orders } = useOrders();
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year'>('today');
   const [revenueTrendFilter, setRevenueTrendFilter] = useState<'4weeks' | '3months' | 'year'>('4weeks');
@@ -232,7 +234,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false }: ReportsProps)
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="reports" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} />
+      <Sidebar currentPage="reports" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">

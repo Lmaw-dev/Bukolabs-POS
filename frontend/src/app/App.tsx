@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SuperadminDashboard } from './components/SuperadminDashboard';
@@ -11,8 +11,10 @@ import { Payment } from './components/Payment';
 import { Receipt } from './components/Receipt';
 import { OrderList } from './components/OrderList';
 import { Reports } from './components/Reports';
+import { StoreInformation } from './components/StoreInformation';
 import { OrderProvider } from './context/OrderContext';
 import { TableProvider } from './context/TableContext';
+import { getApiBaseUrl } from './services/auth';
 import type { AuthenticatedUser } from './types/auth';
 
 export type Page =
@@ -29,12 +31,44 @@ export type Page =
   | 'payment'
   | 'receipt'
   | 'order-list'
-  | 'reports';
+  | 'reports'
+  | 'store-information';
+
+export interface StoreBrand {
+  name: string | null;
+  logo: string | null;
+}
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('login');
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
   const [currentOrder, setCurrentOrder] = useState<any>(null);
+  const [storeBrand, setStoreBrand] = useState<StoreBrand>({ name: null, logo: null });
+
+  useEffect(() => {
+    const loadStoreBrand = async () => {
+      if (!currentUser?.id || currentUser.role !== 'ADMIN') {
+        setStoreBrand({ name: null, logo: null });
+        return;
+      }
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/store-information?admin_user_id=${currentUser.id}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setStoreBrand({
+            name: data.business_name ?? currentUser.store_name ?? null,
+            logo: data.logo ?? null,
+          });
+        }
+      } catch {
+        setStoreBrand({ name: currentUser.store_name ?? null, logo: null });
+      }
+    };
+
+    void loadStoreBrand();
+  }, [currentUser?.id, currentUser?.role, currentUser?.store_name]);
 
   const handleLogin = (user: AuthenticatedUser) => {
     setCurrentUser(user);
@@ -50,7 +84,7 @@ export default function App() {
     }
 
     if (user.role === 'ADMIN' && user.store_type === 'RESTAURANT') {
-      setCurrentPage('admin-dashboard');
+      setCurrentPage('pos-dashboard');
       return;
     }
 
@@ -81,10 +115,15 @@ export default function App() {
     setCurrentUser(null);
     setCurrentPage('login');
     setCurrentOrder(null);
+    setStoreBrand({ name: null, logo: null });
   };
 
   const navigateTo = (page: Page) => {
     setCurrentPage(page);
+  };
+
+  const updateCurrentUser = (updates: Partial<AuthenticatedUser>) => {
+    setCurrentUser((user) => (user ? { ...user, ...updates } : user));
   };
 
   return (
@@ -98,7 +137,7 @@ export default function App() {
             <SuperadminDashboard currentUser={currentUser} onLogout={handleLogout} />
           )}
           {currentPage === 'admin-dashboard' && (
-            <AdminDashboard currentUser={currentUser} onLogout={handleLogout} onNavigate={navigateTo} />
+            <AdminDashboard currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
           {currentPage === 'retail-dashboard' && (
             <RetailDashboard currentUser={currentUser} onLogout={handleLogout} />
@@ -113,7 +152,7 @@ export default function App() {
             <InventoryDashboard onLogout={handleLogout} />
           )}
           {currentPage === 'pos-dashboard' && (
-            <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} />
+            <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
           )}
           {currentPage === 'create-order' && (
             <CreateOrder onNavigate={navigateTo} onOrderCreated={setCurrentOrder} />
@@ -128,10 +167,20 @@ export default function App() {
             <Receipt onNavigate={navigateTo} currentOrder={currentOrder} />
           )}
           {currentPage === 'order-list' && (
-            <OrderList onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} />
+            <OrderList onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
           )}
           {currentPage === 'reports' && (
-            <Reports onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} />
+            <Reports onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
+          )}
+          {currentPage === 'store-information' && (
+            <StoreInformation
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              onNavigate={navigateTo}
+              onUserUpdate={updateCurrentUser}
+              onStoreBrandUpdate={setStoreBrand}
+              storeBrand={storeBrand}
+            />
           )}
         </TableProvider>
       </OrderProvider>

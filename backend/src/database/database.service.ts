@@ -12,6 +12,25 @@ type SchemaColumns = {
   stores: Set<string>;
 };
 
+type StoreInformation = {
+  id: number;
+  store_id: number;
+  business_name: string;
+  business_description: string | null;
+  address: string | null;
+  contact_number: string | null;
+  email: string | null;
+  logo: string | null;
+  receipt_thank_you_message: string | null;
+  receipt_footer_message: string | null;
+  operating_hours: string | null;
+  currency: string | null;
+  theme_color: string | null;
+  tax_rate: string | number | null;
+  service_charge_rate: string | number | null;
+  updated_at: Date | string | null;
+};
+
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly pool: Pool;
@@ -351,6 +370,170 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return rows[0];
   }
 
+  async getStoreInformationForAdmin(adminUserId: number): Promise<StoreInformation> {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can manage store information.');
+    }
+
+    await this.ensureStoreInformationRow(admin.store_id, admin.store_name);
+
+    const rows = await this.query<StoreInformation>(
+      `
+        SELECT
+          id,
+          store_id,
+          business_name,
+          business_description,
+          address,
+          contact_number,
+          email,
+          logo,
+          receipt_thank_you_message,
+          receipt_footer_message,
+          operating_hours,
+          currency,
+          theme_color,
+          tax_rate,
+          service_charge_rate,
+          updated_at
+        FROM store_information
+        WHERE store_id = $1
+        LIMIT 1
+      `,
+      [admin.store_id],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Store information was not found.');
+    }
+
+    return rows[0];
+  }
+
+  async updateStoreInformationForAdmin(input: {
+    adminUserId: number;
+    businessName: string;
+    businessDescription: string | null;
+    address: string | null;
+    contactNumber: string | null;
+    email: string | null;
+    logo: string | null;
+    receiptThankYouMessage: string | null;
+    receiptFooterMessage: string | null;
+    operatingHours: string | null;
+    currency: string | null;
+    themeColor: string | null;
+    taxRate: number | null;
+    serviceChargeRate: number | null;
+  }): Promise<StoreInformation> {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update store information.');
+    }
+
+    await this.ensureStoreInformationRow(admin.store_id, admin.store_name);
+
+    const rows = await this.query<StoreInformation>(
+      `
+        UPDATE store_information
+        SET
+          business_name = $1,
+          business_description = $2,
+          address = $3,
+          contact_number = $4,
+          email = $5,
+          logo = $6,
+          receipt_thank_you_message = $7,
+          receipt_footer_message = $8,
+          operating_hours = $9,
+          currency = $10,
+          theme_color = $11,
+          tax_rate = $12,
+          service_charge_rate = $13,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE store_id = $14
+        RETURNING
+          id,
+          store_id,
+          business_name,
+          business_description,
+          address,
+          contact_number,
+          email,
+          logo,
+          receipt_thank_you_message,
+          receipt_footer_message,
+          operating_hours,
+          currency,
+          theme_color,
+          tax_rate,
+          service_charge_rate,
+          updated_at
+      `,
+      [
+        input.businessName,
+        input.businessDescription,
+        input.address,
+        input.contactNumber,
+        input.email,
+        input.logo,
+        input.receiptThankYouMessage,
+        input.receiptFooterMessage,
+        input.operatingHours,
+        input.currency,
+        input.themeColor,
+        input.taxRate,
+        input.serviceChargeRate,
+        admin.store_id,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null) {
+    await this.query(
+      `
+        INSERT INTO store_information (
+          store_id,
+          business_name,
+          business_description,
+          address,
+          contact_number,
+          email,
+          receipt_thank_you_message,
+          receipt_footer_message,
+          operating_hours,
+          currency,
+          theme_color,
+          tax_rate,
+          service_charge_rate
+        )
+        SELECT
+          $1,
+          $2,
+          'Your one-stop shop for quality ukay-ukay finds! We offer affordable and stylish pre-loved items for the whole family.',
+          '123 Sampaguita St., Barangay Guadalupe, Cebu City, Cebu, Philippines',
+          '0917 123 4567',
+          'ukayhub.main@gmail.com',
+          'Thank you for shopping with us!',
+          'We appreciate your support. Come again!',
+          'Mon-Sun, 9:00 AM - 8:00 PM',
+          'PHP',
+          '#10b981',
+          0,
+          0
+        WHERE NOT EXISTS (
+          SELECT 1 FROM store_information WHERE store_id = $1
+        )
+      `,
+      [storeId, fallbackStoreName ?? 'Ukay Hub - Main Branch'],
+    );
+  }
+
   private async getUserStoreScope(userId: number): Promise<AuthenticatedUser> {
     const schema = await this.getSchemaColumns();
     const userColumns = this.resolveUserColumns(schema.users);
@@ -427,6 +610,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       joinable: columns.has('id'),
       storeTypeColumn: pick(['store_type', 'type', 'store_kind']),
       storeNameColumn: pick(['store_name', 'name']),
+      storeDescriptionColumn: pick(['store_description', 'description']),
+      logoUrlColumn: pick(['logo_url', 'store_logo_url']),
+      contactNumberColumn: pick(['contact_number', 'phone_number', 'phone']),
+      emailAddressColumn: pick(['email_address', 'store_email', 'email']),
+      addressColumn: pick(['address', 'store_address']),
+      updatedAtColumn: pick(['updated_at']),
     };
   }
 
