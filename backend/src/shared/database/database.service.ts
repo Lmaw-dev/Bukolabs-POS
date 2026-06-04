@@ -275,7 +275,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       );
 
       if (storeId) {
-        await this.ensureStoreInformationRow(storeId, storeColumns.storeNameColumn ? `${input.fullName}'s Store` : input.fullName);
+        await this.ensureStoreInformationRow(storeId, storeColumns.storeNameColumn ? `${input.fullName}'s Store` : input.fullName, client);
       }
 
       return {
@@ -704,43 +704,53 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return rows[0];
   }
 
-  private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null) {
+  private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null, client?: PoolClient) {
+    const sql = `
+      INSERT INTO store_information (
+        store_id,
+        business_name,
+        business_description,
+        address,
+        contact_number,
+        email,
+        receipt_thank_you_message,
+        receipt_footer_message,
+        operating_hours,
+        currency,
+        theme_color,
+        tax_rate,
+        service_charge_rate
+      )
+      SELECT
+        $1,
+        $2,
+        'Your one-stop shop for quality ukay-ukay finds! We offer affordable and stylish pre-loved items for the whole family.',
+        '123 Sampaguita St., Barangay Guadalupe, Cebu City, Cebu, Philippines',
+        '0917 123 4567',
+        'ukayhub.main@gmail.com',
+        'Thank you for shopping with us!',
+        'We appreciate your support. Come again!',
+        'Mon-Sun, 9:00 AM - 8:00 PM',
+        'PHP',
+        '#10b981',
+        0,
+        0
+      WHERE NOT EXISTS (
+        SELECT 1 FROM store_information WHERE store_id = $1
+      )
+    `;
+    const params = [storeId, fallbackStoreName ?? 'Ukay Hub - Main Branch'];
+
+    if (client) {
+      await this.queryWithClient(client, sql, params);
+      return;
+    }
+
     await this.query(
       `
-        INSERT INTO store_information (
-          store_id,
-          business_name,
-          business_description,
-          address,
-          contact_number,
-          email,
-          receipt_thank_you_message,
-          receipt_footer_message,
-          operating_hours,
-          currency,
-          theme_color,
-          tax_rate,
-          service_charge_rate
-        )
-        SELECT
-          $1,
-          $2,
-          'Your one-stop shop for quality ukay-ukay finds! We offer affordable and stylish pre-loved items for the whole family.',
-          '123 Sampaguita St., Barangay Guadalupe, Cebu City, Cebu, Philippines',
-          '0917 123 4567',
-          'ukayhub.main@gmail.com',
-          'Thank you for shopping with us!',
-          'We appreciate your support. Come again!',
-          'Mon-Sun, 9:00 AM - 8:00 PM',
-          'PHP',
-          '#10b981',
-          0,
-          0
-        WHERE NOT EXISTS (
-          SELECT 1 FROM store_information WHERE store_id = $1
-        )
+        ${sql}
       `,
-      [storeId, fallbackStoreName ?? 'Ukay Hub - Main Branch'],
+      params,
     );
   }
 
