@@ -61,49 +61,45 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
     : isInventoryStaff
       ? (isRetail ? retailInventoryMenuItems : restaurantInventoryMenuItems)
       : (isRetail ? retailStaffMenuItems : restaurantStaffMenuItems);
-  const defaultTitle = isRetail ? 'Retail POS System' : 'N&Ns POS System';
+  const defaultTitle = isRetail ? 'Retail Store' : 'The Restaurant';
   const headerTitle = storeBrand?.name || defaultTitle;
   const userRoleLabel = isAdmin ? 'Admin' : isInventoryStaff ? 'Inventory Staff' : 'POS Staff';
 
   return (
-    <div className="w-64 bg-sidebar text-sidebar-foreground h-screen flex flex-col">
-      <div className="p-6 border-b border-sidebar-border">
+    <div className="flex h-screen w-80 shrink-0 flex-col bg-[#111827] text-[#f8fafc]">
+      <div className="border-b border-white/10 px-6 pb-8 pt-12">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-20 w-24 items-center justify-center overflow-hidden bg-transparent p-1 text-sidebar-foreground">
+          <div className="mx-auto mb-8 flex h-20 w-24 items-center justify-center overflow-hidden bg-transparent p-1 text-slate-600">
             {storeBrand?.logo ? (
               <img src={storeBrand.logo} alt={headerTitle} className="h-full w-full object-contain" />
             ) : isRetail ? (
-              <ShoppingBag className="h-12 w-12" strokeWidth={1.6} />
+              <ShoppingBag className="h-16 w-16" strokeWidth={1.6} />
             ) : (
-              <Utensils className="h-12 w-12" strokeWidth={1.6} />
+              <UtensilsCrossed className="h-16 w-16" strokeWidth={1.6} />
             )}
           </div>
-          <h2 className="truncate text-xl text-sidebar-foreground">{headerTitle}</h2>
+          <h2 className="truncate text-2xl font-semibold tracking-tight text-white">{headerTitle}</h2>
         </div>
       </div>
 
-      <nav className="flex-1 p-4">
-        <ul className="space-y-2">
+      <nav className="flex-1 px-5 py-7">
+        <ul className="space-y-4">
           {menuItems.map((item) => {
             const active = currentPage === item.page;
             return (
               <li key={item.page}>
                 <button
                   onClick={() => onNavigate(item.page)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-0.5 transition-all text-left"
-                  style={{
-                    background: active ? 'rgba(16,185,129,0.12)' : 'transparent',
-                    border: active ? '1px solid rgba(16,185,129,0.2)' : '1px solid transparent',
-                    color: active ? '#10b981' : '#64748b',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
-                  onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  className={`flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
+                    active
+                      ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
+                      : 'border-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+                  }`}
                 >
-                  <span style={{ flexShrink: 0 }}>
-                    <item.icon className="w-5 h-5" />
+                  <span className="shrink-0">
+                    <item.icon className="h-6 w-6" strokeWidth={1.8} />
                   </span>
-                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, flex: 1 }}>
+                  <span className={`flex-1 text-base ${active ? 'font-semibold' : 'font-medium'}`}>
                     {item.label}
                   </span>
                 </button>
@@ -113,35 +109,21 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
         </ul>
       </nav>
 
-      <div className="border-t border-sidebar-border p-4">
-        <div className="mb-3 px-3 py-2">
+      <div className="border-t border-white/10 px-5 py-8">
+        <div className="mb-8 px-4">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-sidebar-foreground">{userName || (isAdmin ? 'Administrator' : 'Staff')}</p>
-            <p className="truncate text-sm text-sidebar-foreground/70">{userRoleLabel}</p>
+            <p className="truncate text-lg font-semibold leading-tight text-white">{userName || (isAdmin ? 'Administrator' : 'Staff')}</p>
+            <p className="truncate text-lg leading-tight text-slate-200">{userRoleLabel}</p>
           </div>
         </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-left"
-          style={{
-            background: 'transparent',
-            border: '1px solid transparent',
-            color: '#64748b',
-            cursor: 'pointer',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.12)';
-            (e.currentTarget as HTMLElement).style.color = '#ef4444';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-            (e.currentTarget as HTMLElement).style.color = '#64748b';
-          }}
+          className="flex h-[52px] w-full items-center gap-4 rounded-lg border border-transparent px-4 text-left text-slate-500 transition hover:bg-red-500/10 hover:text-red-400"
         >
-          <span style={{ flexShrink: 0 }}>
-            <LogOut className="w-5 h-5" />
+          <span className="shrink-0">
+            <LogOut className="h-6 w-6" strokeWidth={1.8} />
           </span>
-          <span style={{ fontSize: 13, fontWeight: 400, flex: 1 }}>
+          <span className="flex-1 text-base font-medium">
             Logout
           </span>
         </button>
