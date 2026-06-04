@@ -289,6 +289,93 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async updateAdminAccount(input: { adminUserId: number; fullName: string; email: string; storeType: 'RESTAURANT' | 'RETAIL_STORE'; password?: string }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Admin account was not found.');
+    }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+    const storeColumns = this.resolveStoreColumns(schema.stores);
+
+    if (!userColumns.fullNameColumn || !userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for admin updates.');
+    }
+
+    const roleColumn = userColumns.roleColumn;
+    const userUpdates: string[] = [`${this.quoteIdentifier(userColumns.fullNameColumn)} = $1`, 'email = $2'];
+    const values: unknown[] = [input.fullName, input.email];
+
+    if (input.password?.trim()) {
+      if (!userColumns.passwordColumn) {
+        throw new InternalServerErrorException('Users table is missing a password column.');
+      }
+
+      values.push(await bcrypt.hash(input.password, 10));
+      userUpdates.push(`${this.quoteIdentifier(userColumns.passwordColumn)} = $${values.length}`);
+    }
+
+    try {
+      await this.withTransaction(async (client) => {
+        values.push(input.adminUserId);
+        await this.queryWithClient(
+          client,
+          `
+            UPDATE users
+            SET ${userUpdates.join(', ')}
+            WHERE id = $${values.length}
+              AND ${this.quoteIdentifier(roleColumn)} = 'ADMIN'
+          `,
+          values,
+        );
+
+        if (storeColumns.storeTypeColumn) {
+          await this.queryWithClient(
+            client,
+            `
+              UPDATE stores
+              SET ${this.quoteIdentifier(storeColumns.storeTypeColumn)} = $1
+              WHERE id = $2
+            `,
+            [this.toDatabaseStoreType(input.storeType), admin.store_id],
+          );
+        }
+      });
+
+      const updated = await this.getUserStoreScope(input.adminUserId);
+      return updated;
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to update admin account.');
+    }
+  }
+
+  async deleteAdminAccount(adminUserId: number) {
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for admin deletion.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM users
+        WHERE id = $1
+          AND ${this.quoteIdentifier(userColumns.roleColumn)} = 'ADMIN'
+        RETURNING id
+      `,
+      [adminUserId],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Admin account was not found.');
+    }
+
+    return { id: rows[0].id, deleted: true };
+  }
+
   async listStaffForAdmin(adminUserId: number) {
     const admin = await this.getUserStoreScope(adminUserId);
 
@@ -378,14 +465,129 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return rows[0];
   }
 
-  async getStoreInformationForAdmin(adminUserId: number): Promise<StoreInformation> {
-    const admin = await this.getUserStoreScope(adminUserId);
+  async updateStaffAccountForAdmin(input: {
+    adminUserId: number;
+    staffUserId: number;
+    fullName: string;
+    email: string;
+    password?: string;
+    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+  }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
 
     if (admin.role !== 'ADMIN' || !admin.store_id) {
-      throw new InternalServerErrorException('Only store admin accounts can manage store information.');
+      throw new InternalServerErrorException('Only store admin accounts can update staff.');
     }
 
-    await this.ensureStoreInformationRow(admin.store_id, admin.store_name);
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+    const storeColumns = this.resolveStoreColumns(schema.stores);
+
+    if (!userColumns.fullNameColumn || !userColumns.roleColumn || !userColumns.storeIdColumn || !userColumns.staffTypeColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for staff updates.');
+    }
+
+    const updates: string[] = [
+      `${this.quoteIdentifier(userColumns.fullNameColumn)} = $1`,
+      `email = $2`,
+      `${this.quoteIdentifier(userColumns.staffTypeColumn)} = $3`,
+    ];
+    const values: unknown[] = [input.fullName, input.email, input.staffType];
+
+    if (input.password?.trim()) {
+      if (!userColumns.passwordColumn) {
+        throw new InternalServerErrorException('Users table is missing a password column.');
+      }
+
+      values.push(await bcrypt.hash(input.password, 10));
+      updates.push(`${this.quoteIdentifier(userColumns.passwordColumn)} = $${values.length}`);
+    }
+
+    values.push(input.staffUserId, admin.store_id);
+    const staffIdParam = `$${values.length - 1}`;
+    const storeIdParam = `$${values.length}`;
+
+    try {
+      const storeJoin = storeColumns.joinable ? `LEFT JOIN stores s ON s.id = u.${this.quoteIdentifier(userColumns.storeIdColumn)}` : '';
+      const storeTypeSelect = storeColumns.storeTypeColumn ? `${this.normalizedStoreTypeSql(`s.${this.quoteIdentifier(storeColumns.storeTypeColumn)}`)} AS store_type` : 'NULL AS store_type';
+      const storeNameSelect = storeColumns.storeNameColumn ? `s.${this.quoteIdentifier(storeColumns.storeNameColumn)} AS store_name` : 'NULL AS store_name';
+
+      const rows = await this.query<AuthenticatedUser>(
+        `
+          WITH updated AS (
+            UPDATE users
+            SET ${updates.join(', ')}
+            WHERE id = ${staffIdParam}
+              AND ${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
+              AND ${this.quoteIdentifier(userColumns.storeIdColumn)} = ${storeIdParam}
+            RETURNING *
+          )
+          SELECT
+            u.id,
+            u.${this.quoteIdentifier(userColumns.fullNameColumn)} AS full_name,
+            u.email,
+            u.${this.quoteIdentifier(userColumns.roleColumn)} AS role,
+            u.${this.quoteIdentifier(userColumns.storeIdColumn)} AS store_id,
+            u.${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type,
+            ${storeTypeSelect},
+            ${storeNameSelect}
+          FROM updated u
+          ${storeJoin}
+          LIMIT 1
+        `,
+        values,
+      );
+
+      if (rows.length === 0) {
+        throw new InternalServerErrorException('Staff account was not found for this store.');
+      }
+
+      return rows[0];
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to update staff account.');
+    }
+  }
+
+  async deleteStaffAccountForAdmin(input: { adminUserId: number; staffUserId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete staff.');
+    }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.roleColumn || !userColumns.storeIdColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for staff deletion.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM users
+        WHERE id = $1
+          AND ${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
+          AND ${this.quoteIdentifier(userColumns.storeIdColumn)} = $2
+        RETURNING id
+      `,
+      [input.staffUserId, admin.store_id],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Staff account was not found for this store.');
+    }
+
+    return { id: rows[0].id, deleted: true };
+  }
+
+  async getStoreInformationForAdmin(adminUserId: number): Promise<StoreInformation> {
+    const user = await this.getUserStoreScope(adminUserId);
+
+    if (!['ADMIN', 'STAFF'].includes(String(user.role)) || !user.store_id) {
+      throw new InternalServerErrorException('Only store users can view store information.');
+    }
+
+    await this.ensureStoreInformationRow(user.store_id, user.store_name);
 
     const rows = await this.query<StoreInformation>(
       `
@@ -410,7 +612,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         WHERE store_id = $1
         LIMIT 1
       `,
-      [admin.store_id],
+      [user.store_id],
     );
 
     if (rows.length === 0) {

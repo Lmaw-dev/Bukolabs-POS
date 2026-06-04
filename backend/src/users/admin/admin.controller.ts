@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { IsEmail, IsIn, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 import { AdminService } from './admin.service';
@@ -17,6 +17,26 @@ class CreateStaffDto {
   @IsString()
   @MinLength(6)
   password!: string;
+
+  @IsIn(['POS_STAFF', 'INVENTORY_STAFF'])
+  staff_type!: 'POS_STAFF' | 'INVENTORY_STAFF';
+}
+
+class UpdateStaffDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsString()
+  full_name!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  password?: string;
 
   @IsIn(['POS_STAFF', 'INVENTORY_STAFF'])
   staff_type!: 'POS_STAFF' | 'INVENTORY_STAFF';
@@ -98,6 +118,26 @@ export class AdminController {
       email: body.email,
       password: body.password,
       staffType: body.staff_type,
+    });
+  }
+
+  @Patch('staff/:id')
+  updateStaff(@Param('id') id: string, @Body() body: UpdateStaffDto) {
+    return this.adminService.updateStaff({
+      adminUserId: Number(body.admin_user_id),
+      staffUserId: Number(id),
+      fullName: body.full_name,
+      email: body.email,
+      password: body.password,
+      staffType: body.staff_type,
+    });
+  }
+
+  @Delete('staff/:id')
+  deleteStaff(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteStaff({
+      adminUserId: Number(adminUserId),
+      staffUserId: Number(id),
     });
   }
 

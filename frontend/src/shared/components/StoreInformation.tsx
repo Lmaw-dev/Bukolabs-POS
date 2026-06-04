@@ -150,7 +150,17 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
       const normalized = normalizeStoreInfo(data);
       setStoreInfo(normalized);
       onUserUpdate({ store_name: normalized.business_name });
-      onStoreBrandUpdate({ name: normalized.business_name, logo: normalized.logo });
+      onStoreBrandUpdate({
+        name: normalized.business_name,
+        logo: normalized.logo,
+        business_description: normalized.business_description,
+        address: normalized.address,
+        contact_number: normalized.contact_number,
+        email: normalized.email,
+        receipt_thank_you_message: normalized.receipt_thank_you_message,
+        receipt_footer_message: normalized.receipt_footer_message,
+        operating_hours: normalized.operating_hours,
+      });
       setMessage('Store information saved.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save store information.');
@@ -170,7 +180,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="store-information" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} />
+      <Sidebar currentPage="store-information" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} />
 
       <div className="flex-1 overflow-auto bg-background">
         <main className="p-6">

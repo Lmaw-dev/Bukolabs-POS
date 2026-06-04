@@ -4,7 +4,7 @@ import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
-import { useOrders } from '../../shared/context/OrderContext';
+import { useOrders } from '../context/RetailOrderContext';
 
 // Custom Peso Icon Component using ₱ symbol
 const PesoIcon = ({ className }: { className?: string }) => (
@@ -25,7 +25,7 @@ const PesoIcon = ({ className }: { className?: string }) => (
   </span>
 );
 
-interface ReportsProps {
+interface RetailReportsProps {
   onNavigate: (page: Page) => void;
   onLogout: () => void;
   isAdmin?: boolean;
@@ -35,7 +35,7 @@ interface ReportsProps {
   staffType?: StaffType;
 }
 
-export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: ReportsProps) {
+export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailReportsProps) {
   const { orders } = useOrders();
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year'>('today');
   const [revenueTrendFilter, setRevenueTrendFilter] = useState<'4weeks' | '3months' | 'year'>('4weeks');
@@ -46,7 +46,8 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     const todayStr = today.toISOString().split('T')[0];
 
     return orders.filter(o => {
-      if (o.paymentStatus !== 'Paid') return false;
+      // Exclude void, refunded, and unpaid transactions from sales reports
+      if (o.paymentStatus === 'Void' || o.paymentStatus === 'Refunded' || o.paymentStatus === 'Not Paid') return false;
 
       const orderDate = new Date(o.date);
 
@@ -73,18 +74,24 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   // Calculate metrics from filtered orders
   const filteredOrders = getFilteredOrders(dateFilter);
-  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
+  // Only include paid and partially refunded transactions (exclude void, fully refunded, and not paid)
+  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded');
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.amountNumber, 0);
   const todayOrders = paidOrders.filter(o => o.date === new Date().toISOString().split('T')[0]);
   const todayRevenue = todayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
   const filteredRevenue = filteredOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
-  const dineInOrders = filteredOrders.filter(o => o.type === 'Dine-In' || o.type === 'Mixed');
-  const takeoutOrders = filteredOrders.filter(o => o.type === 'Takeout');
+  // Calculate payment method breakdown
+  const cashOrders = filteredOrders.filter(o => o.paymentMethod === 'Cash');
+  const cardOrders = filteredOrders.filter(o => o.paymentMethod === 'Card');
+  const gcashOrders = filteredOrders.filter(o => o.paymentMethod === 'GCash');
+  const paymayaOrders = filteredOrders.filter(o => o.paymentMethod === 'PayMaya');
 
-  const dineInRevenue = dineInOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-  const takeoutRevenue = takeoutOrders.reduce((sum, order) => sum + order.amountNumber, 0);
+  const cashRevenue = cashOrders.reduce((sum, order) => sum + order.amountNumber, 0);
+  const cardRevenue = cardOrders.reduce((sum, order) => sum + order.amountNumber, 0);
+  const gcashRevenue = gcashOrders.reduce((sum, order) => sum + order.amountNumber, 0);
+  const paymayaRevenue = paymayaOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
   // Generate daily sales data from real orders (last 7 days)
   const generateDailySalesData = () => {
@@ -112,10 +119,12 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   const dailySalesData = generateDailySalesData();
 
-  const orderTypeData = [
-    { id: 'order-dinein', name: 'Dine-In', value: dineInOrders.length, revenue: dineInRevenue },
-    { id: 'order-takeout', name: 'Takeout', value: takeoutOrders.length, revenue: takeoutRevenue },
-  ];
+  const paymentMethodData = [
+    { id: 'payment-cash', name: 'Cash', value: cashOrders.length, revenue: cashRevenue },
+    { id: 'payment-card', name: 'Card', value: cardOrders.length, revenue: cardRevenue },
+    { id: 'payment-gcash', name: 'GCash', value: gcashOrders.length, revenue: gcashRevenue },
+    { id: 'payment-paymaya', name: 'PayMaya', value: paymayaOrders.length, revenue: paymayaRevenue },
+  ].filter(p => p.value > 0);
 
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
 
@@ -229,7 +238,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   const totalDiscountGiven = filteredOrders.reduce((sum, order) => sum + (order.discount || 0), 0);
   const totalTaxCollected = filteredOrders.reduce((sum, order) => sum + (order.tax || 0), 0);
-  const totalServiceFees = filteredOrders.reduce((sum, order) => sum + (order.serviceFee || 0), 0);
+  const averageOrderValue = filteredOrders.length > 0 ? filteredRevenue / filteredOrders.length : 0;
 
   const handlePrint = () => {
     window.print();
@@ -237,7 +246,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="reports" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
+      <Sidebar currentPage="retail-reports" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeType={storeType} staffType={staffType} storeBrand={storeBrand} userName={userName} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">
@@ -291,15 +300,15 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Service Fees</p>
+                <p className="text-sm text-muted-foreground">Avg Order Value</p>
                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                   <PesoIcon className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-primary mb-1">₱{totalServiceFees.toFixed(2)}</h2>
+              <h2 className="text-2xl font-bold text-primary mb-1">₱{averageOrderValue.toFixed(2)}</h2>
               <div className="flex items-center text-xs text-blue-600">
-                <TrendingUp className="w-3 h-3 mr-1" />
-                <span>1% of subtotals</span>
+                <ShoppingCart className="w-3 h-3 mr-1" />
+                <span>Per transaction</span>
               </div>
             </div>
 
@@ -360,15 +369,11 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
             </div>
 
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-              <h3 className="text-lg font-medium text-primary mb-4">Payment Summary</h3>
+              <h3 className="text-lg font-medium text-primary mb-4">Sales Summary</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-3 border-b border-border">
                   <span className="text-sm text-muted-foreground">Gross Sales</span>
                   <span className="font-medium">₱{(filteredRevenue + totalDiscountGiven).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between items-center pb-3 border-b border-border">
-                  <span className="text-sm text-muted-foreground">Service Fees (1%)</span>
-                  <span className="font-medium text-blue-600">₱{totalServiceFees.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b border-border">
                   <span className="text-sm text-muted-foreground">Discounts Given</span>
@@ -377,6 +382,10 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                 <div className="flex justify-between items-center pb-3 border-b border-border">
                   <span className="text-sm text-muted-foreground">Tax Collected (12%)</span>
                   <span className="font-medium">₱{totalTaxCollected.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center pb-3 border-b border-border">
+                  <span className="text-sm text-muted-foreground">Total Orders</span>
+                  <span className="font-medium">{filteredOrders.length}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2">
                   <span className="font-medium">Net Revenue</span>
@@ -410,12 +419,12 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
             </div>
 
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-              <h3 className="text-lg font-medium text-primary mb-4">Dine-In vs Takeout Sales</h3>
+              <h3 className="text-lg font-medium text-primary mb-4">Payment Method Breakdown</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    key="order-type-pie"
-                    data={orderTypeData}
+                    key="payment-method-pie"
+                    data={paymentMethodData}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
@@ -424,7 +433,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {orderTypeData.map((entry, index) => (
+                    {paymentMethodData.map((entry, index) => (
                       <Cell key={entry.id} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -432,14 +441,12 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Dine-In Revenue:</span>
-                  <span className="font-medium">₱{dineInRevenue.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Takeout Revenue:</span>
-                  <span className="font-medium">₱{takeoutRevenue.toFixed(2)}</span>
-                </div>
+                {paymentMethodData.map(method => (
+                  <div key={method.id} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{method.name} Revenue:</span>
+                    <span className="font-medium">₱{method.revenue.toFixed(2)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -560,7 +567,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                       Customer
                     </th>
                     <th className="px-6 py-3.5 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest">
-                      Type
+                      Payment
                     </th>
                     <th className="px-6 py-3.5 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest">
                       Date
@@ -580,15 +587,17 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                         {order.orderNumber || order.id}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {order.customer}
+                        {order.customer || 'Walk-in Customer'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                          order.type === 'Dine-In' ? 'bg-green-100 text-green-800' :
-                          order.type === 'Takeout' ? 'bg-blue-100 text-blue-800' :
-                          'bg-purple-100 text-purple-800'
+                          order.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' :
+                          order.paymentMethod === 'Card' ? 'bg-blue-100 text-blue-800' :
+                          order.paymentMethod === 'GCash' ? 'bg-purple-100 text-purple-800' :
+                          order.paymentMethod === 'PayMaya' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
                         }`}>
-                          {order.type}
+                          {order.paymentMethod || 'N/A'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
@@ -613,3 +622,5 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     </div>
   );
 }
+
+

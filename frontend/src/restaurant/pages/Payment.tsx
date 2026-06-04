@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
-import { Page } from '../../shared/App';
+import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { CreditCard, Wallet, Banknote } from 'lucide-react';
 
 interface PaymentProps {
   onNavigate: (page: Page) => void;
   currentOrder: any;
+  onLogout: () => void;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
-export function Payment({ onNavigate, currentOrder }: PaymentProps) {
+export function Payment({ onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: PaymentProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'ewallet'>('cash');
   const [paymentTiming, setPaymentTiming] = useState<'now' | 'later'>('now');
 
@@ -18,7 +24,7 @@ export function Payment({ onNavigate, currentOrder }: PaymentProps) {
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">

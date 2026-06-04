@@ -3,6 +3,11 @@ import { LoginPage } from '../auth/pages/LoginPage';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SuperadminDashboard } from '../superadmin/pages/SuperadminDashboard';
 import { RetailDashboard } from '../retail/pages/RetailDashboard';
+import { RetailOrderProvider } from '../retail/context/RetailOrderContext';
+import { RetailPOSDashboard } from '../retail/pages/RetailPOSDashboard';
+import { RetailCreateOrder } from '../retail/pages/RetailCreateOrder';
+import { RetailOrderList } from '../retail/pages/RetailOrderList';
+import { RetailReports } from '../retail/pages/RetailReports';
 import { InventoryDashboard } from '../restaurant/pages/InventoryDashboard';
 import { POSDashboard } from '../restaurant/pages/POSDashboard';
 import { CreateOrder } from '../restaurant/pages/CreateOrder';
@@ -24,6 +29,9 @@ export type Page =
   | 'retail-dashboard'
   | 'retail-pos-dashboard'
   | 'retail-inventory-dashboard'
+  | 'retail-sales'
+  | 'retail-transactions'
+  | 'retail-reports'
   | 'inventory-dashboard'
   | 'pos-dashboard'
   | 'create-order'
@@ -37,6 +45,13 @@ export type Page =
 export interface StoreBrand {
   name: string | null;
   logo: string | null;
+  business_description?: string | null;
+  address?: string | null;
+  contact_number?: string | null;
+  email?: string | null;
+  receipt_thank_you_message?: string | null;
+  receipt_footer_message?: string | null;
+  operating_hours?: string | null;
 }
 
 export default function App() {
@@ -47,7 +62,7 @@ export default function App() {
 
   useEffect(() => {
     const loadStoreBrand = async () => {
-      if (!currentUser?.id || currentUser.role !== 'ADMIN') {
+      if (!currentUser?.id || currentUser.role === 'SUPERADMIN') {
         setStoreBrand({ name: null, logo: null });
         return;
       }
@@ -60,6 +75,13 @@ export default function App() {
           setStoreBrand({
             name: data.business_name ?? currentUser.store_name ?? null,
             logo: data.logo ?? null,
+            business_description: data.business_description ?? null,
+            address: data.address ?? null,
+            contact_number: data.contact_number ?? null,
+            email: data.email ?? null,
+            receipt_thank_you_message: data.receipt_thank_you_message ?? null,
+            receipt_footer_message: data.receipt_footer_message ?? null,
+            operating_hours: data.operating_hours ?? null,
           });
         }
       } catch {
@@ -79,7 +101,7 @@ export default function App() {
     }
 
     if (user.role === 'ADMIN' && user.store_type === 'RETAIL_STORE') {
-      setCurrentPage('retail-dashboard');
+      setCurrentPage('retail-pos-dashboard');
       return;
     }
 
@@ -140,37 +162,82 @@ export default function App() {
             <AdminDashboard currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
           {currentPage === 'retail-dashboard' && (
-            <RetailDashboard currentUser={currentUser} onLogout={handleLogout} />
+            <RetailDashboard currentUser={currentUser} onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
-          {currentPage === 'retail-pos-dashboard' && (
-            <RetailDashboard title="Retail POS Dashboard" roleLabel="Retail POS Staff" currentUser={currentUser} onLogout={handleLogout} />
+          {(currentPage === 'retail-pos-dashboard' || currentPage === 'retail-sales' || currentPage === 'retail-transactions' || currentPage === 'retail-reports') && (
+            <RetailOrderProvider>
+              {currentPage === 'retail-pos-dashboard' && (
+                <RetailPOSDashboard
+                  onLogout={handleLogout}
+                  onNavigate={navigateTo}
+                  isAdmin={currentUser?.role === 'ADMIN'}
+                  storeBrand={storeBrand}
+                  userName={currentUser?.full_name}
+                  storeType={currentUser?.store_type}
+                  staffType={currentUser?.staff_type}
+                />
+              )}
+              {currentPage === 'retail-sales' && (
+                <RetailCreateOrder
+                  onNavigate={navigateTo}
+                  onOrderCreated={setCurrentOrder}
+                  onLogout={handleLogout}
+                  storeBrand={storeBrand}
+                  userName={currentUser?.full_name}
+                  storeType={currentUser?.store_type}
+                  staffType={currentUser?.staff_type}
+                />
+              )}
+              {currentPage === 'retail-transactions' && (
+                <RetailOrderList
+                  onNavigate={navigateTo}
+                  onLogout={handleLogout}
+                  isAdmin={currentUser?.role === 'ADMIN'}
+                  storeBrand={storeBrand}
+                  userName={currentUser?.full_name}
+                  storeType={currentUser?.store_type}
+                  staffType={currentUser?.staff_type}
+                />
+              )}
+              {currentPage === 'retail-reports' && (
+                <RetailReports
+                  onNavigate={navigateTo}
+                  onLogout={handleLogout}
+                  isAdmin={currentUser?.role === 'ADMIN'}
+                  storeBrand={storeBrand}
+                  userName={currentUser?.full_name}
+                  storeType={currentUser?.store_type}
+                  staffType={currentUser?.staff_type}
+                />
+              )}
+            </RetailOrderProvider>
           )}
           {currentPage === 'retail-inventory-dashboard' && (
-            <RetailDashboard title="Retail Inventory Dashboard" roleLabel="Retail Inventory Staff" currentUser={currentUser} onLogout={handleLogout} />
+            <RetailDashboard title="Retail Inventory Dashboard" roleLabel="Retail Inventory Staff" currentUser={currentUser} onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'inventory-dashboard' && (
-            <InventoryDashboard onLogout={handleLogout} />
+            <InventoryDashboard onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'pos-dashboard' && (
-            <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
+            <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'create-order' && (
-            <CreateOrder onNavigate={navigateTo} onOrderCreated={setCurrentOrder} />
+            <CreateOrder onNavigate={navigateTo} onOrderCreated={setCurrentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'table-management' && (
-            <TableManagement onNavigate={navigateTo} currentOrder={currentOrder} />
+            <TableManagement onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'payment' && (
-            <Payment onNavigate={navigateTo} currentOrder={currentOrder} />
+            <Payment onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'receipt' && (
-            <Receipt onNavigate={navigateTo} currentOrder={currentOrder} />
+            <Receipt onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'order-list' && (
-            <OrderList onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
+            <OrderList onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'reports' && (
-            <Reports onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} />
+            <Reports onNavigate={navigateTo} onLogout={handleLogout} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'store-information' && (
             <StoreInformation

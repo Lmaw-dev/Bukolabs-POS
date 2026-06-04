@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
-import { Page } from '../../shared/App';
+import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
@@ -13,6 +14,11 @@ import freshLemonadeImg from '../../imports/image-7.png';
 interface CreateOrderProps {
   onNavigate: (page: Page) => void;
   onOrderCreated: (order: any) => void;
+  onLogout: () => void;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
 interface Ingredient {
@@ -250,7 +256,7 @@ function toOrderListFormat(order: any, paid: boolean) {
   };
 }
 
-export function CreateOrder({ onNavigate, onOrderCreated }: CreateOrderProps) {
+export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType, staffType }: CreateOrderProps) {
   const { addOrder, orders } = useOrders();
   const { tables } = useTables();
   const orderNumberRef = useRef(100001); // Start from 100001
@@ -718,7 +724,7 @@ export function CreateOrder({ onNavigate, onOrderCreated }: CreateOrderProps) {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-gray-50">
         <div className="p-5">
@@ -2078,6 +2084,7 @@ export function CreateOrder({ onNavigate, onOrderCreated }: CreateOrderProps) {
                 total={successOrderDetails.total}
                 cashReceived={successOrderDetails.cashReceived}
                 changeGiven={successOrderDetails.changeGiven}
+                storeBrand={storeBrand}
               />
 
               {/* Actions */}

@@ -12,4 +12,12 @@ export class SuperadminService {
   createAdminAccount(input: { fullName: string; email: string; storeType: 'RESTAURANT' | 'RETAIL_STORE'; password?: string }) {
     return this.databaseService.createAdminAccount(input);
   }
+
+  updateAdminAccount(input: { adminUserId: number; fullName: string; email: string; storeType: 'RESTAURANT' | 'RETAIL_STORE'; password?: string }) {
+    return this.databaseService.updateAdminAccount(input);
+  }
+
+  deleteAdminAccount(adminUserId: number) {
+    return this.databaseService.deleteAdminAccount(adminUserId);
+  }
 }

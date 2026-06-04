@@ -19,6 +19,21 @@ export class AdminService {
     return this.databaseService.createStaffAccount(input);
   }
 
+  updateStaff(input: {
+    adminUserId: number;
+    staffUserId: number;
+    fullName: string;
+    email: string;
+    password?: string;
+    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+  }) {
+    return this.databaseService.updateStaffAccountForAdmin(input);
+  }
+
+  deleteStaff(input: { adminUserId: number; staffUserId: number }) {
+    return this.databaseService.deleteStaffAccountForAdmin(input);
+  }
+
   getStoreInformation(adminUserId: number) {
     return this.databaseService.getStoreInformationForAdmin(adminUserId);
   }

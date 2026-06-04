@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { X, Search, Eye, CreditCard, Printer, RotateCcw, CheckCircle, ChevronDown, Download, Users } from 'lucide-react';
 import { useOrders, Order } from '../../shared/context/OrderContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
@@ -11,6 +12,8 @@ interface OrderListProps {
   isAdmin?: boolean;
   storeBrand?: StoreBrand;
   userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
 type ActiveModal = 'details' | 'payment' | 'payment-success' | 'receipt' | 'refund' | null;
@@ -23,7 +26,7 @@ function generateId(prefix: string) {
   return `${prefix}-${Date.now().toString().slice(-6)}`;
 }
 
-export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName }: OrderListProps) {
+export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: OrderListProps) {
   const { orders, updateOrder, removeOrder, completePayment } = useOrders();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -133,7 +136,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar currentPage="order-list" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} />
+      <Sidebar currentPage="order-list" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto p-8">
         {/* Header */}
@@ -675,6 +678,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               time={selectedOrder.time}
               receiptId={selectedOrder.receiptId || currentReceiptId}
               paymentId={selectedOrder.paymentId || currentPaymentId}
+              storeBrand={storeBrand}
             />
 
             {/* Actions */}

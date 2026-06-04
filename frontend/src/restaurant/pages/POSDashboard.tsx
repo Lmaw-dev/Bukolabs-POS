@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,9 +13,11 @@ interface POSDashboardProps {
   isAdmin?: boolean;
   storeBrand?: StoreBrand;
   userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
-export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName }: POSDashboardProps) {
+export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType, staffType }: POSDashboardProps) {
   const { orders, queuedOrders } = useOrders();
   const { tables, getAvailableTablesCount } = useTables();
   const [dateFilter, setDateFilter] = useState('this-month');
@@ -137,7 +140,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="pos-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} />
+      <Sidebar currentPage="pos-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-6">

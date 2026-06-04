@@ -1,3 +1,8 @@
+import { Boxes, ShoppingBag } from 'lucide-react';
+import { Sidebar } from '../../shared/components/Sidebar';
+import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
+
 interface RetailDashboardProps {
   title?: string;
   roleLabel?: string;
@@ -10,9 +15,62 @@ interface RetailDashboardProps {
     store_name: string | null;
   } | null;
   onLogout: () => void;
+  onNavigate?: (page: Page) => void;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
-export function RetailDashboard({ title = 'Retail Dashboard', roleLabel = 'Retail Admin', currentUser, onLogout }: RetailDashboardProps) {
+export function RetailDashboard({
+  title = 'Retail Dashboard',
+  roleLabel = 'Retail Admin',
+  currentUser,
+  onLogout,
+  onNavigate,
+  storeBrand,
+  userName,
+  storeType = 'RETAIL_STORE',
+  staffType,
+}: RetailDashboardProps) {
+  if (onNavigate) {
+    const isInventoryStaff = staffType === 'INVENTORY_STAFF';
+
+    return (
+      <div className="flex h-screen">
+        <Sidebar
+          currentPage={isInventoryStaff ? 'retail-inventory-dashboard' : 'retail-pos-dashboard'}
+          onNavigate={onNavigate}
+          onLogout={onLogout}
+          storeBrand={storeBrand}
+          userName={userName ?? currentUser?.full_name}
+          storeType={storeType}
+          staffType={staffType}
+        />
+
+        <div className="flex-1 overflow-auto bg-background">
+          <main className="p-8">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {isInventoryStaff ? <Boxes className="h-5 w-5" /> : <ShoppingBag className="h-5 w-5" />}
+              </div>
+              <div>
+                <h1 className="text-primary">{title}</h1>
+                <p className="text-sm text-muted-foreground">{roleLabel}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground">Store</p>
+              <h2 className="mt-2 text-xl text-primary">{storeBrand?.name ?? currentUser?.store_name ?? 'Retail Store'}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Signed in as {userName ?? currentUser?.full_name ?? 'Retail Staff'}</p>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 p-6 text-slate-100 md:p-10">
       <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">

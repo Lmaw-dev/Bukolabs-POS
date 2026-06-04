@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { AuthenticatedUser } from '../types/auth';
 import { login } from '../services/auth';
-import { User, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, AlertCircle, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 interface LoginPageProps {
   onLogin: (user: AuthenticatedUser) => void;
@@ -36,48 +36,44 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
+      className="min-h-screen flex items-center justify-center relative overflow-hidden px-4"
       style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
+        background: 'linear-gradient(135deg, #0f172a 0%, #162033 45%, #0f172a 100%)'
       }}
     >
       {/* Decorative background elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/40 to-transparent" />
+        <div className="absolute left-1/2 top-20 h-64 w-[42rem] -translate-x-1/2 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 bg-cyan-400/5 blur-3xl" />
       </div>
 
       {/* Glass-morphism login card */}
       <div
-        className="relative z-10 rounded-2xl shadow-2xl p-8 w-full max-w-md backdrop-blur-xl"
+        className="relative z-10 w-full max-w-md rounded-2xl p-8 shadow-2xl backdrop-blur-xl"
         style={{
-          background: 'rgba(255,255,255,0.05)',
+          background: 'rgba(255,255,255,0.06)',
           border: '1px solid rgba(255,255,255,0.08)'
         }}
       >
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center mb-4">
-            <div
-              className="flex h-32 w-32 items-center justify-center rounded-3xl border border-white/10 text-2xl font-semibold tracking-[0.3em] text-emerald-300"
-              style={{ background: 'rgba(255,255,255,0.04)' }}
-            >
-              NNS
-            </div>
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+            <ShieldCheck className="h-6 w-6" />
           </div>
           <h1
-            className="text-[28px] mb-2"
+            className="mb-2 text-[28px]"
             style={{
               color: '#f1f5f9',
               fontFamily: 'Montserrat, sans-serif',
               fontWeight: 700,
-              letterSpacing: '0.02em'
+              letterSpacing: 0
             }}
           >
-            N&Ns POS System
+            Sign In
           </h1>
-          <p className="text-sm" style={{ color: '#64748b' }}>
-            Sign in to continue
+          <p className="text-sm" style={{ color: '#94a3b8' }}>
+            Log in to continue
           </p>
         </div>
 
@@ -203,64 +199,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             {isSubmitting ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Demo credentials */}
-        <div
-          className="mt-6 p-4 rounded-xl"
-          style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)'
-          }}
-        >
-          <p
-            className="text-xs mb-3"
-            style={{ color: '#475569' }}
-          >
-            Demo Accounts
-          </p>
-
-          <div className="space-y-2">
-            {/* Superadmin pill */}
-            <div
-              className="flex items-center justify-between p-3 rounded-lg"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: '#7c3aed' }}
-                />
-                <span className="text-sm" style={{ color: '#94a3b8' }}>Superadmin</span>
-              </div>
-              <div className="text-xs" style={{ color: '#475569' }}>
-                superadmin@email.com / password
-              </div>
-            </div>
-
-            {/* POS staff pill */}
-            <div
-              className="flex items-center justify-between p-3 rounded-lg"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: '#0284c7' }}
-                />
-                <span className="text-sm" style={{ color: '#94a3b8' }}>POS Staff</span>
-              </div>
-              <div className="text-xs" style={{ color: '#475569' }}>
-                staff@email.com / password
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

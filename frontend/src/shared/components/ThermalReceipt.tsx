@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import type { StoreBrand } from '../App';
 
 interface ReceiptItem {
   name: string;
@@ -25,6 +26,7 @@ interface ThermalReceiptProps {
   time?: string;
   receiptId?: string;
   paymentId?: string;
+  storeBrand?: StoreBrand;
 }
 
 export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
@@ -47,6 +49,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       time,
       receiptId,
       paymentId,
+      storeBrand,
     },
     ref
   ) => {
@@ -66,9 +69,18 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       >
         {/* Header */}
         <div className="text-center mb-4">
-          <p className="text-sm" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>N&Ns RESTAURANT</p>
-          <p className="text-xs text-gray-500">123 Restaurant Ave., Manila, PH</p>
-          <p className="text-xs text-gray-500">Tel: (02) 8123-4567</p>
+          {storeBrand?.logo && (
+            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center">
+              <img src={storeBrand.logo} alt={storeBrand.name ?? 'Store logo'} className="h-full w-full object-contain" />
+            </div>
+          )}
+          <p className="text-sm" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>{storeBrand?.name || 'N&Ns RESTAURANT'}</p>
+          {storeBrand?.business_description && <p className="mt-1 text-xs text-gray-500">{storeBrand.business_description}</p>}
+          <p className="text-xs text-gray-500">{storeBrand?.address || '123 Restaurant Ave., Manila, PH'}</p>
+          {(storeBrand?.contact_number || storeBrand?.email) && (
+            <p className="text-xs text-gray-500">{[storeBrand.contact_number, storeBrand.email].filter(Boolean).join(' | ')}</p>
+          )}
+          {storeBrand?.operating_hours && <p className="text-xs text-gray-500">{storeBrand.operating_hours}</p>}
           <div className="border-t border-dashed border-gray-300 my-3" />
           <p className="text-xs text-gray-600" style={{ fontWeight: 700 }}>OFFICIAL RECEIPT</p>
         </div>
@@ -206,9 +218,9 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
         </div>
 
         <div className="border-t border-dashed border-gray-300 mt-4 pt-3 text-center">
-          <p className="text-xs text-gray-400">Thank you for dining with us!</p>
-          <p className="text-xs text-gray-400">Please come again.</p>
-          <p className="text-xs text-gray-300 mt-1">— N&Ns POS System —</p>
+          <p className="text-xs text-gray-400">{storeBrand?.receipt_thank_you_message || 'Thank you for dining with us!'}</p>
+          <p className="text-xs text-gray-400">{storeBrand?.receipt_footer_message || 'Please come again.'}</p>
+          <p className="text-xs text-gray-300 mt-1">{storeBrand?.name || 'N&Ns POS System'}</p>
         </div>
       </div>
     );

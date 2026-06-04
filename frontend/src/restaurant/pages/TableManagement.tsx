@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
-import { Page } from '../../shared/App';
+import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { Clock, Edit2, X, Users, Bell, CheckCircle, MoreVertical, Save, Plus, Trash2, History, Eye, CreditCard } from 'lucide-react';
 import { useOrders, Order } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
@@ -9,9 +10,14 @@ import { TableAssignmentNotification } from '../../shared/components/TableAssign
 interface TableManagementProps {
   onNavigate: (page: Page) => void;
   currentOrder: any;
+  onLogout: () => void;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
-export function TableManagement({ onNavigate, currentOrder }: TableManagementProps) {
+export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: TableManagementProps) {
   const { orders, updateOrder, queuedOrders, removeFromQueue } = useOrders();
   const {
     tables: contextTables,
@@ -223,7 +229,7 @@ export function TableManagement({ onNavigate, currentOrder }: TableManagementPro
 
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="table-management" onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+      <Sidebar currentPage="table-management" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-background p-8">
         <h1 className="text-primary mb-6">Table Management</h1>

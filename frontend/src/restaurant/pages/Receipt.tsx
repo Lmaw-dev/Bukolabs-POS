@@ -1,17 +1,23 @@
 import { Sidebar } from '../../shared/components/Sidebar';
-import { Page } from '../../shared/App';
+import { Page, type StoreBrand } from '../../shared/App';
+import type { StaffType, StoreType } from '../../auth/types/auth';
 import { Printer } from 'lucide-react';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 
 interface ReceiptProps {
   onNavigate: (page: Page) => void;
   currentOrder: any;
+  onLogout: () => void;
+  storeBrand?: StoreBrand;
+  userName?: string | null;
+  storeType?: StoreType;
+  staffType?: StaffType;
 }
 
-export function Receipt({ onNavigate, currentOrder }: ReceiptProps) {
+export function Receipt({ onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: ReceiptProps) {
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={() => onNavigate('login')} />
+      <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">
@@ -40,6 +46,7 @@ export function Receipt({ onNavigate, currentOrder }: ReceiptProps) {
                 time={currentOrder?.time}
                 receiptId={currentOrder?.receiptId}
                 paymentId={currentOrder?.paymentId}
+                storeBrand={storeBrand}
               />
             </div>
 

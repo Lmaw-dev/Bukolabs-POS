@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { getApiBaseUrl } from '../../auth/services/auth';
+import { Pencil, Trash2, UserPlus } from 'lucide-react';
 
 interface AdminSummary {
   id: number;
@@ -22,6 +23,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState<AdminSummary | null>(null);
+  const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
   const [createError, setCreateError] = useState('');
   const [createdPassword, setCreatedPassword] = useState('');
   const [formFullName, setFormFullName] = useState('');
@@ -57,8 +60,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
     setCreatedPassword('');
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins`, {
-        method: 'POST',
+      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins${editingAdmin ? `/${editingAdmin.id}` : ''}`, {
+        method: editingAdmin ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           full_name: formFullName,
@@ -70,19 +73,68 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message ?? 'Unable to create admin account.');
+        throw new Error(data?.message ?? 'Unable to save admin account.');
       }
 
-      setAdmins((current) => [...current, data.user]);
-      setCreatedPassword(data.temporary_password || formPassword);
+      setAdmins((current) => editingAdmin ? current.map((admin) => (admin.id === data.id ? data : admin)) : [...current, data.user]);
+      if (!editingAdmin) {
+        setCreatedPassword(data.temporary_password || formPassword);
+      }
+      setEditingAdmin(null);
       setFormFullName('');
       setFormEmail('');
       setFormPassword('');
       setFormStoreType('RESTAURANT');
     } catch (createAdminError) {
-      setCreateError(createAdminError instanceof Error ? createAdminError.message : 'Unable to create admin account.');
+      setCreateError(createAdminError instanceof Error ? createAdminError.message : 'Unable to save admin account.');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleEditAdmin = (admin: AdminSummary) => {
+    setEditingAdmin(admin);
+    setFormFullName(admin.full_name);
+    setFormEmail(admin.email);
+    setFormPassword('');
+    setFormStoreType(admin.store_type === 'RETAIL_STORE' ? 'RETAIL_STORE' : 'RESTAURANT');
+    setCreateError('');
+    setCreatedPassword('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAdmin(null);
+    setFormFullName('');
+    setFormEmail('');
+    setFormPassword('');
+    setFormStoreType('RESTAURANT');
+    setCreateError('');
+    setCreatedPassword('');
+  };
+
+  const handleDeleteAdmin = async (admin: AdminSummary) => {
+    if (!window.confirm(`Delete ${admin.full_name}?`)) {
+      return;
+    }
+
+    setDeletingAdminId(admin.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins/${admin.id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to delete admin account.');
+      }
+
+      setAdmins((current) => current.filter((item) => item.id !== admin.id));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete admin account.');
+    } finally {
+      setDeletingAdminId(null);
     }
   };
 
@@ -128,8 +180,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
 
         <form onSubmit={handleCreateAdmin} className="rounded-3xl border border-white/10 bg-white/5 p-6">
           <div>
-            <h2 className="text-xl font-semibold">Create Admin Account</h2>
-            <p className="text-sm text-slate-400">Select the store type and generate an account that can log in immediately.</p>
+            <h2 className="text-xl font-semibold">{editingAdmin ? 'Edit Admin Account' : 'Create Admin Account'}</h2>
+            <p className="text-sm text-slate-400">Select the store type and manage the account that can log in immediately.</p>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -158,7 +210,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 type="password"
                 value={formPassword}
                 onChange={(event) => setFormPassword(event.target.value)}
-                placeholder="Leave blank to generate"
+                placeholder={editingAdmin ? 'Leave blank to keep current password' : 'Leave blank to generate'}
                 className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
               />
             </label>
@@ -178,13 +230,25 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           {createError && <p className="mt-4 rounded-xl border border-rose-400/20 bg-rose-400/10 p-3 text-sm text-rose-200">{createError}</p>}
           {createdPassword && <p className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-3 text-sm text-emerald-200">Admin created. Login password: {createdPassword}</p>}
 
-          <button
-            type="submit"
-            disabled={creating}
-            className="mt-5 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {creating ? 'Creating...' : 'Create Admin'}
-          </button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="submit"
+              disabled={creating}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <UserPlus className="h-4 w-4" />
+              {creating ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin'}
+            </button>
+            {editingAdmin && (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="rounded-xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -215,12 +279,13 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                     <th className="px-4 py-3 font-medium">Email</th>
                     <th className="px-4 py-3 font-medium">Store Type</th>
                     <th className="px-4 py-3 font-medium">Store</th>
+                    <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {admins.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-slate-400">
+                      <td colSpan={5} className="px-4 py-6 text-slate-400">
                         No admin accounts were returned by the database yet.
                       </td>
                     </tr>
@@ -231,6 +296,27 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                         <td className="px-4 py-3 text-slate-300">{admin.email}</td>
                         <td className="px-4 py-3 text-slate-300">{admin.store_type ?? 'Unassigned'}</td>
                         <td className="px-4 py-3 text-slate-300">{admin.store_name ?? 'Unassigned'}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditAdmin(admin)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-white/10"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAdmin(admin)}
+                              disabled={deletingAdminId === admin.id}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-400/20 px-3 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-400/10 disabled:opacity-60"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {deletingAdminId === admin.id ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}

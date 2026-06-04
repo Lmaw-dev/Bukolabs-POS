@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Sidebar } from './Sidebar';
-import { UserPlus, X } from 'lucide-react';
+import { Pencil, Trash2, UserPlus, X } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser, StaffType } from '../../auth/types/auth';
@@ -28,6 +28,8 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<number | null>(null);
 
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -61,10 +63,21 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   }, [currentUser?.id]);
 
   const handleAddUser = () => {
+    setEditingUser(null);
     setFormName('');
     setFormEmail('');
     setFormPassword('');
     setFormStaffType('POS_STAFF');
+    setError('');
+    setShowModal(true);
+  };
+
+  const handleEditUser = (user: StaffUser) => {
+    setEditingUser(user);
+    setFormName(user.full_name);
+    setFormEmail(user.email);
+    setFormPassword('');
+    setFormStaffType(user.staff_type ?? 'POS_STAFF');
     setError('');
     setShowModal(true);
   };
@@ -81,14 +94,14 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     setError('');
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/admin/staff`, {
-        method: 'POST',
+      const response = await fetch(`${getApiBaseUrl()}/admin/staff${editingUser ? `/${editingUser.id}` : ''}`, {
+        method: editingUser ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           admin_user_id: currentUser.id,
           full_name: formName,
           email: formEmail,
-          password: formPassword,
+          password: formPassword || undefined,
           staff_type: formStaffType,
         }),
       });
@@ -98,25 +111,52 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
         throw new Error(data?.message ?? 'Unable to create staff account.');
       }
 
-      setUsers((current) => [...current, data]);
+      setUsers((current) => editingUser ? current.map((user) => (user.id === data.id ? data : user)) : [...current, data]);
       setShowModal(false);
+      setEditingUser(null);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : 'Unable to create staff account.');
+      setError(createError instanceof Error ? createError.message : 'Unable to save staff account.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleDeleteUser = async (user: StaffUser) => {
+    if (!currentUser?.id || !window.confirm(`Delete ${user.full_name}?`)) {
+      return;
+    }
+
+    setDeletingUserId(user.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/admin/staff/${user.id}?admin_user_id=${currentUser.id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to delete staff account.');
+      }
+
+      setUsers((current) => current.filter((staff) => staff.id !== user.id));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete staff account.');
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   return (
     <div className="flex h-screen">
-      <Sidebar currentPage="admin-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} />
+      <Sidebar currentPage="admin-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} />
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h1 className="text-primary mb-2">User Management</h1>
-              <p className="text-muted-foreground">Manage staff accounts for {currentUser?.store_name ?? 'this restaurant store'}</p>
+              <p className="text-muted-foreground">Manage staff accounts for {currentUser?.store_name ?? 'this store'}</p>
             </div>
             <button
               onClick={handleAddUser}
@@ -143,18 +183,19 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                   <th className="px-6 py-4 text-left">Role</th>
                   <th className="px-6 py-4 text-left">Staff Type</th>
                   <th className="px-6 py-4 text-left">Store ID</th>
+                  <th className="px-6 py-4 text-left">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-muted-foreground">
+                    <td colSpan={7} className="px-6 py-8 text-muted-foreground">
                       Loading staff accounts...
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-muted-foreground">
+                    <td colSpan={7} className="px-6 py-8 text-muted-foreground">
                       No staff accounts have been created for this store yet.
                     </td>
                   </tr>
@@ -167,6 +208,27 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                       <td className="px-6 py-4">{user.role}</td>
                       <td className="px-6 py-4">{user.staff_type === 'INVENTORY_STAFF' ? 'Inventory Staff' : 'POS Staff'}</td>
                       <td className="px-6 py-4">{user.store_id}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditUser(user)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-muted"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={deletingUserId === user.id}
+                            className="inline-flex items-center gap-1 rounded-lg border border-destructive/20 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {deletingUserId === user.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -180,8 +242,15 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-primary">Add Staff Account</h3>
-              <button type="button" onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
+              <h3 className="text-primary">{editingUser ? 'Edit Staff Account' : 'Add Staff Account'}</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setEditingUser(null);
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -210,13 +279,13 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                 />
               </div>
               <div>
-                <label className="block mb-2 font-medium">Password <span className="text-red-500">*</span></label>
+                <label className="block mb-2 font-medium">Password {!editingUser && <span className="text-red-500">*</span>}</label>
                 <input
                   type="password"
                   value={formPassword}
                   onChange={(event) => setFormPassword(event.target.value)}
-                  required
-                  placeholder="Enter password"
+                  required={!editingUser}
+                  placeholder={editingUser ? 'Leave blank to keep current password' : 'Enter password'}
                   className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-input-background"
                 />
               </div>
@@ -239,7 +308,10 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
               <div className="flex gap-3 justify-end pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingUser(null);
+                  }}
                   className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
                 >
                   Cancel
@@ -249,7 +321,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                   disabled={submitting}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium disabled:opacity-60"
                 >
-                  {submitting ? 'Creating...' : 'Create Staff'}
+                  {submitting ? 'Saving...' : editingUser ? 'Save Changes' : 'Create Staff'}
                 </button>
               </div>
             </div>
