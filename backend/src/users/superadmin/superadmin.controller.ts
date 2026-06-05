@@ -87,6 +87,11 @@ export class SuperadminController {
     return this.superadminService.deleteAdminAccount(Number(id));
   }
 
+  @Patch('admins/:id/activate')
+  activateAdmin(@Param('id') id: string) {
+    return this.superadminService.activateAdminAccount(Number(id));
+  }
+
   private normalizeStoreType(storeType: CreateAdminDto['store_type']) {
     if (storeType === 'RETAIL') {
       return 'RETAIL_STORE';

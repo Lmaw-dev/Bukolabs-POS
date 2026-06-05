@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Ban,
   ChevronRight,
+  CircleCheck,
   Eye,
   EyeOff,
   KeyRound,
@@ -28,6 +29,7 @@ interface AdminSummary {
   store_id: number | null;
   store_type: string | null;
   store_name: string | null;
+  status?: string | null;
 }
 
 interface SuperadminDashboardProps {
@@ -51,6 +53,13 @@ const storeTypeStyles = (storeType: string | null | undefined) =>
       : 'border-slate-100 bg-slate-50 text-slate-500';
 
 const formatStoreCount = (count: number, total: number) => (total === 0 ? '0 (0%)' : `${count} (${((count / total) * 100).toFixed(1)}%)`);
+
+const isAdminActive = (admin: AdminSummary) => (admin.status ?? 'ACTIVE') === 'ACTIVE';
+
+const statusBadge = (admin: AdminSummary) =>
+  isAdminActive(admin)
+    ? <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+    : <span className="inline-flex rounded bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">Deactivated</span>;
 
 export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboardProps) {
   const [admins, setAdmins] = useState<AdminSummary[]>([]);
@@ -214,10 +223,32 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         throw new Error(data?.message ?? 'Unable to deactivate admin account.');
       }
 
-      setAdmins((current) => current.filter((item) => item.id !== admin.id));
+      setAdmins((current) => current.map((item) => (item.id === admin.id ? { ...item, status: 'INACTIVE' } : item)));
       setAdminActionPreview(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to deactivate admin account.');
+    } finally {
+      setDeletingAdminId(null);
+    }
+  };
+
+  const handleActivateAdmin = async (admin: AdminSummary) => {
+    setDeletingAdminId(admin.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins/${admin.id}/activate`, {
+        method: 'PATCH',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to activate admin account.');
+      }
+
+      setAdmins((current) => current.map((item) => (item.id === admin.id ? { ...item, status: 'ACTIVE' } : item)));
+    } catch (activateError) {
+      setError(activateError instanceof Error ? activateError.message : 'Unable to activate admin account.');
     } finally {
       setDeletingAdminId(null);
     }
@@ -496,7 +527,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                               </td>
                               <td className="px-3 py-3 text-[#475569]">{store.full_name}</td>
                               <td className="px-3 py-3">
-                                <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                                {statusBadge(store)}
                               </td>
                               <td className="px-3 py-3 text-[#64748b]">May 31, 2026</td>
                               <td className="px-3 py-3">
@@ -612,7 +643,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                             </td>
                             <td className="truncate px-3 py-4">{admin.store_name ?? 'Unassigned'}</td>
                             <td className="px-3 py-4">
-                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                              {statusBadge(admin)}
                             </td>
                             <td className="px-3 py-4 text-slate-500">May 31, 2026</td>
                             <td className="px-3 py-4">
@@ -629,15 +660,28 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                                 >
                                   <KeyRound className="h-4 w-4" />
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setAdminActionPreview({ action: 'deactivate-account', admin })}
-                                  className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"
-                                  title="Delete or deactivate account"
-                                  aria-label={`Delete or deactivate ${admin.full_name}`}
-                                >
-                                  <Ban className="h-4 w-4" />
-                                </button>
+                                {isAdminActive(admin) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setAdminActionPreview({ action: 'deactivate-account', admin })}
+                                    className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                    title="Deactivate account"
+                                    aria-label={`Deactivate ${admin.full_name}`}
+                                  >
+                                    <Ban className="h-4 w-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleActivateAdmin(admin)}
+                                    disabled={deletingAdminId === admin.id}
+                                    className="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                                    title="Activate account"
+                                    aria-label={`Activate ${admin.full_name}`}
+                                  >
+                                    <CircleCheck className="h-4 w-4" />
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -770,7 +814,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                               <p className="mt-0.5 text-xs text-slate-500">{store.email}</p>
                             </td>
                             <td className="px-4 py-4">
-                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                              {statusBadge(store)}
                             </td>
                             <td className="px-4 py-4 text-slate-500">May 31, 2026</td>
                             <td className="px-4 py-4">
@@ -826,7 +870,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                               </span>
                             </td>
                             <td className="px-4 py-4">
-                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                              {statusBadge(admin)}
                             </td>
                             <td className="px-4 py-4 text-slate-500">May 31, 2026</td>
                             <td className="px-4 py-4">
@@ -922,7 +966,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Status</p>
-                  <span className="mt-1 inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                  <span className="mt-1 inline-flex">{statusBadge(viewSummaryRecord)}</span>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-500">Date Created</p>
@@ -997,7 +1041,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-xl font-extrabold text-slate-900">
-                  {adminActionPreview.action === 'reset-password' ? 'Reset Password' : 'Delete or Deactivate Account'}
+                  {adminActionPreview.action === 'reset-password' ? 'Reset Password' : 'Deactivate Account'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   {adminActionPreview.action === 'reset-password'
@@ -1028,7 +1072,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             ) : (
               <div className="space-y-4">
                 <div className="rounded-md border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-                  Deactivating prevents this admin from accessing the system. Deleting removes the account record.
+                  Deactivating prevents this admin from accessing the system, but the account remains visible here and can be activated again.
                 </div>
                 <div className="rounded-md border border-slate-200 p-3 text-sm">
                   <p className="font-semibold text-slate-900">{adminActionPreview.admin.full_name}</p>

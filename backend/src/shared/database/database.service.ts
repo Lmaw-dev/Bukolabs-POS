@@ -129,6 +129,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       password_hash: string;
       store_type: string | null;
       store_name: string | null;
+      status: string | null;
     }>(
       `
         SELECT
@@ -140,7 +141,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ${staffTypeSelect},
           u.${this.quoteIdentifier(passwordColumn)} AS password_hash,
           ${storeTypeSelect},
-          ${storeNameSelect}
+          ${storeNameSelect},
+          ${userColumns.statusColumn ? `u.${this.quoteIdentifier(userColumns.statusColumn)} AS status` : `'ACTIVE' AS status`}
         FROM users u
         ${storeJoin}
         WHERE LOWER(u.email) = LOWER($1)
@@ -183,6 +185,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       store_type: string | null;
       store_name: string | null;
       staff_type: 'POS_STAFF' | null;
+      status: string | null;
     }>(
       `
         SELECT
@@ -193,11 +196,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ${userColumns.storeIdColumn ? `u.${this.quoteIdentifier(userColumns.storeIdColumn)} AS store_id` : 'NULL AS store_id'},
           ${storeTypeSelect},
           ${storeNameSelect},
-          ${userColumns.staffTypeColumn ? `u.${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type` : 'NULL AS staff_type'}
+          ${userColumns.staffTypeColumn ? `u.${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type` : 'NULL AS staff_type'},
+          ${userColumns.statusColumn ? `u.${this.quoteIdentifier(userColumns.statusColumn)} AS status` : `'ACTIVE' AS status`}
         FROM users u
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'ADMIN'
-        ${this.activeUsersWhereClause(userColumns)}
         ORDER BY u.id ASC
       `,
     );
@@ -381,37 +384,30 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for admin deletion.');
     }
 
-    if (userColumns.activeColumn) {
-      const deactivatedIds = await this.deactivateAdminAndStoreStaff(adminUserId, admin.store_id, userColumns);
-      return { id: adminUserId, deactivated: true, deleted: false, affected_user_ids: deactivatedIds };
+    const deactivatedIds = await this.deactivateAdminAndStoreStaff(adminUserId, admin.store_id, userColumns);
+    return { id: adminUserId, status: 'INACTIVE', deactivated: true, deleted: false, affected_user_ids: deactivatedIds };
+  }
+
+  async activateAdminAccount(adminUserId: number) {
+    if (!Number.isFinite(adminUserId) || adminUserId <= 0) {
+      throw new BadRequestException('A valid admin user id is required.');
     }
 
-    try {
-      if (admin.store_id && userColumns.storeIdColumn) {
-        await this.query(
-          `
-            DELETE FROM users
-            WHERE ${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
-              AND ${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
-          `,
-          [admin.store_id],
-        );
-      }
+    const admin = await this.getUserStoreScope(adminUserId);
 
-      const rows = await this.hardDeleteUserByRole(adminUserId, 'ADMIN', null, userColumns);
-
-      if (rows.length === 0) {
-        throw new NotFoundException('Admin account was not found.');
-      }
-
-      return { id: rows[0].id, deleted: true, deactivated: false };
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
-      this.handleDatabaseWriteError(error, 'Unable to remove admin account.');
+    if (admin.role !== 'ADMIN') {
+      throw new NotFoundException('Admin account was not found.');
     }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.statusColumn || !userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required status columns.');
+    }
+
+    const activatedIds = await this.activateAdminAndStoreStaff(adminUserId, admin.store_id, userColumns);
+    return { id: adminUserId, status: 'ACTIVE', activated: true, affected_user_ids: activatedIds };
   }
 
   async listStaffForAdmin(adminUserId: number) {
@@ -448,11 +444,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
           AND u.${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
-<<<<<<< HEAD
           ${userColumns.staffTypeColumn ? `AND u.${this.quoteIdentifier(userColumns.staffTypeColumn)} = 'POS_STAFF'` : ''}
-=======
-        ${this.activeUsersWhereClause(userColumns)}
->>>>>>> 97402b2a667932cf7ad0f55387450540e08e0766
+          ${this.activeUsersWhereClause(userColumns)}
         ORDER BY u.id ASC
       `,
       [admin.store_id],
@@ -617,14 +610,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for staff deletion.');
     }
 
-    if (userColumns.activeColumn) {
+    if (userColumns.statusColumn) {
       const rows = await this.deactivateStaffForStore(input.staffUserId, admin.store_id, userColumns);
 
       if (rows.length === 0) {
         throw new NotFoundException('Staff account was not found for this store.');
       }
 
-      return { id: rows[0].id, deactivated: true, deleted: false };
+      return { id: rows[0].id, status: 'INACTIVE', deactivated: true, deleted: false };
     }
 
     try {
@@ -1217,16 +1210,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       storeIdColumn: pick(['store_id']),
       staffTypeColumn: pick(['staff_type']),
       passwordColumn: pick(['hashed_password', 'password_hash', 'password']),
-      activeColumn: pick(['is_active']),
+      statusColumn: pick(['status']),
     };
   }
 
-  private activeUsersWhereClause(userColumns: { activeColumn: string | null }, alias = 'u') {
-    if (!userColumns.activeColumn) {
+  private activeUsersWhereClause(userColumns: { statusColumn: string | null }, alias = 'u') {
+    if (!userColumns.statusColumn) {
       return '';
     }
 
-    return ` AND COALESCE(${alias}.${this.quoteIdentifier(userColumns.activeColumn)}, TRUE) = TRUE`;
+    return ` AND COALESCE(${alias}.${this.quoteIdentifier(userColumns.statusColumn)}, 'ACTIVE') = 'ACTIVE'`;
   }
 
   private async deactivateAdminAndStoreStaff(
@@ -1234,11 +1227,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     storeId: number | null,
     userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
   ) {
-    if (!userColumns.activeColumn || !userColumns.roleColumn) {
-      return [adminUserId];
+    if (!userColumns.statusColumn || !userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required status columns.');
     }
 
-    const activeColumn = this.quoteIdentifier(userColumns.activeColumn);
+    const statusColumn = this.quoteIdentifier(userColumns.statusColumn);
     const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
 
     if (storeId && userColumns.storeIdColumn) {
@@ -1246,18 +1239,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       const rows = await this.query<{ id: number }>(
         `
           UPDATE users
-          SET ${activeColumn} = FALSE
+          SET ${statusColumn} = 'INACTIVE'
           WHERE (
             (id = $1 AND ${roleColumn} = 'ADMIN')
             OR (${roleColumn} = 'STAFF' AND ${storeIdColumn} = $2)
           )
-          AND COALESCE(${activeColumn}, TRUE) = TRUE
           RETURNING id
         `,
         [adminUserId, storeId],
       );
 
-      if (!rows.some((row) => row.id === adminUserId)) {
+      if (!rows.some((row) => Number(row.id) === adminUserId)) {
         throw new NotFoundException('Admin account was not found.');
       }
 
@@ -1267,10 +1259,61 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     const rows = await this.query<{ id: number }>(
       `
         UPDATE users
-        SET ${activeColumn} = FALSE
+        SET ${statusColumn} = 'INACTIVE'
         WHERE id = $1
           AND ${roleColumn} = 'ADMIN'
-          AND COALESCE(${activeColumn}, TRUE) = TRUE
+        RETURNING id
+      `,
+      [adminUserId],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Admin account was not found.');
+    }
+
+    return rows.map((row) => row.id);
+  }
+
+  private async activateAdminAndStoreStaff(
+    adminUserId: number,
+    storeId: number | null,
+    userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
+  ) {
+    if (!userColumns.statusColumn || !userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required status columns.');
+    }
+
+    const statusColumn = this.quoteIdentifier(userColumns.statusColumn);
+    const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
+
+    if (storeId && userColumns.storeIdColumn) {
+      const storeIdColumn = this.quoteIdentifier(userColumns.storeIdColumn);
+      const rows = await this.query<{ id: number }>(
+        `
+          UPDATE users
+          SET ${statusColumn} = 'ACTIVE'
+          WHERE (
+            (id = $1 AND ${roleColumn} = 'ADMIN')
+            OR (${roleColumn} = 'STAFF' AND ${storeIdColumn} = $2)
+          )
+          RETURNING id
+        `,
+        [adminUserId, storeId],
+      );
+
+      if (!rows.some((row) => Number(row.id) === adminUserId)) {
+        throw new NotFoundException('Admin account was not found.');
+      }
+
+      return rows.map((row) => row.id);
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        UPDATE users
+        SET ${statusColumn} = 'ACTIVE'
+        WHERE id = $1
+          AND ${roleColumn} = 'ADMIN'
         RETURNING id
       `,
       [adminUserId],
@@ -1288,22 +1331,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     storeId: number,
     userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
   ) {
-    if (!userColumns.activeColumn || !userColumns.roleColumn || !userColumns.storeIdColumn) {
+    if (!userColumns.statusColumn || !userColumns.roleColumn || !userColumns.storeIdColumn) {
       return [];
     }
 
-    const activeColumn = this.quoteIdentifier(userColumns.activeColumn);
+    const statusColumn = this.quoteIdentifier(userColumns.statusColumn);
     const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
     const storeIdColumn = this.quoteIdentifier(userColumns.storeIdColumn);
 
     return this.query<{ id: number }>(
       `
         UPDATE users
-        SET ${activeColumn} = FALSE
+        SET ${statusColumn} = 'INACTIVE'
         WHERE id = $1
           AND ${roleColumn} = 'STAFF'
           AND ${storeIdColumn} = $2
-          AND COALESCE(${activeColumn}, TRUE) = TRUE
         RETURNING id
       `,
       [staffUserId, storeId],

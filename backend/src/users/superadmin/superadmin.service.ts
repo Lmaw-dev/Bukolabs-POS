@@ -20,4 +20,8 @@ export class SuperadminService {
   deleteAdminAccount(adminUserId: number) {
     return this.databaseService.deleteAdminAccount(adminUserId);
   }
+
+  activateAdminAccount(adminUserId: number) {
+    return this.databaseService.activateAdminAccount(adminUserId);
+  }
 }
