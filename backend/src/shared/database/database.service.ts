@@ -1101,7 +1101,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         'We appreciate your support. Come again!',
         'Mon-Sun, 9:00 AM - 8:00 PM',
         'PHP',
-        '#10b981',
+        '#008967',
         0,
         0
       WHERE NOT EXISTS (
@@ -1403,3 +1403,4 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return Math.random().toString(36).slice(-10);
   }
 }
+

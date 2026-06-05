@@ -24,7 +24,7 @@ export function Reports({ onNavigate, onLogout }: ReportsProps) {
     { id: 'order-takeout', name: 'Takeout', value: 32 },
   ];
 
-  const COLORS = ['#10b981', '#3b82f6'];
+  const COLORS = ['#00a7a5', '#3b82f6'];
 
   const topProducts = [
     { id: 'product-1', name: 'Chicken Adobo', sales: 145 },
@@ -76,7 +76,7 @@ export function Reports({ onNavigate, onLogout }: ReportsProps) {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="sales" fill="#10b981" key="sales-bar" />
+                  <Bar dataKey="sales" fill="#00a7a5" key="sales-bar" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -141,3 +141,4 @@ export function Reports({ onNavigate, onLogout }: ReportsProps) {
     </div>
   );
 }
+

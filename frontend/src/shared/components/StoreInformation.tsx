@@ -45,7 +45,7 @@ const defaultStoreInfo: StoreInformationData = {
   receipt_footer_message: 'We appreciate your support. Come again!',
   operating_hours: 'Mon-Sun, 9:00 AM - 8:00 PM',
   currency: 'PHP',
-  theme_color: '#10b981',
+  theme_color: '#008967',
   tax_rate: 0,
   service_charge_rate: 0,
 };
@@ -295,7 +295,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                       <div className="flex gap-3">
                         <input
                           type="color"
-                          value={storeInfo.theme_color || '#10b981'}
+                          value={storeInfo.theme_color || '#008967'}
                           onChange={(event) => updateField('theme_color', event.target.value)}
                           className="h-10 w-14 rounded-lg border border-border bg-input-background p-1"
                         />
@@ -459,3 +459,4 @@ function textOrNull(value: string | null) {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
 }
+

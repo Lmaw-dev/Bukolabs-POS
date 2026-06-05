@@ -113,8 +113,8 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Completed': return 'bg-[#dcfce7] text-[#15803d]';
-      case 'Served': return 'bg-[#f0fdf4] text-[#10b981]';
-      case 'Ready': return 'bg-[#f0fdf4] text-[#10b981]';
+      case 'Served': return 'bg-[#f0fdf4] text-[#008967]';
+      case 'Ready': return 'bg-[#f0fdf4] text-[#008967]';
       case 'Preparing': return 'bg-[#f5f3ff] text-[#8b5cf6]';
       case 'Pending': return 'bg-[#fffbeb] text-[#f59e0b]';
       default: return 'bg-[#f1f5f9] text-[#64748b]';
@@ -776,3 +776,4 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     </div>
   );
 }
+
