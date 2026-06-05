@@ -30,8 +30,8 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
   const isRetail = storeType === 'RETAIL_STORE';
   const { settings } = useStoreSettings();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Store: true,
-    Temporary: true,
+    Store: false,
+    Temporary: false,
   });
 
   const storeItems = [
@@ -88,6 +88,12 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
   const defaultTitle = isRetail ? 'Retail Store' : 'The Restaurant';
   const headerTitle = storeBrand?.name || defaultTitle;
   const userRoleLabel = isAdmin ? 'Admin' : 'POS Staff';
+  const closeManagementGroups = () => {
+    setOpenGroups({
+      Store: false,
+      Temporary: false,
+    });
+  };
 
   return (
     <div
@@ -120,9 +126,14 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                 <button
                   onClick={() => {
                     if (item.children) {
-                      setOpenGroups((current) => ({ ...current, [item.label]: !current[item.label] }));
+                      setOpenGroups((current) => ({
+                        Store: item.label === 'Store' ? !current.Store : false,
+                        Temporary: item.label === 'Temporary' ? !current.Temporary : false,
+                      }));
                       return;
                     }
+
+                    closeManagementGroups();
                     item.page && onNavigate(item.page);
                   }}
                   className={`flex h-8 w-full items-center gap-3 rounded-lg border px-4 text-left transition ${
@@ -153,7 +164,10 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                       return (
                         <li key={child.page}>
                           <button
-                            onClick={() => onNavigate(child.page)}
+                            onClick={() => {
+                              closeManagementGroups();
+                              onNavigate(child.page);
+                            }}
                             className={`flex h-7 w-full items-center gap-3 rounded-md px-3 text-left transition ${
                               childIsActive ? 'text-white' : 'text-slate-200 hover:text-white'
                             }`}
@@ -182,9 +196,14 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                     <button
                       onClick={() => {
                         if (item.children) {
-                          setOpenGroups((current) => ({ ...current, [item.label]: !current[item.label] }));
+                          setOpenGroups((current) => ({
+                            Store: item.label === 'Store' ? !current.Store : false,
+                            Temporary: item.label === 'Temporary' ? !current.Temporary : false,
+                          }));
                           return;
                         }
+
+                        closeManagementGroups();
                         item.page && onNavigate(item.page);
                       }}
                       className={`flex h-8 w-full items-center gap-3 rounded-lg border px-4 text-left transition ${
@@ -215,7 +234,10 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                           return (
                             <li key={child.page}>
                               <button
-                                onClick={() => onNavigate(child.page)}
+                                    onClick={() => {
+                                      closeManagementGroups();
+                                      onNavigate(child.page);
+                                    }}
                                 className={`flex h-7 w-full items-center gap-3 rounded-md px-3 text-left transition ${
                                   childIsActive ? 'text-white' : 'text-slate-200 hover:text-white'
                                 }`}
