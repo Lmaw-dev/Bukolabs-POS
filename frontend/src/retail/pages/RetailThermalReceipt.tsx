@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import logoImg from '../../imports/logo1.png';
 import type { StoreBrand } from '../../shared/App';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 
 interface ReceiptItem {
   name: string;
@@ -70,6 +71,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     },
     ref
   ) => {
+    const { settings } = useStoreSettings();
     const currentDate = date || new Date().toISOString().split('T')[0];
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -234,11 +236,13 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span>Subtotal</span>
             <span className="text-right">₱{subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-gray-600">
-            <span>Tax (12%)</span>
-            <span className="text-right">₱{tax.toFixed(2)}</span>
-          </div>
-          {discount > 0 && (
+          {settings.enable_tax && (
+            <div className="flex justify-between text-gray-600">
+              <span>Tax ({settings.tax_rate}%)</span>
+              <span className="text-right">₱{tax.toFixed(2)}</span>
+            </div>
+          )}
+          {settings.enable_discount && discount > 0 && (
             <div className="flex justify-between text-red-600">
               <span>Discount {discountType && `(${discountType})`}</span>
               <span className="text-right">− ₱{discount.toFixed(2)}</span>
@@ -278,3 +282,4 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
 );
 
 ThermalReceipt.displayName = 'ThermalReceipt';
+
