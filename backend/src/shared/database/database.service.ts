@@ -1,4 +1,14 @@
-import { ConflictException, Injectable, InternalServerErrorException, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import * as bcrypt from 'bcrypt';
 import { AuthenticatedUser } from '../common/types';
@@ -134,6 +144,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         FROM users u
         ${storeJoin}
         WHERE LOWER(u.email) = LOWER($1)
+        ${this.activeUsersWhereClause(userColumns)}
         LIMIT 1
       `,
       [email],
@@ -186,6 +197,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         FROM users u
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'ADMIN'
+        ${this.activeUsersWhereClause(userColumns)}
         ORDER BY u.id ASC
       `,
     );
@@ -352,6 +364,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async deleteAdminAccount(adminUserId: number) {
+    if (!Number.isFinite(adminUserId) || adminUserId <= 0) {
+      throw new BadRequestException('A valid admin user id is required.');
+    }
+
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN') {
+      throw new NotFoundException('Admin account was not found.');
+    }
+
     const schema = await this.getSchemaColumns();
     const userColumns = this.resolveUserColumns(schema.users);
 
@@ -359,21 +381,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for admin deletion.');
     }
 
-    const rows = await this.query<{ id: number }>(
-      `
-        DELETE FROM users
-        WHERE id = $1
-          AND ${this.quoteIdentifier(userColumns.roleColumn)} = 'ADMIN'
-        RETURNING id
-      `,
-      [adminUserId],
-    );
-
-    if (rows.length === 0) {
-      throw new InternalServerErrorException('Admin account was not found.');
+    if (userColumns.activeColumn) {
+      const deactivatedIds = await this.deactivateAdminAndStoreStaff(adminUserId, admin.store_id, userColumns);
+      return { id: adminUserId, deactivated: true, deleted: false, affected_user_ids: deactivatedIds };
     }
 
-    return { id: rows[0].id, deleted: true };
+    try {
+      if (admin.store_id && userColumns.storeIdColumn) {
+        await this.query(
+          `
+            DELETE FROM users
+            WHERE ${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
+              AND ${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
+          `,
+          [admin.store_id],
+        );
+      }
+
+      const rows = await this.hardDeleteUserByRole(adminUserId, 'ADMIN', null, userColumns);
+
+      if (rows.length === 0) {
+        throw new NotFoundException('Admin account was not found.');
+      }
+
+      return { id: rows[0].id, deleted: true, deactivated: false };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      this.handleDatabaseWriteError(error, 'Unable to remove admin account.');
+    }
   }
 
   async listStaffForAdmin(adminUserId: number) {
@@ -410,7 +448,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
           AND u.${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
+<<<<<<< HEAD
           ${userColumns.staffTypeColumn ? `AND u.${this.quoteIdentifier(userColumns.staffTypeColumn)} = 'POS_STAFF'` : ''}
+=======
+        ${this.activeUsersWhereClause(userColumns)}
+>>>>>>> 97402b2a667932cf7ad0f55387450540e08e0766
         ORDER BY u.id ASC
       `,
       [admin.store_id],
@@ -550,10 +592,22 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async deleteStaffAccountForAdmin(input: { adminUserId: number; staffUserId: number }) {
+    if (!Number.isFinite(input.adminUserId) || input.adminUserId <= 0) {
+      throw new BadRequestException('A valid admin_user_id is required.');
+    }
+
+    if (!Number.isFinite(input.staffUserId) || input.staffUserId <= 0) {
+      throw new BadRequestException('A valid staff user id is required.');
+    }
+
+    if (input.adminUserId === input.staffUserId) {
+      throw new ForbiddenException('You cannot remove your own account from this screen.');
+    }
+
     const admin = await this.getUserStoreScope(input.adminUserId);
 
     if (admin.role !== 'ADMIN' || !admin.store_id) {
-      throw new InternalServerErrorException('Only store admin accounts can delete staff.');
+      throw new ForbiddenException('Only store admin accounts can remove staff for their store.');
     }
 
     const schema = await this.getSchemaColumns();
@@ -563,22 +617,27 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Users table is missing required columns for staff deletion.');
     }
 
-    const rows = await this.query<{ id: number }>(
-      `
-        DELETE FROM users
-        WHERE id = $1
-          AND ${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
-          AND ${this.quoteIdentifier(userColumns.storeIdColumn)} = $2
-        RETURNING id
-      `,
-      [input.staffUserId, admin.store_id],
-    );
+    if (userColumns.activeColumn) {
+      const rows = await this.deactivateStaffForStore(input.staffUserId, admin.store_id, userColumns);
 
-    if (rows.length === 0) {
-      throw new InternalServerErrorException('Staff account was not found for this store.');
+      if (rows.length === 0) {
+        throw new NotFoundException('Staff account was not found for this store.');
+      }
+
+      return { id: rows[0].id, deactivated: true, deleted: false };
     }
 
-    return { id: rows[0].id, deleted: true };
+    try {
+      const rows = await this.hardDeleteUserByRole(input.staffUserId, 'STAFF', admin.store_id, userColumns);
+
+      if (rows.length === 0) {
+        throw new NotFoundException('Staff account was not found for this store.');
+      }
+
+      return { id: rows[0].id, deleted: true, deactivated: false };
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to remove staff account.');
+    }
   }
 
   async getStoreInformationForAdmin(adminUserId: number): Promise<StoreInformation> {
@@ -1158,7 +1217,134 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       storeIdColumn: pick(['store_id']),
       staffTypeColumn: pick(['staff_type']),
       passwordColumn: pick(['hashed_password', 'password_hash', 'password']),
+      activeColumn: pick(['is_active']),
     };
+  }
+
+  private activeUsersWhereClause(userColumns: { activeColumn: string | null }, alias = 'u') {
+    if (!userColumns.activeColumn) {
+      return '';
+    }
+
+    return ` AND COALESCE(${alias}.${this.quoteIdentifier(userColumns.activeColumn)}, TRUE) = TRUE`;
+  }
+
+  private async deactivateAdminAndStoreStaff(
+    adminUserId: number,
+    storeId: number | null,
+    userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
+  ) {
+    if (!userColumns.activeColumn || !userColumns.roleColumn) {
+      return [adminUserId];
+    }
+
+    const activeColumn = this.quoteIdentifier(userColumns.activeColumn);
+    const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
+
+    if (storeId && userColumns.storeIdColumn) {
+      const storeIdColumn = this.quoteIdentifier(userColumns.storeIdColumn);
+      const rows = await this.query<{ id: number }>(
+        `
+          UPDATE users
+          SET ${activeColumn} = FALSE
+          WHERE (
+            (id = $1 AND ${roleColumn} = 'ADMIN')
+            OR (${roleColumn} = 'STAFF' AND ${storeIdColumn} = $2)
+          )
+          AND COALESCE(${activeColumn}, TRUE) = TRUE
+          RETURNING id
+        `,
+        [adminUserId, storeId],
+      );
+
+      if (!rows.some((row) => row.id === adminUserId)) {
+        throw new NotFoundException('Admin account was not found.');
+      }
+
+      return rows.map((row) => row.id);
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        UPDATE users
+        SET ${activeColumn} = FALSE
+        WHERE id = $1
+          AND ${roleColumn} = 'ADMIN'
+          AND COALESCE(${activeColumn}, TRUE) = TRUE
+        RETURNING id
+      `,
+      [adminUserId],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Admin account was not found.');
+    }
+
+    return rows.map((row) => row.id);
+  }
+
+  private async deactivateStaffForStore(
+    staffUserId: number,
+    storeId: number,
+    userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
+  ) {
+    if (!userColumns.activeColumn || !userColumns.roleColumn || !userColumns.storeIdColumn) {
+      return [];
+    }
+
+    const activeColumn = this.quoteIdentifier(userColumns.activeColumn);
+    const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
+    const storeIdColumn = this.quoteIdentifier(userColumns.storeIdColumn);
+
+    return this.query<{ id: number }>(
+      `
+        UPDATE users
+        SET ${activeColumn} = FALSE
+        WHERE id = $1
+          AND ${roleColumn} = 'STAFF'
+          AND ${storeIdColumn} = $2
+          AND COALESCE(${activeColumn}, TRUE) = TRUE
+        RETURNING id
+      `,
+      [staffUserId, storeId],
+    );
+  }
+
+  private async hardDeleteUserByRole(
+    userId: number,
+    role: 'ADMIN' | 'STAFF',
+    storeId: number | null,
+    userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
+  ) {
+    if (!userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing a role column.');
+    }
+
+    const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
+    const conditions = [`id = $1`, `${roleColumn} = $2`];
+    const params: unknown[] = [userId, role];
+
+    if (role === 'STAFF') {
+      if (!userColumns.storeIdColumn || storeId === null) {
+        throw new InternalServerErrorException('Staff deletion requires a store scope.');
+      }
+
+      conditions.push(`${this.quoteIdentifier(userColumns.storeIdColumn)} = $3`);
+      params.push(storeId);
+    }
+
+    try {
+      return await this.query<{ id: number }>(
+        `
+          DELETE FROM users
+          WHERE ${conditions.join(' AND ')}
+          RETURNING id
+        `,
+        params,
+      );
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to remove user account.');
+    }
   }
 
   private resolveStoreColumns(columns: Set<string>) {
@@ -1191,6 +1377,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   private handleDatabaseWriteError(error: unknown, fallbackMessage: string): never {
     const databaseError = error as { code?: string; detail?: string; message?: string };
+
+    if (databaseError.code === '23503') {
+      throw new ConflictException(
+        'This account is linked to other records and cannot be permanently deleted. Run backend/sql/add-user-is-active.sql to enable deactivation instead.',
+      );
+    }
 
     if (databaseError.code === '23505') {
       throw new ConflictException(databaseError.detail ?? 'A record with the same unique value already exists.');

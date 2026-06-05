@@ -122,7 +122,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   };
 
   const handleDeleteUser = async (user: StaffUser) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${user.full_name}?`)) {
+    if (!currentUser?.id || !window.confirm(`Deactivate ${user.full_name}? They will no longer be able to log in.`)) {
       return;
     }
 
