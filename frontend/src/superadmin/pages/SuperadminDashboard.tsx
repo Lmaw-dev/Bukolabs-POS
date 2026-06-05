@@ -3,18 +3,20 @@ import type { AuthenticatedUser } from '../../auth/types/auth';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import {
   CalendarDays,
+  Ban,
   ChevronRight,
   Eye,
   EyeOff,
+  KeyRound,
   LogOut,
-  MoreHorizontal,
   Pencil,
   Plus,
+  Search,
   Store,
   StoreIcon,
-  Trash2,
   UserPlus,
   Utensils,
+  X,
 } from 'lucide-react';
 
 interface AdminSummary {
@@ -34,6 +36,8 @@ interface SuperadminDashboardProps {
 
 type StoreFilter = 'ALL' | 'RETAIL_STORE' | 'RESTAURANT';
 type DashboardSection = 'stores' | 'admins';
+type SummaryModal = 'all-stores' | 'all-admins' | 'retail-stores' | 'restaurant-stores' | null;
+type AdminActionPreview = 'reset-password' | 'deactivate-account';
 
 const storeTypeLabel = (storeType: string | null | undefined) =>
   storeType === 'RETAIL_STORE' ? 'Retail Store' : storeType === 'RESTAURANT' ? 'Restaurant' : 'Unassigned';
@@ -53,7 +57,6 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<AdminSummary | null>(null);
-  const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
   const [createError, setCreateError] = useState('');
   const [createdPassword, setCreatedPassword] = useState('');
   const [formFullName, setFormFullName] = useState('');
@@ -65,6 +68,10 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [visiblePassword, setVisiblePassword] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<DashboardSection>('stores');
+  const [activeSummaryModal, setActiveSummaryModal] = useState<SummaryModal>(null);
+  const [viewSummaryRecord, setViewSummaryRecord] = useState<AdminSummary | null>(null);
+  const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
+  const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -104,9 +111,14 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const restaurantStores = stores.filter((store) => store.store_type === 'RESTAURANT');
   const filteredStores = stores.filter((store) => storeFilter === 'ALL' || store.store_type === storeFilter);
   const filteredAdmins = admins.filter((admin) => adminFilter === 'ALL' || admin.store_type === adminFilter);
-  const retailAdmins = admins.filter((admin) => admin.store_type === 'RETAIL_STORE').length;
-  const restaurantAdmins = admins.filter((admin) => admin.store_type === 'RESTAURANT').length;
   const retailPercent = stores.length === 0 ? 0 : Math.round((retailStores.length / stores.length) * 100);
+  const modalStores =
+    activeSummaryModal === 'retail-stores'
+      ? retailStores
+      : activeSummaryModal === 'restaurant-stores'
+        ? restaurantStores
+        : stores;
+  const modalAdmins = admins;
 
   const handleCreateAdmin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -185,50 +197,22 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
     setAdminModalOpen(false);
   };
 
-  const handleDeleteAdmin = async (admin: AdminSummary) => {
-    if (!window.confirm(`Delete ${admin.full_name}?`)) {
-      return;
-    }
-
-    setDeletingAdminId(admin.id);
-    setError('');
-
-    try {
-      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins/${admin.id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data?.message ?? 'Unable to delete admin account.');
-      }
-
-      setAdmins((current) => current.filter((item) => item.id !== admin.id));
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete admin account.');
-    } finally {
-      setDeletingAdminId(null);
-    }
-  };
-
   const summaryCards = [
     {
       title: 'Total Stores',
       value: stores.length,
-      detail: `${retailStores.length} Retail - ${restaurantStores.length} Restaurant`,
       link: 'View all stores',
       icon: StoreIcon,
       tone: 'blue',
-      onClick: () => setStoreFilter('ALL'),
+      onClick: () => setActiveSummaryModal('all-stores'),
     },
     {
       title: 'Total Admin Accounts',
       value: admins.length,
-      detail: `${retailAdmins} Retail - ${restaurantAdmins} Restaurant`,
       link: 'View all admin accounts',
       icon: UserPlus,
       tone: 'green',
-      onClick: () => setAdminFilter('ALL'),
+      onClick: () => setActiveSummaryModal('all-admins'),
     },
     {
       title: 'Retail Stores',
@@ -237,7 +221,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       link: 'View retail stores',
       icon: Store,
       tone: 'violet',
-      onClick: () => setStoreFilter('RETAIL_STORE'),
+      onClick: () => setActiveSummaryModal('retail-stores'),
     },
     {
       title: 'Restaurant Stores',
@@ -246,9 +230,44 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       link: 'View restaurant stores',
       icon: Utensils,
       tone: 'orange',
-      onClick: () => setStoreFilter('RESTAURANT'),
+      onClick: () => setActiveSummaryModal('restaurant-stores'),
     },
   ];
+
+  const summaryModalTitle =
+    activeSummaryModal === 'all-admins'
+      ? 'Admin Accounts'
+      : activeSummaryModal === 'retail-stores'
+        ? 'Retail Stores'
+        : activeSummaryModal === 'restaurant-stores'
+          ? 'Restaurant Stores'
+          : 'All Stores';
+  const summaryModalSubtitle =
+    activeSummaryModal === 'all-admins'
+      ? 'Manage all admin accounts in the system.'
+      : activeSummaryModal === 'retail-stores'
+        ? 'View and manage all retail stores.'
+        : activeSummaryModal === 'restaurant-stores'
+          ? 'View and manage all restaurant stores.'
+          : 'View and manage all stores in the system.';
+  const summaryModalBadge =
+    activeSummaryModal === 'all-admins'
+      ? 'View All Admin Accounts'
+      : activeSummaryModal === 'retail-stores'
+        ? 'View Retail Stores'
+        : activeSummaryModal === 'restaurant-stores'
+          ? 'View Restaurant Stores'
+          : 'View All Stores';
+  const summaryModalBadgeClass =
+    activeSummaryModal === 'all-admins'
+      ? 'bg-emerald-700'
+      : activeSummaryModal === 'retail-stores'
+        ? 'bg-amber-600'
+        : activeSummaryModal === 'restaurant-stores'
+          ? 'bg-red-600'
+          : 'bg-violet-700';
+  const isStoreSummaryModal = activeSummaryModal && activeSummaryModal !== 'all-admins';
+  const isFilteredStoreSummaryModal = activeSummaryModal === 'retail-stores' || activeSummaryModal === 'restaurant-stores';
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-[#0f172a]">
@@ -355,7 +374,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                           : 'bg-orange-50 text-orange-500';
 
                   return (
-                    <article key={card.title} className="min-h-[178px] rounded-lg border border-slate-200 bg-white p-6 shadow-md">
+                    <article key={card.title} className="flex min-h-[178px] flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-md">
                       <div className="flex items-start gap-5">
                         <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${tone}`}>
                           <Icon className="h-7 w-7" />
@@ -363,11 +382,19 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                         <div className="min-w-0">
                           <p className="text-base font-bold text-[#334155]">{card.title}</p>
                           <p className="mt-2 text-[32px] font-extrabold leading-none text-[#020617]">{card.value}</p>
-                          <p className="mt-2 min-h-5 text-base text-[#64748b]">{card.detail}</p>
+                          {card.detail !== undefined && (
+                            <p className="mt-2 min-h-5 text-base text-[#64748b]">{card.detail}</p>
+                          )}
                         </div>
                       </div>
-                      <button type="button" onClick={card.onClick} className="mt-6 text-base font-bold text-[#0b5cff] hover:text-blue-700">
-                        {card.link}
+                      <button
+                        type="button"
+                        onClick={card.onClick}
+                        className="mt-auto inline-flex h-11 w-full items-center justify-center rounded-md border border-blue-100 bg-blue-50 px-4 text-[#0b5cff] transition hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                        aria-label={card.link}
+                        title={card.link}
+                      >
+                        <Eye className="h-5 w-5" />
                       </button>
                     </article>
                   );
@@ -505,16 +532,16 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1120px] text-left text-base">
-                    <thead className="border-y border-slate-200 bg-slate-50 text-sm font-bold text-slate-600">
+                <div className="overflow-hidden">
+                  <table className="w-full table-fixed text-left text-sm">
+                    <thead className="border-y border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
                       <tr>
-                        <th className="px-4 py-4">Admin Name</th>
-                        <th className="px-4 py-4">Store Type</th>
-                        <th className="px-4 py-4">Store Name</th>
-                        <th className="px-4 py-4">Status</th>
-                        <th className="px-4 py-4">Date Created</th>
-                        <th className="px-4 py-4 text-right">Action</th>
+                        <th className="w-[18%] px-3 py-4">Admin Name</th>
+                        <th className="w-[18%] px-3 py-4">Store Type</th>
+                        <th className="w-[22%] px-3 py-4">Store Name</th>
+                        <th className="w-[13%] px-3 py-4">Status</th>
+                        <th className="w-[17%] px-3 py-4">Date Created</th>
+                        <th className="w-[12%] px-3 py-4 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -529,30 +556,39 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                       ) : (
                         filteredAdmins.slice(0, 6).map((admin) => (
                           <tr key={admin.id} className="text-slate-700">
-                            <td className="px-4 py-4 font-medium text-slate-900">{admin.full_name}</td>
-                            <td className="px-4 py-4">
-                              <span className={`inline-flex rounded px-3 py-1 text-sm font-medium ${storeTypeStyles(admin.store_type)}`}>
+                            <td className="truncate px-3 py-4 font-medium text-slate-900">{admin.full_name}</td>
+                            <td className="px-3 py-4">
+                              <span className={`inline-flex max-w-full rounded px-2 py-1 text-xs font-medium ${storeTypeStyles(admin.store_type)}`}>
                                 {storeTypeLabel(admin.store_type)}
                               </span>
                             </td>
-                            <td className="px-4 py-4">{admin.store_name ?? 'Unassigned'}</td>
-                            <td className="px-4 py-4">
-                              <span className="inline-flex rounded bg-emerald-50 px-3 py-1 text-sm font-medium text-emerald-700">Active</span>
+                            <td className="truncate px-3 py-4">{admin.store_name ?? 'Unassigned'}</td>
+                            <td className="px-3 py-4">
+                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
                             </td>
-                            <td className="px-4 py-4 text-slate-500">May 31, 2026</td>
-                            <td className="px-4 py-4">
+                            <td className="px-3 py-4 text-slate-500">May 31, 2026</td>
+                            <td className="px-3 py-4">
                               <div className="flex justify-end gap-1">
-                                <button type="button" onClick={() => handleEditAdmin(admin)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="Edit admin">
-                                  <Pencil className="h-5 w-5" />
+                                <button type="button" onClick={() => handleEditAdmin(admin)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" title="Edit admin" aria-label={`Edit ${admin.full_name}`}>
+                                  <Pencil className="h-4 w-4" />
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteAdmin(admin)}
-                                  disabled={deletingAdminId === admin.id}
-                                  className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                  title="Delete admin"
+                                  onClick={() => setAdminActionPreview({ action: 'reset-password', admin })}
+                                  className="rounded-md p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                                  title="Reset password"
+                                  aria-label={`Reset password for ${admin.full_name}`}
                                 >
-                                  {deletingAdminId === admin.id ? <MoreHorizontal className="h-5 w-5" /> : <Trash2 className="h-5 w-5" />}
+                                  <KeyRound className="h-4 w-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminActionPreview({ action: 'deactivate-account', admin })}
+                                  className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600"
+                                  title="Delete or deactivate account"
+                                  aria-label={`Delete or deactivate ${admin.full_name}`}
+                                >
+                                  <Ban className="h-4 w-4" />
                                 </button>
                               </div>
                             </td>
@@ -580,6 +616,396 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           <footer className="text-sm text-slate-500">© 2026 Unified POS System. All rights reserved.</footer>
         </div>
       </main>
+
+      {activeSummaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-5 py-8 backdrop-blur-sm">
+          <section className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+            <div className={`flex min-h-12 items-center gap-3 px-5 text-white ${summaryModalBadgeClass}`}>
+              <p className="text-base font-extrabold uppercase tracking-wide">{summaryModalBadge}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSummaryModal(null);
+                  setViewSummaryRecord(null);
+                }}
+                className="ml-auto rounded-md p-1.5 text-white/80 hover:bg-white/15 hover:text-white"
+                aria-label="Close summary popup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-7">
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-2xl font-extrabold text-slate-900">{summaryModalTitle}</h3>
+                  <p className="mt-1 text-sm text-slate-500">{summaryModalSubtitle}</p>
+                </div>
+                <button type="button" className="flex h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900">
+                  May 31, 2026
+                  <CalendarDays className="h-4 w-4 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="mb-5 flex flex-wrap items-center gap-3">
+                <label className="relative min-w-[260px] flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    placeholder={activeSummaryModal === 'all-admins' ? 'Search admin name or email...' : 'Search store name or admin...'}
+                    className="h-11 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                  />
+                </label>
+                {(activeSummaryModal === 'all-stores' || activeSummaryModal === 'all-admins') && (
+                  <select className="h-11 min-w-40 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-400">
+                    <option>All Store Types</option>
+                    <option>Retail Store</option>
+                    <option>Restaurant</option>
+                  </select>
+                )}
+                <select className="h-11 min-w-36 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-blue-400">
+                  <option>All Statuses</option>
+                  <option>Active</option>
+                </select>
+                {activeSummaryModal === 'all-stores' && (
+                  <button
+                    type="button"
+                    onClick={() => setAddStoreModalOpen(true)}
+                    className="ml-auto inline-flex h-11 items-center gap-2 rounded-md bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Store
+                  </button>
+                )}
+                {activeSummaryModal === 'all-admins' && (
+                  <button type="button" onClick={handleOpenCreateAdmin} className="ml-auto inline-flex h-11 items-center gap-2 rounded-md bg-emerald-700 px-5 text-sm font-bold text-white hover:bg-emerald-800">
+                    <Plus className="h-4 w-4" />
+                    Create Admin
+                  </button>
+                )}
+              </div>
+
+              {isStoreSummaryModal && (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full min-w-[900px] text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3">Store Name</th>
+                        {!isFilteredStoreSummaryModal && <th className="px-4 py-3">Store Type</th>}
+                        <th className="px-4 py-3">Admin Name</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Date Created</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={isFilteredStoreSummaryModal ? 5 : 6} className="px-4 py-10 text-center text-slate-500">Loading stores...</td>
+                        </tr>
+                      ) : modalStores.length === 0 ? (
+                        <tr>
+                          <td colSpan={isFilteredStoreSummaryModal ? 5 : 6} className="px-4 py-10 text-center text-slate-500">No stores to display.</td>
+                        </tr>
+                      ) : (
+                        modalStores.map((store) => (
+                          <tr key={`${store.store_id ?? store.id}-summary-store`} className="text-slate-700">
+                            <td className="px-4 py-4 font-medium text-slate-900">{store.store_name ?? `${store.full_name}'s Store`}</td>
+                            {!isFilteredStoreSummaryModal && (
+                              <td className="px-4 py-4">
+                                <span className={`inline-flex rounded px-2.5 py-1 text-xs font-medium ${storeTypeStyles(store.store_type)}`}>
+                                  {storeTypeLabel(store.store_type)}
+                                </span>
+                              </td>
+                            )}
+                            <td className="px-4 py-4">
+                              <p className="font-medium text-slate-800">{store.full_name}</p>
+                              <p className="mt-0.5 text-xs text-slate-500">{store.email}</p>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                            </td>
+                            <td className="px-4 py-4 text-slate-500">May 31, 2026</td>
+                            <td className="px-4 py-4">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewSummaryRecord(store)}
+                                  className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
+                                  title="View store"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeSummaryModal === 'all-admins' && (
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full min-w-[980px] text-left text-sm">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3">Full Name</th>
+                        <th className="px-4 py-3">Email</th>
+                        <th className="px-4 py-3">Store Type</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3">Date Created</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-10 text-center text-slate-500">Loading admin accounts...</td>
+                        </tr>
+                      ) : modalAdmins.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-10 text-center text-slate-500">No admin accounts to display.</td>
+                        </tr>
+                      ) : (
+                        modalAdmins.map((admin) => (
+                          <tr key={`${admin.id}-summary-admin`} className="text-slate-700">
+                            <td className="px-4 py-4 font-medium text-slate-900">{admin.full_name}</td>
+                            <td className="px-4 py-4 text-slate-600">{admin.email}</td>
+                            <td className="px-4 py-4">
+                              <span className={`inline-flex rounded px-2.5 py-1 text-xs font-medium ${storeTypeStyles(admin.store_type)}`}>
+                                {storeTypeLabel(admin.store_type)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4">
+                              <span className="inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                            </td>
+                            <td className="px-4 py-4 text-slate-500">May 31, 2026</td>
+                            <td className="px-4 py-4">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewSummaryRecord(admin)}
+                                  className="rounded-md border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50"
+                                  title="View admin"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+                <span>
+                  Showing {activeSummaryModal === 'all-admins' ? (modalAdmins.length === 0 ? 0 : 1) : modalStores.length === 0 ? 0 : 1} to{' '}
+                  {activeSummaryModal === 'all-admins' ? modalAdmins.length : modalStores.length} of{' '}
+                  {activeSummaryModal === 'all-admins' ? modalAdmins.length : modalStores.length}{' '}
+                  {activeSummaryModal === 'all-admins' ? 'admins' : 'stores'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button type="button" className="h-8 w-8 rounded-md border border-slate-200 text-slate-400">
+                    <ChevronRight className="mx-auto h-4 w-4 rotate-180" />
+                  </button>
+                  <button type="button" className="h-8 w-8 rounded-md border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700">1</button>
+                  <button type="button" className="h-8 w-8 rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50">
+                    <ChevronRight className="mx-auto h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {viewSummaryRecord && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
+          <section className="w-full max-w-2xl rounded-lg border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900">
+                  {activeSummaryModal === 'all-admins' ? 'Admin Details' : 'Store Details'}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {activeSummaryModal === 'all-admins' ? 'View admin account information.' : 'View store information.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewSummaryRecord(null)}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close details popup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
+              <div className={`flex h-20 w-20 items-center justify-center rounded-full ${viewSummaryRecord.store_type === 'RESTAURANT' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                {activeSummaryModal === 'all-admins' ? (
+                  <UserPlus className="h-10 w-10" />
+                ) : viewSummaryRecord.store_type === 'RESTAURANT' ? (
+                  <Utensils className="h-10 w-10" />
+                ) : (
+                  <Store className="h-10 w-10" />
+                )}
+              </div>
+              <div className="grid gap-4 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Full Name</p>
+                  <p className="mt-1 font-semibold text-slate-900">{viewSummaryRecord.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Email</p>
+                  <p className="mt-1 font-semibold text-slate-900">{viewSummaryRecord.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Store Name</p>
+                  <p className="mt-1 font-semibold text-slate-900">{viewSummaryRecord.store_name ?? `${viewSummaryRecord.full_name}'s Store`}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Store Type</p>
+                  <p className="mt-1 font-semibold text-slate-900">{storeTypeLabel(viewSummaryRecord.store_type)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Status</p>
+                  <span className="mt-1 inline-flex rounded bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Date Created</p>
+                  <p className="mt-1 font-semibold text-slate-900">May 31, 2026</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {addStoreModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
+          <form className="w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900">Add Store</h3>
+                <p className="mt-1 text-sm text-slate-500">Create a store profile and assign its store type.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddStoreModalOpen(false)}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close add store popup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              <label className="block text-xs font-semibold text-slate-600">
+                Store Name
+                <input placeholder="Enter store name" className="mt-1 h-11 w-full rounded-md border border-slate-200 px-3 text-sm font-normal text-slate-900 outline-none focus:border-blue-400" />
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Store Type
+                <select className="mt-1 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-blue-400">
+                  <option>Retail Store</option>
+                  <option>Restaurant</option>
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Assigned Admin
+                <select className="mt-1 h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 outline-none focus:border-blue-400">
+                  <option>Select admin account</option>
+                  {admins.map((admin) => (
+                    <option key={`store-admin-${admin.id}`}>{admin.full_name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-xs font-semibold text-slate-600">
+                Address
+                <input placeholder="Enter store address" className="mt-1 h-11 w-full rounded-md border border-slate-200 px-3 text-sm font-normal text-slate-900 outline-none focus:border-blue-400" />
+              </label>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setAddStoreModalOpen(false)} className="h-11 rounded-md border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Cancel
+              </button>
+              <button type="button" onClick={() => setAddStoreModalOpen(false)} className="h-11 rounded-md bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800">
+                Save Store
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {adminActionPreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4 py-8 backdrop-blur-sm">
+          <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-extrabold text-slate-900">
+                  {adminActionPreview.action === 'reset-password' ? 'Reset Password' : 'Delete or Deactivate Account'}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {adminActionPreview.action === 'reset-password'
+                    ? `Set a new temporary password for ${adminActionPreview.admin.full_name}.`
+                    : `Review this action for ${adminActionPreview.admin.full_name}.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdminActionPreview(null)}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Close admin action popup"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {adminActionPreview.action === 'reset-password' ? (
+              <div className="space-y-4">
+                <label className="block text-xs font-semibold text-slate-600">
+                  Temporary Password
+                  <input placeholder="Enter new temporary password" className="mt-1 h-11 w-full rounded-md border border-slate-200 px-3 text-sm font-normal text-slate-900 outline-none focus:border-blue-400" />
+                </label>
+                <div className="rounded-md border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+                  The admin should change this password after logging in.
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-md border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                  Deactivating prevents this admin from accessing the system. Deleting removes the account record.
+                </div>
+                <div className="rounded-md border border-slate-200 p-3 text-sm">
+                  <p className="font-semibold text-slate-900">{adminActionPreview.admin.full_name}</p>
+                  <p className="mt-1 text-slate-500">{adminActionPreview.admin.email}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setAdminActionPreview(null)} className="h-11 rounded-md border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                Cancel
+              </button>
+              {adminActionPreview.action === 'reset-password' ? (
+                <button type="button" onClick={() => setAdminActionPreview(null)} className="h-11 rounded-md bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700">
+                  Reset Password
+                </button>
+              ) : (
+                <button type="button" onClick={() => setAdminActionPreview(null)} className="h-11 rounded-md bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700">
+                  Deactivate Account
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {adminModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-8 backdrop-blur-sm">
