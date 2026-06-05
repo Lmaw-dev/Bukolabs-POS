@@ -388,6 +388,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return { id: adminUserId, status: 'INACTIVE', deactivated: true, deleted: false, affected_user_ids: deactivatedIds };
   }
 
+  async permanentlyDeleteAdminAccount(adminUserId: number) {
+    if (!Number.isFinite(adminUserId) || adminUserId <= 0) {
+      throw new BadRequestException('A valid admin user id is required.');
+    }
+
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN') {
+      throw new NotFoundException('Admin account was not found.');
+    }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.roleColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for admin deletion.');
+    }
+
+    try {
+      const rows = await this.hardDeleteUserByRole(adminUserId, 'ADMIN', null, userColumns);
+
+      if (rows.length === 0) {
+        throw new NotFoundException('Admin account was not found.');
+      }
+
+      return { id: rows[0].id, deleted: true, deactivated: false };
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to delete admin account.');
+    }
+  }
+
   async activateAdminAccount(adminUserId: number) {
     if (!Number.isFinite(adminUserId) || adminUserId <= 0) {
       throw new BadRequestException('A valid admin user id is required.');
@@ -632,6 +663,45 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       return { id: rows[0].id, deleted: true, deactivated: false };
     } catch (error) {
       this.handleDatabaseWriteError(error, 'Unable to remove staff account.');
+    }
+  }
+
+  async permanentlyDeleteStaffAccountForAdmin(input: { adminUserId: number; staffUserId: number }) {
+    if (!Number.isFinite(input.adminUserId) || input.adminUserId <= 0) {
+      throw new BadRequestException('A valid admin_user_id is required.');
+    }
+
+    if (!Number.isFinite(input.staffUserId) || input.staffUserId <= 0) {
+      throw new BadRequestException('A valid staff user id is required.');
+    }
+
+    if (input.adminUserId === input.staffUserId) {
+      throw new ForbiddenException('You cannot remove your own account from this screen.');
+    }
+
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new ForbiddenException('Only store admin accounts can remove staff for their store.');
+    }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.roleColumn || !userColumns.storeIdColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for staff deletion.');
+    }
+
+    try {
+      const rows = await this.hardDeleteUserByRole(input.staffUserId, 'STAFF', admin.store_id, userColumns);
+
+      if (rows.length === 0) {
+        throw new NotFoundException('Staff account was not found for this store.');
+      }
+
+      return { id: rows[0].id, deleted: true, deactivated: false };
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to delete staff account.');
     }
   }
 

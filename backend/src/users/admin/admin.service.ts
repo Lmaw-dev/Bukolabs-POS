@@ -34,6 +34,10 @@ export class AdminService {
     return this.databaseService.deleteStaffAccountForAdmin(input);
   }
 
+  permanentlyDeleteStaff(input: { adminUserId: number; staffUserId: number }) {
+    return this.databaseService.permanentlyDeleteStaffAccountForAdmin(input);
+  }
+
   activateStaff(input: { adminUserId: number; staffUserId: number }) {
     return this.databaseService.activateStaffAccountForAdmin(input);
   }

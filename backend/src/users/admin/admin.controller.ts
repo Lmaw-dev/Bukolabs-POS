@@ -305,6 +305,14 @@ export class AdminController {
     });
   }
 
+  @Delete('staff/:id/permanent')
+  permanentlyDeleteStaff(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.permanentlyDeleteStaff({
+      adminUserId: Number(adminUserId),
+      staffUserId: Number(id),
+    });
+  }
+
   @Patch('staff/:id/activate')
   activateStaff(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
     return this.adminService.activateStaff({

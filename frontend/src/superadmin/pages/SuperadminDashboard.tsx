@@ -16,6 +16,7 @@ import {
   Search,
   Store,
   StoreIcon,
+  Trash2,
   UserPlus,
   Utensils,
   X,
@@ -84,6 +85,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
+  const [permanentlyDeletingAdminId, setPermanentlyDeletingAdminId] = useState<number | null>(null);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -251,6 +253,32 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       setError(activateError instanceof Error ? activateError.message : 'Unable to activate admin account.');
     } finally {
       setDeletingAdminId(null);
+    }
+  };
+
+  const handlePermanentlyDeleteAdmin = async (admin: AdminSummary) => {
+    if (!window.confirm(`Permanently delete ${admin.full_name}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setPermanentlyDeletingAdminId(admin.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins/${admin.id}/permanent`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to delete admin account.');
+      }
+
+      setAdmins((current) => current.filter((item) => item.id !== admin.id));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete admin account.');
+    } finally {
+      setPermanentlyDeletingAdminId(null);
     }
   };
 
@@ -678,6 +706,16 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                                     <CircleCheck className="h-4 w-4" />
                                   </button>
                                 )}
+                                <button
+                                  type="button"
+                                  onClick={() => void handlePermanentlyDeleteAdmin(admin)}
+                                  disabled={permanentlyDeletingAdminId === admin.id}
+                                  className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+                                  title="Delete admin"
+                                  aria-label={`Delete ${admin.full_name}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
                               </div>
                             </td>
                           </tr>

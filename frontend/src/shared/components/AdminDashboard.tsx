@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Sidebar } from './Sidebar';
-import { Ban, CircleCheck, Eye, EyeOff, Pencil, UserPlus, X } from 'lucide-react';
+import { Ban, CircleCheck, Eye, EyeOff, KeyRound, Pencil, Trash2, UserPlus, X } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser, StaffType } from '../../auth/types/auth';
@@ -31,6 +31,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   const [submitting, setSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
   const [statusActionUserId, setStatusActionUserId] = useState<number | null>(null);
+  const [deleteActionUserId, setDeleteActionUserId] = useState<number | null>(null);
 
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -185,6 +186,32 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     }
   };
 
+  const handleDeleteUser = async (user: StaffUser) => {
+    if (!currentUser?.id || !window.confirm(`Permanently delete ${user.full_name}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleteActionUserId(user.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/admin/staff/${user.id}/permanent?admin_user_id=${currentUser.id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to delete staff account.');
+      }
+
+      setUsers((current) => current.filter((staff) => staff.id !== user.id));
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete staff account.');
+    } finally {
+      setDeleteActionUserId(null);
+    }
+  };
+
   return (
     <div className="flex h-screen">
       <Sidebar currentPage="admin-dashboard" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} />
@@ -249,38 +276,58 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                       <td className="px-6 py-4">{user.store_id}</td>
                       <td className="px-6 py-4">{statusBadge(user)}</td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
                             onClick={() => handleEditUser(user)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-muted"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#003534]"
+                            title="Edit staff"
+                            aria-label={`Edit ${user.full_name}`}
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Edit
+                            <Pencil className="h-5 w-5" strokeWidth={1.9} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditUser(user)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#003534]"
+                            title="Reset password"
+                            aria-label={`Reset password for ${user.full_name}`}
+                          >
+                            <KeyRound className="h-5 w-5" strokeWidth={1.9} />
                           </button>
                           {isStaffActive(user) ? (
                             <button
                               type="button"
                               onClick={() => handleDeactivateUser(user)}
                               disabled={statusActionUserId === user.id}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
-                              title="Deactivate account"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+                              title="Deactivate staff"
                               aria-label={`Deactivate ${user.full_name}`}
                             >
-                              <Ban className="h-4 w-4" />
+                              <Ban className="h-5 w-5" strokeWidth={1.9} />
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => handleActivateUser(user)}
                               disabled={statusActionUserId === user.id}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-60"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
                               title="Activate account"
                               aria-label={`Activate ${user.full_name}`}
                             >
-                              <CircleCheck className="h-4 w-4" />
+                              <CircleCheck className="h-5 w-5" strokeWidth={1.9} />
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={deleteActionUserId === user.id}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
+                            title="Delete staff"
+                            aria-label={`Delete ${user.full_name}`}
+                          >
+                            <Trash2 className="h-5 w-5" strokeWidth={1.9} />
+                          </button>
                         </div>
                       </td>
                     </tr>

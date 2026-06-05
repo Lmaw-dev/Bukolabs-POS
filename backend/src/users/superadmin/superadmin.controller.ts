@@ -87,6 +87,11 @@ export class SuperadminController {
     return this.superadminService.deleteAdminAccount(Number(id));
   }
 
+  @Delete('admins/:id/permanent')
+  permanentlyDeleteAdmin(@Param('id') id: string) {
+    return this.superadminService.permanentlyDeleteAdminAccount(Number(id));
+  }
+
   @Patch('admins/:id/activate')
   activateAdmin(@Param('id') id: string) {
     return this.superadminService.activateAdminAccount(Number(id));
