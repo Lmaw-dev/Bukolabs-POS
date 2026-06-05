@@ -157,7 +157,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               type="button"
               onClick={onLogout}
               className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-              style={{ background: 'rgba(255,255,255,0.12)' }}
+              style={{ background: 'rgba(255,255,255,0.2)' }}
             >
               Sign Out
             </button>
