@@ -69,13 +69,31 @@ export class AdminService {
     enableVoid?: boolean;
     enableDiscount?: boolean;
     enableServiceCharge?: boolean;
-    serviceChargePercentage?: number;
+    serviceChargeRate?: number;
+    enableTax?: boolean;
+    taxRate?: number;
     enableDineIn?: boolean;
     enableTakeout?: boolean;
     enableIngredientCustomization?: boolean;
     enableReceiptPrinting?: boolean;
   }) {
     return this.databaseService.updateStoreSettingsForAdmin(input);
+  }
+
+  listDiscountSettings(adminUserId: number) {
+    return this.databaseService.listDiscountSettingsForAdmin(adminUserId);
+  }
+
+  createDiscountSetting(input: { adminUserId: number; discountName: string; discountRate: number; isEnabled: boolean }) {
+    return this.databaseService.createDiscountSettingForAdmin(input);
+  }
+
+  updateDiscountSetting(input: { adminUserId: number; discountId: number; discountName: string; discountRate: number; isEnabled: boolean }) {
+    return this.databaseService.updateDiscountSettingForAdmin(input);
+  }
+
+  deleteDiscountSetting(input: { adminUserId: number; discountId: number }) {
+    return this.databaseService.deleteDiscountSettingForAdmin(input);
   }
 
   listCategories(adminUserId: number) {

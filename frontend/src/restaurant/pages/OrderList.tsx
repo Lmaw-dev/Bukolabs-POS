@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { X, Search, Eye, CreditCard, Printer, RotateCcw, CheckCircle, ChevronDown, Download, Users } from 'lucide-react';
 import { useOrders, Order } from '../../shared/context/OrderContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 
 interface OrderListProps {
   onNavigate: (page: Page) => void;
@@ -28,6 +29,7 @@ function generateId(prefix: string) {
 
 export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: OrderListProps) {
   const { orders, updateOrder, removeOrder, completePayment } = useOrders();
+  const { settings } = useStoreSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [paymentFilter, setPaymentFilter] = useState('All');
@@ -43,6 +45,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [refundReason, setRefundReason] = useState('');
 
   const openModal = (order: Order, modal: ActiveModal) => {
+    if (modal === 'refund' && !settings.enable_refund) return;
     setSelectedOrder(order);
     setActiveModal(modal);
   };
@@ -81,6 +84,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   };
 
   const handleRefundSubmit = () => {
+    if (!settings.enable_refund) return;
     if (!selectedOrder || !refundReason.trim()) return;
     removeOrder(selectedOrder.id);
     closeModal();
@@ -321,7 +325,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                         )}
 
                         {/* Receipt - only if Paid */}
-                        {order.paymentStatus === 'Paid' && (
+                        {settings.enable_refund && order.paymentStatus === 'Paid' && (
                           <button
                             onClick={() => openModal(order, 'receipt')}
                             title="View Receipt"

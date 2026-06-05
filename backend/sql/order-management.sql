@@ -1,13 +1,17 @@
 CREATE TABLE IF NOT EXISTS store_settings (
   id BIGSERIAL PRIMARY KEY,
   store_id BIGINT UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+  store_type VARCHAR(50),
   enable_customer_recommendation BOOLEAN DEFAULT TRUE,
   enable_table_management BOOLEAN DEFAULT TRUE,
   enable_refund BOOLEAN DEFAULT TRUE,
   enable_void BOOLEAN DEFAULT TRUE,
   enable_discount BOOLEAN DEFAULT TRUE,
   enable_service_charge BOOLEAN DEFAULT TRUE,
+  service_charge_rate DECIMAL(5,2) DEFAULT 0,
   service_charge_percentage DECIMAL(5,2) DEFAULT 0,
+  enable_tax BOOLEAN DEFAULT TRUE,
+  tax_rate DECIMAL(5,2) DEFAULT 0,
   enable_dine_in BOOLEAN DEFAULT TRUE,
   enable_takeout BOOLEAN DEFAULT TRUE,
   enable_ingredient_customization BOOLEAN DEFAULT TRUE,
@@ -17,11 +21,29 @@ CREATE TABLE IF NOT EXISTS store_settings (
 );
 
 ALTER TABLE store_settings
+  ADD COLUMN IF NOT EXISTS store_type VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS enable_customer_recommendation BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_table_management BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_refund BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_void BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_discount BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enable_service_charge BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS service_charge_rate DECIMAL(5,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS service_charge_percentage DECIMAL(5,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS enable_tax BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS tax_rate DECIMAL(5,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS enable_dine_in BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS enable_takeout BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS enable_ingredient_customization BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   ADD COLUMN IF NOT EXISTS enable_receipt_printing BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+UPDATE store_settings
+SET service_charge_rate = COALESCE(service_charge_rate, service_charge_percentage, 0),
+    service_charge_percentage = COALESCE(service_charge_percentage, service_charge_rate, 0)
+WHERE service_charge_rate IS NULL
+   OR service_charge_percentage IS NULL;
 
 CREATE TABLE IF NOT EXISTS discount_types (
   id BIGSERIAL PRIMARY KEY,
@@ -34,6 +56,18 @@ CREATE TABLE IF NOT EXISTS discount_types (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS discount_settings (
+  id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  discount_name VARCHAR(100) NOT NULL,
+  discount_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+  is_enabled BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS discount_settings_store_id_idx ON discount_settings(store_id);
 
 CREATE TABLE IF NOT EXISTS product_categories (
   id BIGSERIAL PRIMARY KEY,

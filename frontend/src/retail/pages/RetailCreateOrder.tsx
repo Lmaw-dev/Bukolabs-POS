@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { Minus, Plus, Search, X, AlertCircle, ShoppingBag, Shirt, Barcode, Receipt, Trash2, Printer } from 'lucide-react';
 import { useOrders } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 
 interface RetailCreateOrderProps {
   onNavigate: (page: Page) => void;
@@ -238,6 +239,12 @@ const products = [
 
 export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailCreateOrderProps) {
   const { addOrder, orders, getCustomerHistory, getRecommendedProducts } = useOrders();
+  const { settings, discounts } = useStoreSettings();
+  const enabledDiscounts = discounts.filter((discount) => discount.is_enabled);
+  const findDiscountRate = (name: string, fallback: number) => {
+    const discount = enabledDiscounts.find((item) => item.discount_name.toLowerCase().includes(name.toLowerCase()));
+    return discount ? Number(discount.discount_rate) / 100 : fallback;
+  };
   const transactionNumberRef = useRef(100001);
   const [currentTransactionNumber, setCurrentTransactionNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
@@ -435,17 +442,22 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   });
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.12; // 12% tax
+  const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
+  const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
 
   // Calculate discount
   let discountRate = 0;
-  if (discountType === 'senior' || discountType === 'pwd') {
-    discountRate = 0.20; // 20%
+  if (!settings.enable_discount) {
+    discountRate = 0;
+  } else if (discountType === 'senior') {
+    discountRate = findDiscountRate('Senior', 0.2);
+  } else if (discountType === 'pwd') {
+    discountRate = findDiscountRate('PWD', 0.2);
   } else if (discountType === 'custom') {
-    discountRate = customDiscountPercent / 100;
+    discountRate = customDiscountPercent > 0 ? customDiscountPercent / 100 : findDiscountRate('Custom', 0);
   }
   const discount = subtotal * discountRate;
-  const total = subtotal + tax - discount;
+  const total = subtotal + serviceFee + tax - discount;
 
   const validateOrder = (): boolean => {
     if (cart.length === 0) {
@@ -496,6 +508,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
         price: item.price,
       })),
       subtotal,
+      serviceFee,
       discount,
       discountType: discountType !== 'none' ? (
         discountType === 'senior' ? 'Senior Citizen (20%)' :
@@ -773,11 +786,20 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
             <span className="text-muted-foreground">Subtotal:</span>
             <span>₱ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax (12%):</span>
-            <span>₱ {tax.toFixed(2)}</span>
-          </div>
+          {settings.enable_service_charge && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
+              <span>PHP {serviceFee.toFixed(2)}</span>
+            </div>
+          )}
+          {settings.enable_tax && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
+              <span>PHP {tax.toFixed(2)}</span>
+            </div>
+          )}
 
+          {settings.enable_discount && (
           <div className="border-t border-border pt-2 mt-2">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs text-muted-foreground">Discount:</span>
@@ -801,6 +823,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
               <p className="text-xs text-muted-foreground">No discount applied</p>
             )}
           </div>
+          )}
 
           <div className="flex justify-between pt-2 border-t border-border font-medium">
             <span>TOTAL:</span>
@@ -1087,5 +1110,6 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
     </div>
   );
 }
+
 
 
