@@ -295,10 +295,13 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-[#0f172a]">
-      <aside className="fixed inset-y-0 left-0 z-30 flex w-80 flex-col overflow-y-auto bg-[#111827] text-white">
+      <aside
+        className="fixed inset-y-0 left-0 z-30 flex w-80 flex-col overflow-y-auto text-white"
+        style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
+      >
         <div className="border-b border-white/10 px-6 pb-8 pt-12">
           <div className="text-center">
-            <div className="mx-auto mb-8 flex h-20 w-24 items-center justify-center text-slate-600">
+            <div className="mx-auto mb-8 flex h-20 w-24 items-center justify-center text-[#008967]">
               <StoreIcon className="h-16 w-16" strokeWidth={1.6} />
             </div>
             <h1 className="truncate text-2xl font-semibold tracking-tight text-white">Unified POS</h1>
@@ -315,9 +318,14 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             }}
             className={`mb-4 flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
               activeSection === 'stores'
-                ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
-                : 'border-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+                ? 'border-[#00a7a5]/25 text-white'
+                : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
             }`}
+            style={
+              activeSection === 'stores'
+                ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
+                : undefined
+            }
           >
             <StoreIcon className="h-6 w-6 shrink-0" strokeWidth={1.8} />
             <span className={`flex-1 text-base ${activeSection === 'stores' ? 'font-semibold' : 'font-medium'}`}>Stores</span>
@@ -330,9 +338,14 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             }}
             className={`flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
               activeSection === 'admins'
-                ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
-                : 'border-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+                ? 'border-[#00a7a5]/25 text-white'
+                : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
             }`}
+            style={
+              activeSection === 'admins'
+                ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
+                : undefined
+            }
           >
             <UserPlus className="h-6 w-6 shrink-0" strokeWidth={1.8} />
             <span className={`flex-1 text-base ${activeSection === 'admins' ? 'font-semibold' : 'font-medium'}`}>Admin Accounts</span>
@@ -347,7 +360,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           <button
             type="button"
             onClick={onLogout}
-            className="flex h-[52px] w-full items-center gap-4 rounded-lg border border-transparent px-4 text-left text-slate-500 transition hover:bg-red-500/10 hover:text-red-400"
+            className="flex h-[52px] w-full items-center gap-4 rounded-lg border border-transparent px-4 text-left text-white transition hover:bg-red-500/10 hover:text-red-400"
           >
             <LogOut className="h-6 w-6 shrink-0" strokeWidth={1.8} />
             <span className="flex-1 text-base font-medium">Logout</span>
