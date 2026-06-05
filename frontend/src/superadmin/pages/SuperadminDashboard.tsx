@@ -385,11 +385,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           </button>
         </nav>
 
-        <div className="border-t border-white/10 px-5 py-8">
-          <div className="mb-8 px-4">
-            <p className="truncate text-lg font-semibold leading-tight text-white">{currentUser?.full_name ?? 'Super Admin'}</p>
-            <p className="truncate text-lg leading-tight text-slate-200">Super Admin</p>
-          </div>
+        <div className="border-t border-white/10 px-5 py-4">
           <button
             type="button"
             onClick={onLogout}
