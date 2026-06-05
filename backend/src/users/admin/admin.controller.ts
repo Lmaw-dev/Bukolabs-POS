@@ -133,7 +133,21 @@ class UpdateStoreSettingsDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  service_charge_rate?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
   service_charge_percentage?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_tax?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  tax_rate?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -150,6 +164,23 @@ class UpdateStoreSettingsDto {
   @IsOptional()
   @IsBoolean()
   enable_receipt_printing?: boolean;
+}
+
+class DiscountSettingDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsString()
+  discount_name!: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  discount_rate!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_enabled?: boolean;
 }
 
 class CategoryDto {
@@ -314,11 +345,47 @@ export class AdminController {
       enableVoid: body.enable_void,
       enableDiscount: body.enable_discount,
       enableServiceCharge: body.enable_service_charge,
-      serviceChargePercentage: body.service_charge_percentage,
+      serviceChargeRate: body.service_charge_rate ?? body.service_charge_percentage,
+      enableTax: body.enable_tax,
+      taxRate: body.tax_rate,
       enableDineIn: body.enable_dine_in,
       enableTakeout: body.enable_takeout,
       enableIngredientCustomization: body.enable_ingredient_customization,
       enableReceiptPrinting: body.enable_receipt_printing,
+    });
+  }
+
+  @Get('discount-settings')
+  listDiscountSettings(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listDiscountSettings(Number(adminUserId));
+  }
+
+  @Post('discount-settings')
+  createDiscountSetting(@Body() body: DiscountSettingDto) {
+    return this.adminService.createDiscountSetting({
+      adminUserId: Number(body.admin_user_id),
+      discountName: body.discount_name,
+      discountRate: body.discount_rate,
+      isEnabled: body.is_enabled ?? true,
+    });
+  }
+
+  @Patch('discount-settings/:id')
+  updateDiscountSetting(@Param('id') id: string, @Body() body: DiscountSettingDto) {
+    return this.adminService.updateDiscountSetting({
+      adminUserId: Number(body.admin_user_id),
+      discountId: Number(id),
+      discountName: body.discount_name,
+      discountRate: body.discount_rate,
+      isEnabled: body.is_enabled ?? true,
+    });
+  }
+
+  @Delete('discount-settings/:id')
+  deleteDiscountSetting(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteDiscountSetting({
+      adminUserId: Number(adminUserId),
+      discountId: Number(id),
     });
   }
 

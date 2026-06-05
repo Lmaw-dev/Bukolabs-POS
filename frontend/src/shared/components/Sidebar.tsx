@@ -1,6 +1,7 @@
 import { Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed, Store, ShoppingBag, Settings, Tags, Package } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import type { StaffType } from '../../auth/types/auth';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 interface SidebarProps {
   currentPage: Page;
@@ -15,6 +16,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RESTAURANT', staffType = 'POS_STAFF' }: SidebarProps) {
   const isRetail = storeType === 'RETAIL_STORE';
+  const { settings } = useStoreSettings();
 
   const restaurantAdminMenuItems = [
     { icon: Home, label: 'Dashboard', page: 'pos-dashboard' as Page },
@@ -56,45 +58,55 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
   const menuItems = isAdmin
     ? (isRetail ? retailAdminMenuItems : restaurantAdminMenuItems)
     : (isRetail ? retailStaffMenuItems : restaurantStaffMenuItems);
+  const visibleMenuItems = menuItems.filter((item) => item.page !== 'table-management' || settings.enable_table_management);
   const defaultTitle = isRetail ? 'Retail Store' : 'The Restaurant';
   const headerTitle = storeBrand?.name || defaultTitle;
   const userRoleLabel = isAdmin ? 'Admin' : 'POS Staff';
 
   return (
-    <div className="flex h-screen w-80 shrink-0 flex-col bg-[#111827] text-[#f8fafc]">
-      <div className="border-b border-white/10 px-6 pb-8 pt-12">
+    <div
+      className="sticky top-0 flex h-screen w-80 shrink-0 flex-col overflow-hidden text-white"
+      style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
+    >
+      <div className="shrink-0 border-b border-white/10 px-6 pb-5 pt-6">
         <div className="text-center">
-          <div className="mx-auto mb-8 flex h-20 w-24 items-center justify-center overflow-hidden bg-transparent p-1 text-slate-600">
+          <div className="mx-auto mb-3 flex h-10 w-12 items-center justify-center overflow-hidden bg-transparent p-1 text-[#008967]">
             {storeBrand?.logo ? (
               <img src={storeBrand.logo} alt={headerTitle} className="h-full w-full object-contain" />
             ) : isRetail ? (
-              <ShoppingBag className="h-16 w-16" strokeWidth={1.6} />
+              <ShoppingBag className="h-9 w-9" strokeWidth={1.6} />
             ) : (
-              <UtensilsCrossed className="h-16 w-16" strokeWidth={1.6} />
+              <UtensilsCrossed className="h-9 w-9" strokeWidth={1.6} />
             )}
           </div>
-          <h2 className="truncate text-2xl font-semibold tracking-tight text-white">{headerTitle}</h2>
+          <h2 className="truncate text-xl font-semibold tracking-tight text-white">{headerTitle}</h2>
+          <p className="mt-1 text-base leading-tight text-slate-200">{userRoleLabel}</p>
         </div>
       </div>
 
-      <nav className="flex-1 px-5 py-7">
-        <ul className="space-y-4">
-          {menuItems.map((item) => {
+      <nav className="min-h-0 flex-1 px-5 py-3">
+        <ul className="space-y-1">
+          {visibleMenuItems.map((item) => {
             const active = currentPage === item.page;
             return (
               <li key={item.page}>
                 <button
                   onClick={() => onNavigate(item.page)}
-                  className={`flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
+                  className={`flex h-9 w-full items-center gap-3 rounded-lg border px-4 text-left transition ${
                     active
-                      ? 'border-emerald-500/30 bg-emerald-500/15 text-emerald-400'
-                      : 'border-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+                      ? 'border-[#00a7a5]/25 text-white'
+                      : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
                   }`}
+                  style={
+                    active
+                      ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
+                      : undefined
+                  }
                 >
                   <span className="shrink-0">
-                    <item.icon className="h-6 w-6" strokeWidth={1.8} />
+                    <item.icon className="h-4 w-4" strokeWidth={1.8} />
                   </span>
-                  <span className={`flex-1 text-base ${active ? 'font-semibold' : 'font-medium'}`}>
+                  <span className={`flex-1 text-[15px] ${active ? 'font-semibold' : 'font-medium'}`}>
                     {item.label}
                   </span>
                 </button>
@@ -104,21 +116,21 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
         </ul>
       </nav>
 
-      <div className="border-t border-white/10 px-5 py-8">
-        <div className="mb-8 px-4">
+      <div className="shrink-0 border-t border-white/10 px-5 py-3 text-white">
+        <div className="mb-2 px-4">
           <div className="min-w-0">
-            <p className="truncate text-lg font-semibold leading-tight text-white">{userName || (isAdmin ? 'Administrator' : 'Staff')}</p>
-            <p className="truncate text-lg leading-tight text-slate-200">{userRoleLabel}</p>
+            <p className="truncate text-base font-semibold leading-tight text-white">{userName || (isAdmin ? 'Administrator' : 'Staff')}</p>
+            <p className="truncate text-base leading-tight text-slate-200">{userRoleLabel}</p>
           </div>
         </div>
         <button
           onClick={onLogout}
-          className="flex h-[52px] w-full items-center gap-4 rounded-lg border border-transparent px-4 text-left text-slate-500 transition hover:bg-red-500/10 hover:text-red-400"
+          className="flex h-9 w-full items-center gap-3 rounded-lg border border-transparent px-4 text-left text-white transition hover:bg-red-500/10 hover:text-red-200"
         >
           <span className="shrink-0">
-            <LogOut className="h-6 w-6" strokeWidth={1.8} />
+            <LogOut className="h-4 w-4" strokeWidth={1.8} />
           </span>
-          <span className="flex-1 text-base font-medium">
+          <span className="flex-1 text-[15px] font-medium">
             Logout
           </span>
         </button>

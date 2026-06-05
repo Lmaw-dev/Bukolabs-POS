@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { X, Search, Eye, Receipt, RotateCcw, Printer, XCircle } from 'lucide-react';
 import { useOrders, Order } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 
 interface RetailOrderListProps {
   onNavigate: (page: Page) => void;
@@ -18,6 +19,7 @@ interface RetailOrderListProps {
 
 export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailOrderListProps) {
   const { orders, refundOrderItems, voidTransaction } = useOrders();
+  const { settings } = useStoreSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
@@ -61,6 +63,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   };
 
   const handleRefundClick = (order: Order) => {
+    if (!settings.enable_refund) return;
     setOrderToRefund(order);
     setSelectedRefundItems({});
     setRefundReason('');
@@ -75,6 +78,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   };
 
   const handleRefundConfirm = () => {
+    if (!settings.enable_refund) return;
     if (!orderToRefund) return;
 
     const selectedIndices = Object.keys(selectedRefundItems)
@@ -94,12 +98,14 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   };
 
   const handleVoidClick = (order: Order) => {
+    if (!settings.enable_void) return;
     setOrderToVoid(order);
     setVoidReason('');
     setShowVoidModal(true);
   };
 
   const handleVoidConfirm = () => {
+    if (!settings.enable_void) return;
     if (!orderToVoid || !voidReason.trim()) return;
 
     voidTransaction(orderToVoid.id, voidReason, 'Cashier');
@@ -219,7 +225,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
                             <Receipt className="w-3.5 h-3.5" />
                             Receipt
                           </button>
-                          {(order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Refunded') && !order.items.every(item => item.refunded) && (
+                          {settings.enable_refund && (order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Refunded') && !order.items.every(item => item.refunded) && (
                             <button
                               onClick={() => handleRefundClick(order)}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -229,7 +235,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
                               Refund
                             </button>
                           )}
-                          {order.paymentStatus === 'Paid' && (
+                          {settings.enable_void && order.paymentStatus === 'Paid' && (
                             <button
                               onClick={() => handleVoidClick(order)}
                               className="inline-flex items-center gap-1 px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"

@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 import wagyuSteakImg from '../../imports/image-4.png';
 import trufflePastaImg from '../../imports/image-5.png';
@@ -259,6 +260,11 @@ function toOrderListFormat(order: any, paid: boolean) {
 export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType, staffType }: CreateOrderProps) {
   const { addOrder, orders } = useOrders();
   const { tables } = useTables();
+  const { settings, discounts } = useStoreSettings();
+  const tableManagementEnabled = settings.enable_table_management;
+  const customerRecommendationEnabled = settings.enable_customer_recommendation;
+  const discountEnabled = settings.enable_discount;
+  const enabledDiscounts = discounts.filter((discount) => discount.is_enabled);
   const orderNumberRef = useRef(100001); // Start from 100001
   const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
@@ -280,7 +286,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [partySize, setPartySize] = useState<string>('');
-  const [discountType, setDiscountType] = useState<'none' | 'senior' | 'pwd' | 'promo' | 'custom'>('none');
+  const [discountType, setDiscountType] = useState<string>('none');
   const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
   const [discountIdNumber, setDiscountIdNumber] = useState<string>('');
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -299,7 +305,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
 
   // Autocomplete: Get unique customer names and filter based on input
   useEffect(() => {
-    if (!customerName.trim()) {
+    if (!customerRecommendationEnabled || !customerName.trim()) {
       setShowCustomerSuggestions(false);
       setCustomerSuggestions([]);
       return;
@@ -327,7 +333,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
     }
 
     setSelectedSuggestionIndex(-1);
-  }, [customerName, orders]);
+  }, [customerName, orders, customerRecommendationEnabled]);
 
   // Close suggestions dropdown when clicking outside
   useEffect(() => {
@@ -381,7 +387,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
 
   // Auto-check customer history from actual orders
   useEffect(() => {
-    if (!customerName.trim()) {
+    if (!customerRecommendationEnabled || !customerName.trim()) {
       setHasHistory(false);
       setRecommendedProducts([]);
       return;
@@ -426,7 +432,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       setHasHistory(false);
       setRecommendedProducts([]);
     }
-  }, [customerName, orders]);
+  }, [customerName, orders, customerRecommendationEnabled]);
 
   const addToCart = (product: typeof products[0], orderType?: 'dine-in' | 'takeout') => {
     const typeToUse = orderType || (diningOption === 'dine-in' || diningOption === 'takeout' ? diningOption : 'dine-in');
@@ -519,18 +525,15 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
   });
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const serviceFee = subtotal * 0.01; // 1% service fee
-  const tax = subtotal * 0.12; // 12% tax calculated on subtotal
+  const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
+  const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
+  const selectedDiscount = enabledDiscounts.find((item) => String(item.id) === discountType);
+  const selectedDiscountName = selectedDiscount?.discount_name ?? '';
+  const selectedDiscountRate = selectedDiscount ? Number(selectedDiscount.discount_rate) : 0;
+  const selectedDiscountNeedsId = /pwd|senior/i.test(selectedDiscountName);
 
   // Calculate discount based on type
-  let discountRate = 0;
-  if (discountType === 'senior' || discountType === 'pwd') {
-    discountRate = 0.20; // 20%
-  } else if (discountType === 'promo') {
-    discountRate = 0.10; // 10%
-  } else if (discountType === 'custom') {
-    discountRate = customDiscountPercent / 100;
-  }
+  const discountRate = discountEnabled && selectedDiscount ? selectedDiscountRate / 100 : 0;
   const discount = subtotal * discountRate;
 
   const total = subtotal + serviceFee + tax - discount;
@@ -550,7 +553,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
     }
 
     // Only validate party size and table for dine-in orders
-    const hasDineIn = cart.some(item => item.orderType === 'dine-in');
+    const hasDineIn = tableManagementEnabled && cart.some(item => item.orderType === 'dine-in');
     if (hasDineIn) {
       if (!partySize || parseInt(partySize) < 1) {
         setValidationError('Please enter the number of customers.');
@@ -887,7 +890,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
         </div>
 
         {/* Show party size and table selection when Dine-In is selected */}
-        {diningOption === 'dine-in' && (
+        {tableManagementEnabled && diningOption === 'dine-in' && (
           <div className="mb-4 space-y-2">
             <div>
               <label className="block text-xs text-muted-foreground mb-1.5">Number of Customers (Pila mo kabuok?):</label>
@@ -1102,16 +1105,21 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
             <span className="text-muted-foreground">Subtotal:</span>
             <span>₱ {subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Service Fee (1%):</span>
-            <span>₱ {serviceFee.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Tax (12%):</span>
-            <span>₱ {tax.toFixed(2)}</span>
-          </div>
+          {settings.enable_service_charge && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
+              <span>PHP {serviceFee.toFixed(2)}</span>
+            </div>
+          )}
+          {settings.enable_tax && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
+              <span>PHP {tax.toFixed(2)}</span>
+            </div>
+          )}
 
           {/* Discount section with Edit button */}
+          {discountEnabled && (
           <div className="border-t border-border pt-2 mt-2">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs text-muted-foreground">Discount:</span>
@@ -1126,10 +1134,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
             {discount > 0 ? (
               <div className="flex justify-between text-destructive text-xs">
                 <span>
-                  {discountType === 'senior' ? 'Senior Citizen (20%)' :
-                   discountType === 'pwd' ? 'PWD (20%)' :
-                   discountType === 'promo' ? 'Promo Discount (10%)' :
-                   `Custom (${customDiscountPercent}%)`}
+                  {selectedDiscountName} ({selectedDiscountRate}%)
                   {discountIdNumber && ` - ID: ${discountIdNumber}`}
                 </span>
                 <span>- ₱ {discount.toFixed(2)}</span>
@@ -1138,6 +1143,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
               <p className="text-xs text-muted-foreground">No discount applied</p>
             )}
           </div>
+          )}
 
           <div className="flex justify-between pt-2 border-t border-border font-medium">
             <span>TOTAL:</span>
@@ -1287,22 +1293,21 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                   <span>Subtotal:</span>
                   <span>₱{subtotal.toFixed(2)}</span>
                 </div>
+                {settings.enable_service_charge && (
                 <div className="flex justify-between">
-                  <span>Service Fee (1%):</span>
+                  <span>Service Fee ({settings.service_charge_rate}%):</span>
                   <span>₱{serviceFee.toFixed(2)}</span>
                 </div>
+                )}
+                {settings.enable_tax && (
                 <div className="flex justify-between">
-                  <span>Tax (12%):</span>
+                  <span>Tax ({settings.tax_rate}%):</span>
                   <span>₱{tax.toFixed(2)}</span>
                 </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between text-destructive">
-                    <span>Discount ({
-                      discountType === 'senior' ? 'Senior Citizen' :
-                      discountType === 'pwd' ? 'PWD' :
-                      discountType === 'promo' ? 'Promo' :
-                      `Custom ${customDiscountPercent}%`
-                    }):</span>
+                    <span>Discount ({selectedDiscountName} {selectedDiscountRate}%):</span>
                     <span>- ₱{discount.toFixed(2)}</span>
                   </div>
                 )}
@@ -1505,14 +1510,18 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                     <span className="text-muted-foreground">Subtotal:</span>
                     <span>₱{subtotal.toFixed(2)}</span>
                   </div>
+                  {settings.enable_service_charge && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Service Fee (1%):</span>
+                    <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
                     <span>₱{serviceFee.toFixed(2)}</span>
                   </div>
+                  )}
+                  {settings.enable_tax && (
                   <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Tax (12%):</span>
+                    <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
                     <span>₱{tax.toFixed(2)}</span>
                   </div>
+                  )}
                   {discount > 0 && (
                     <div className="flex justify-between text-destructive text-xs">
                       <span>Discount:</span>
@@ -2116,3 +2125,4 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
     </div>
   );
 }
+

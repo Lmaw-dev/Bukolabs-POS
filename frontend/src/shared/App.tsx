@@ -21,6 +21,7 @@ import { CategoryManagement } from './components/CategoryManagement';
 import { ProductManagement } from './components/ProductManagement';
 import { OrderProvider } from './context/OrderContext';
 import { TableProvider } from './context/TableContext';
+import { StoreSettingsProvider } from './context/StoreSettingsContext';
 import { getApiBaseUrl } from '../auth/services/auth';
 import type { AuthenticatedUser } from '../auth/types/auth';
 
@@ -143,8 +144,9 @@ export default function App() {
 
   return (
     <div className="size-full bg-background">
-      <OrderProvider>
-        <TableProvider>
+      <StoreSettingsProvider currentUser={currentUser}>
+        <OrderProvider>
+          <TableProvider>
           {currentPage === 'login' && (
             <LoginPage onLogin={handleLogin} />
           )}
@@ -245,8 +247,9 @@ export default function App() {
           {currentPage === 'product-management' && (
             <ProductManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
-        </TableProvider>
-      </OrderProvider>
+          </TableProvider>
+        </OrderProvider>
+      </StoreSettingsProvider>
     </div>
   );
 }

@@ -448,11 +448,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
           AND u.${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
-<<<<<<< HEAD
           ${userColumns.staffTypeColumn ? `AND u.${this.quoteIdentifier(userColumns.staffTypeColumn)} = 'POS_STAFF'` : ''}
-=======
-        ${this.activeUsersWhereClause(userColumns)}
->>>>>>> 97402b2a667932cf7ad0f55387450540e08e0766
+          ${this.activeUsersWhereClause(userColumns)}
         ORDER BY u.id ASC
       `,
       [admin.store_id],
@@ -767,20 +764,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   async getStoreSettingsForAdmin(adminUserId: number) {
     const admin = await this.getUserStoreScope(adminUserId);
 
-    if (admin.role !== 'ADMIN' || !admin.store_id) {
-      throw new InternalServerErrorException('Only store admin accounts can view store settings.');
+    if (!admin.store_id) {
+      throw new InternalServerErrorException('Only store-linked accounts can view store settings.');
     }
 
-    await this.ensureStoreSettingsRow(admin.store_id);
+    await this.ensureStoreSettingsRow(admin.store_id, admin.store_type);
 
     const rows = await this.query(
       `
         SELECT *
         FROM store_settings
         WHERE store_id = $1
+          AND (store_type = $2 OR store_type IS NULL)
         LIMIT 1
       `,
-      [admin.store_id],
+      [admin.store_id, admin.store_type],
     );
 
     return rows[0];
@@ -794,7 +792,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     enableVoid?: boolean;
     enableDiscount?: boolean;
     enableServiceCharge?: boolean;
-    serviceChargePercentage?: number;
+    serviceChargeRate?: number;
+    enableTax?: boolean;
+    taxRate?: number;
     enableDineIn?: boolean;
     enableTakeout?: boolean;
     enableIngredientCustomization?: boolean;
@@ -806,7 +806,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Only store admin accounts can update store settings.');
     }
 
-    await this.ensureStoreSettingsRow(admin.store_id);
+    await this.ensureStoreSettingsRow(admin.store_id, admin.store_type);
 
     const rows = await this.query(
       `
@@ -818,13 +818,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           enable_void = COALESCE($4, enable_void),
           enable_discount = COALESCE($5, enable_discount),
           enable_service_charge = COALESCE($6, enable_service_charge),
+          service_charge_rate = COALESCE($7, service_charge_rate),
           service_charge_percentage = COALESCE($7, service_charge_percentage),
-          enable_dine_in = COALESCE($8, enable_dine_in),
-          enable_takeout = COALESCE($9, enable_takeout),
-          enable_ingredient_customization = COALESCE($10, enable_ingredient_customization),
-          enable_receipt_printing = COALESCE($11, enable_receipt_printing),
+          enable_tax = COALESCE($8, enable_tax),
+          tax_rate = COALESCE($9, tax_rate),
+          enable_dine_in = COALESCE($10, enable_dine_in),
+          enable_takeout = COALESCE($11, enable_takeout),
+          enable_ingredient_customization = COALESCE($12, enable_ingredient_customization),
+          enable_receipt_printing = COALESCE($13, enable_receipt_printing),
+          store_type = COALESCE(store_type, $14),
           updated_at = CURRENT_TIMESTAMP
-        WHERE store_id = $12
+        WHERE store_id = $15
+          AND (store_type = $14 OR store_type IS NULL)
         RETURNING *
       `,
       [
@@ -834,16 +839,110 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.enableVoid,
         input.enableDiscount,
         input.enableServiceCharge,
-        input.serviceChargePercentage,
+        input.serviceChargeRate,
+        input.enableTax,
+        input.taxRate,
         input.enableDineIn,
         input.enableTakeout,
         input.enableIngredientCustomization,
         input.enableReceiptPrinting,
+        admin.store_type,
         admin.store_id,
       ],
     );
 
     return rows[0];
+  }
+
+  async listDiscountSettingsForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (!admin.store_id) {
+      throw new InternalServerErrorException('Only store-linked accounts can view discount settings.');
+    }
+
+    await this.ensureDefaultDiscountSettings(admin.store_id);
+
+    return this.query(
+      `
+        SELECT id, store_id, discount_name, discount_rate, is_enabled, created_at, updated_at
+        FROM discount_settings
+        WHERE store_id = $1
+        ORDER BY id ASC
+      `,
+      [admin.store_id],
+    );
+  }
+
+  async createDiscountSettingForAdmin(input: { adminUserId: number; discountName: string; discountRate: number; isEnabled: boolean }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can create discount settings.');
+    }
+
+    const rows = await this.query(
+      `
+        INSERT INTO discount_settings (store_id, discount_name, discount_rate, is_enabled)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, store_id, discount_name, discount_rate, is_enabled, created_at, updated_at
+      `,
+      [admin.store_id, input.discountName, input.discountRate, input.isEnabled],
+    );
+
+    return rows[0];
+  }
+
+  async updateDiscountSettingForAdmin(input: { adminUserId: number; discountId: number; discountName: string; discountRate: number; isEnabled: boolean }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update discount settings.');
+    }
+
+    const rows = await this.query(
+      `
+        UPDATE discount_settings
+        SET discount_name = $1,
+            discount_rate = $2,
+            is_enabled = $3,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $4
+          AND store_id = $5
+        RETURNING id, store_id, discount_name, discount_rate, is_enabled, created_at, updated_at
+      `,
+      [input.discountName, input.discountRate, input.isEnabled, input.discountId, admin.store_id],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Discount setting was not found for this store.');
+    }
+
+    return rows[0];
+  }
+
+  async deleteDiscountSettingForAdmin(input: { adminUserId: number; discountId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete discount settings.');
+    }
+
+    const rows = await this.query(
+      `
+        DELETE FROM discount_settings
+        WHERE id = $1
+          AND store_id = $2
+        RETURNING id
+      `,
+      [input.discountId, admin.store_id],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Discount setting was not found for this store.');
+    }
+
+    return { id: input.discountId };
   }
 
   async listCategoriesForAdmin(adminUserId: number) {
@@ -1123,25 +1222,55 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async ensureStoreSettingsRow(storeId: number) {
+  private async ensureStoreSettingsRow(storeId: number, storeType: string | null) {
     await this.query(
       `
         INSERT INTO store_settings (
           store_id,
+          store_type,
           enable_customer_recommendation,
           enable_table_management,
           enable_refund,
           enable_void,
           enable_discount,
           enable_service_charge,
+          service_charge_rate,
           service_charge_percentage,
+          enable_tax,
+          tax_rate,
           enable_dine_in,
           enable_takeout,
           enable_ingredient_customization,
           enable_receipt_printing
         )
-        VALUES ($1, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, TRUE, TRUE, TRUE, TRUE)
-        ON CONFLICT (store_id) DO NOTHING
+        VALUES ($1, $2, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, 0, TRUE, 0, TRUE, TRUE, TRUE, TRUE)
+        ON CONFLICT (store_id) DO UPDATE
+        SET store_type = COALESCE(store_settings.store_type, EXCLUDED.store_type),
+            service_charge_rate = COALESCE(store_settings.service_charge_rate, store_settings.service_charge_percentage, 0),
+            service_charge_percentage = COALESCE(store_settings.service_charge_percentage, store_settings.service_charge_rate, 0),
+            updated_at = CURRENT_TIMESTAMP
+      `,
+      [storeId, storeType],
+    );
+  }
+
+  private async ensureDefaultDiscountSettings(storeId: number) {
+    await this.query(
+      `
+        INSERT INTO discount_settings (store_id, discount_name, discount_rate, is_enabled)
+        SELECT $1, seed.discount_name, seed.discount_rate, TRUE
+        FROM (
+          VALUES
+            ('PWD', 20),
+            ('Senior Citizen', 20),
+            ('Promo Discount', 10),
+            ('Custom Discount', 0)
+        ) AS seed(discount_name, discount_rate)
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM discount_settings ds
+          WHERE ds.store_id = $1
+        )
       `,
       [storeId],
     );

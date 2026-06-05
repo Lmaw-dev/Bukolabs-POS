@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Sidebar } from './Sidebar';
-import { Pencil, Trash2, UserPlus, X } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Trash2, UserPlus, X } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser, StaffType } from '../../auth/types/auth';
@@ -34,6 +34,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [formStaffType, setFormStaffType] = useState<Exclude<StaffType, null>>('POS_STAFF');
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
         }
 
         setUsers(data);
+        setError('');
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : 'Unable to load staff accounts.');
       } finally {
@@ -67,6 +69,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     setFormName('');
     setFormEmail('');
     setFormPassword('');
+    setShowPassword(false);
     setFormStaffType('POS_STAFF');
     setError('');
     setShowModal(true);
@@ -77,6 +80,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     setFormName(user.full_name);
     setFormEmail(user.email);
     setFormPassword('');
+    setShowPassword(false);
     setFormStaffType(user.staff_type ?? 'POS_STAFF');
     setError('');
     setShowModal(true);
@@ -113,6 +117,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
 
       setUsers((current) => editingUser ? current.map((user) => (user.id === data.id ? data : user)) : [...current, data]);
       setShowModal(false);
+      setShowPassword(false);
       setEditingUser(null);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Unable to save staff account.');
@@ -247,6 +252,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                 type="button"
                 onClick={() => {
                   setShowModal(false);
+                  setShowPassword(false);
                   setEditingUser(null);
                 }}
                 className="text-muted-foreground hover:text-foreground"
@@ -280,14 +286,25 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
               </div>
               <div>
                 <label className="block mb-2 font-medium">Password {!editingUser && <span className="text-red-500">*</span>}</label>
-                <input
-                  type="password"
-                  value={formPassword}
-                  onChange={(event) => setFormPassword(event.target.value)}
-                  required={!editingUser}
-                  placeholder={editingUser ? 'Leave blank to keep current password' : 'Enter password'}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-input-background"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formPassword}
+                    onChange={(event) => setFormPassword(event.target.value)}
+                    required={!editingUser}
+                    placeholder={editingUser ? 'Leave blank to keep current password' : 'Enter password'}
+                    className="w-full rounded-lg border border-border bg-input-background px-4 py-2 pr-12 focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block mb-2 font-medium">Staff Type <span className="text-red-500">*</span></label>
@@ -309,6 +326,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                   type="button"
                   onClick={() => {
                     setShowModal(false);
+                    setShowPassword(false);
                     setEditingUser(null);
                   }}
                   className="px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
