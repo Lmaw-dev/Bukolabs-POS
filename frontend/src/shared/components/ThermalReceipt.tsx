@@ -123,6 +123,12 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span className="text-gray-500">Type:</span>
             <span>{orderType}</span>
           </div>
+          {cashier && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Staff:</span>
+              <span>{cashier}</span>
+            </div>
+          )}
           {table && table !== '—' && (
             <div className="flex justify-between">
               <span className="text-gray-500">Table:</span>

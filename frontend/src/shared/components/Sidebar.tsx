@@ -237,12 +237,6 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
       </nav>
 
       <div className="shrink-0 border-t border-white/10 px-5 py-2 text-white">
-        <div className="mb-1 px-4">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-tight text-white">{userName || (isAdmin ? 'Administrator' : 'Staff')}</p>
-            <p className="truncate text-sm leading-tight text-slate-200">{userRoleLabel}</p>
-          </div>
-        </div>
         <button
           onClick={onLogout}
           className="flex h-8 w-full items-center gap-3 rounded-lg border border-transparent px-4 text-left text-white transition hover:bg-red-500/10 hover:text-red-200"

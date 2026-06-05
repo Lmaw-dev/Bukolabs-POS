@@ -682,7 +682,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               time={selectedOrder.time}
               receiptId={selectedOrder.receiptId || currentReceiptId}
               paymentId={selectedOrder.paymentId || currentPaymentId}
-              staffName={selectedOrder.cashier ?? userName}
+              cashier={selectedOrder.cashier ?? userName ?? 'Staff'}
               storeBrand={storeBrand}
             />
 

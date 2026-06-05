@@ -244,6 +244,7 @@ function toOrderListFormat(order: any, paid: boolean) {
     orderStatus: 'Pending' as const,
     date: now.toISOString().split('T')[0],
     time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    cashier: order.cashier,
     items: order.items.map((item: CartItem) => ({
       name: item.name,
       quantity: item.quantity,
@@ -592,6 +593,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       total,
       timestamp: new Date(),
       paid: false,
+      cashier: userName || 'Staff',
       tableNumber: selectedTables.length === 1 ? selectedTables[0] : null,
       tableNumbers: selectedTables.length > 0 ? selectedTables : undefined,
       partySize: parseInt(partySize) || undefined,
@@ -2124,7 +2126,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                 total={successOrderDetails.total}
                 cashReceived={successOrderDetails.cashReceived}
                 changeGiven={successOrderDetails.changeGiven}
-                staffName={userName}
+                cashier={successOrderDetails.cashier || userName || 'Staff'}
                 storeBrand={storeBrand}
               />
 
