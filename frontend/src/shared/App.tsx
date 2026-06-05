@@ -25,6 +25,7 @@ import { TableProvider } from './context/TableContext';
 import { StoreSettingsProvider } from './context/StoreSettingsContext';
 import { getApiBaseUrl } from '../auth/services/auth';
 import type { AuthenticatedUser } from '../auth/types/auth';
+import { getDefaultStoreLogo } from './utils/defaultStoreLogo';
 
 export type Page =
   | 'login'
@@ -73,6 +74,8 @@ export default function App() {
         return;
       }
 
+      const defaultLogo = getDefaultStoreLogo(currentUser.store_type);
+
       try {
         const response = await fetch(`${getApiBaseUrl()}/admin/store-information?admin_user_id=${currentUser.id}`);
         const data = await response.json();
@@ -80,7 +83,7 @@ export default function App() {
         if (response.ok) {
           setStoreBrand({
             name: data.business_name ?? currentUser.store_name ?? null,
-            logo: data.logo ?? null,
+            logo: data.logo || defaultLogo,
             business_description: data.business_description ?? null,
             address: data.address ?? null,
             contact_number: data.contact_number ?? null,
@@ -91,12 +94,12 @@ export default function App() {
           });
         }
       } catch {
-        setStoreBrand({ name: currentUser.store_name ?? null, logo: null });
+        setStoreBrand({ name: currentUser.store_name ?? null, logo: defaultLogo });
       }
     };
 
     void loadStoreBrand();
-  }, [currentUser?.id, currentUser?.role, currentUser?.store_name]);
+  }, [currentUser?.id, currentUser?.role, currentUser?.store_name, currentUser?.store_type]);
 
   const handleLogin = (user: AuthenticatedUser) => {
     setCurrentUser(user);

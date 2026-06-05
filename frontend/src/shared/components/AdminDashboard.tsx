@@ -280,7 +280,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                           <button
                             type="button"
                             onClick={() => handleEditUser(user)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#003534]"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#007a5e]"
                             title="Edit staff"
                             aria-label={`Edit ${user.full_name}`}
                           >
@@ -289,7 +289,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                           <button
                             type="button"
                             onClick={() => handleEditUser(user)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#003534]"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-slate-100 hover:text-[#007a5e]"
                             title="Reset password"
                             aria-label={`Reset password for ${user.full_name}`}
                           >

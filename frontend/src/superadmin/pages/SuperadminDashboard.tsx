@@ -11,6 +11,8 @@ import {
   EyeOff,
   KeyRound,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   Search,
@@ -86,6 +88,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
   const [permanentlyDeletingAdminId, setPermanentlyDeletingAdminId] = useState<number | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -355,29 +358,42 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const isFilteredStoreSummaryModal = activeSummaryModal === 'retail-stores' || activeSummaryModal === 'restaurant-stores';
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#003534]">
+    <div className="min-h-screen bg-[#f8fafc] text-[#007a5e]">
       <aside
-        className="fixed inset-y-0 left-0 z-30 flex w-80 flex-col overflow-y-auto text-white"
+        className={`fixed inset-y-0 left-0 z-30 flex flex-col overflow-y-auto text-white transition-[width] duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-80'}`}
         style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
       >
-        <div className="border-b border-white/10 px-4 pb-6 pt-8">
+        <div className={`relative border-b border-white/10 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3 pb-3 pt-4' : 'px-4 pb-4 pt-5'}`}>
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((value) => !value)}
+            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}
+          </button>
           <div className="text-center">
-            <div className="mx-auto mb-2 flex h-28 w-28 items-center justify-center">
-              <img src={logoImage} alt="N&Ns logo" className="h-24 w-24 object-contain" />
+            <div className={`mx-auto flex items-center justify-center transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'mb-0 h-10 w-10' : 'mb-1 h-24 w-24'}`}>
+              <img src={logoImage} alt="N&Ns logo" className={`object-contain transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'h-10 w-10' : 'h-20 w-20'}`} />
             </div>
-            <h1 className="truncate text-xl font-semibold tracking-tight text-white">Unified POS</h1>
-            <p className="mt-1 text-lg leading-tight text-slate-200">Super Admin</p>
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}>
+              <h1 className="truncate text-xl font-semibold tracking-tight text-white">Unified POS</h1>
+              <p className="mt-1 text-lg leading-tight text-slate-200">Super Admin</p>
+            </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-5 py-7">
+        <nav className={`flex-1 py-7 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3' : 'px-5'}`}>
           <button
             type="button"
             onClick={() => {
               setActiveSection('stores');
               setStoreFilter('ALL');
             }}
-            className={`mb-4 flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
+            className={`mb-4 flex h-[52px] w-full items-center rounded-lg border transition ${
+              isSidebarCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
+            } ${
               activeSection === 'stores'
                 ? 'border-[#00a7a5]/25 text-white'
                 : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
@@ -389,7 +405,9 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             }
           >
             <StoreIcon className="h-6 w-6 shrink-0" strokeWidth={1.8} />
-            <span className={`flex-1 text-base ${activeSection === 'stores' ? 'font-semibold' : 'font-medium'}`}>Stores</span>
+            <span className={`overflow-hidden whitespace-nowrap text-base transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'} ${activeSection === 'stores' ? 'font-semibold' : 'font-medium'}`}>
+              {!isSidebarCollapsed && 'Stores'}
+            </span>
           </button>
           <button
             type="button"
@@ -397,7 +415,9 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               setActiveSection('admins');
               setAdminFilter('ALL');
             }}
-            className={`flex h-[52px] w-full items-center gap-4 rounded-lg border px-4 text-left transition ${
+            className={`flex h-[52px] w-full items-center rounded-lg border transition ${
+              isSidebarCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
+            } ${
               activeSection === 'admins'
                 ? 'border-[#00a7a5]/25 text-white'
                 : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
@@ -409,32 +429,38 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             }
           >
             <UserPlus className="h-6 w-6 shrink-0" strokeWidth={1.8} />
-            <span className={`flex-1 text-base ${activeSection === 'admins' ? 'font-semibold' : 'font-medium'}`}>Admin Accounts</span>
+            <span className={`overflow-hidden whitespace-nowrap text-base transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'} ${activeSection === 'admins' ? 'font-semibold' : 'font-medium'}`}>
+              {!isSidebarCollapsed && 'Admin Accounts'}
+            </span>
           </button>
         </nav>
 
-        <div className="border-t border-white/10 px-5 py-4">
+        <div className={`border-t border-white/10 py-2 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3' : 'px-5'}`}>
           <button
             type="button"
             onClick={onLogout}
-            className="flex h-[52px] w-full items-center gap-4 rounded-lg border border-transparent px-4 text-left text-white transition hover:bg-red-500/10 hover:text-red-400"
+            className={`flex h-11 w-full items-center rounded-lg border border-transparent text-white transition hover:bg-red-500/10 hover:text-red-400 ${
+              isSidebarCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
+            }`}
           >
             <LogOut className="h-6 w-6 shrink-0" strokeWidth={1.8} />
-            <span className="flex-1 text-base font-medium">Logout</span>
+            <span className={`overflow-hidden whitespace-nowrap text-base font-medium transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-0 opacity-0' : 'flex-1 opacity-100'}`}>
+              {!isSidebarCollapsed && 'Logout'}
+            </span>
           </button>
         </div>
       </aside>
 
-      <main className="ml-80 min-h-screen min-w-0">
+      <main className={`min-h-screen min-w-0 transition-[margin-left] duration-300 ease-in-out ${isSidebarCollapsed ? 'ml-20' : 'ml-80'}`}>
         {activeSection === 'stores' && (
           <header className="flex min-h-[96px] items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
             <div>
-              <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-[#003534]">Store Management</h2>
+              <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-[#007a5e]">Store Management</h2>
               <p className="mt-1 text-base text-[#64748b]">Manage stores and admin accounts for the system.</p>
             </div>
             <div className="flex items-center gap-5">
               <div className="relative">
-                <button type="button" className="flex h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-base text-[#003534]">
+                <button type="button" className="flex h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-base text-[#007a5e]">
                   {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   <CalendarDays className="h-4 w-4 text-slate-500" />
                 </button>
@@ -483,8 +509,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                           <Icon className="h-7 w-7" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-base font-bold text-[#003534]">{card.title}</p>
-                          <p className="mt-2 text-[32px] font-extrabold leading-none text-[#003534]">{card.value}</p>
+                          <p className="text-base font-bold text-[#007a5e]">{card.title}</p>
+                          <p className="mt-2 text-[32px] font-extrabold leading-none text-[#007a5e]">{card.value}</p>
                           {card.detail !== undefined && (
                             <p className="mt-2 min-h-5 text-base text-[#64748b]">{card.detail}</p>
                           )}
@@ -507,11 +533,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <section className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(360px,1fr)]">
                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-md">
                   <div className="mb-4 flex items-center justify-between gap-4">
-                    <h3 className="text-xl font-extrabold text-[#003534]">Stores Overview</h3>
+                    <h3 className="text-xl font-extrabold text-[#007a5e]">Stores Overview</h3>
                     <select
                       value={storeFilter}
                       onChange={(event) => setStoreFilter(event.target.value as StoreFilter)}
-                      className="h-10 rounded-md border border-slate-200 bg-white px-4 text-base font-medium text-[#003534] outline-none focus:border-blue-400"
+                      className="h-10 rounded-md border border-slate-200 bg-white px-4 text-base font-medium text-[#007a5e] outline-none focus:border-blue-400"
                     >
                       <option value="ALL">All Store Types</option>
                       <option value="RETAIL_STORE">Retail Store</option>
@@ -543,7 +569,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                         ) : (
                           filteredStores.slice(0, 6).map((store) => (
                             <tr key={`${store.store_id ?? store.id}-store`} className="text-slate-700">
-                              <td className="px-3 py-3 font-medium text-[#003534]">{store.store_name ?? `${store.full_name}'s Store`}</td>
+                              <td className="px-3 py-3 font-medium text-[#007a5e]">{store.store_name ?? `${store.full_name}'s Store`}</td>
                               <td className="px-3 py-3">
                                 <span className={`inline-flex rounded px-2.5 py-1 text-xs font-medium ${storeTypeStyles(store.store_type)}`}>
                                   {storeTypeLabel(store.store_type)}
@@ -580,7 +606,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 </div>
 
                 <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-md">
-                  <h3 className="text-xl font-extrabold text-[#003534]">Store Type Distribution</h3>
+                  <h3 className="text-xl font-extrabold text-[#007a5e]">Store Type Distribution</h3>
                   <div className="mt-8 flex items-center justify-center gap-8">
                     <div
                       className="relative aspect-square w-56 rounded-full overflow-hidden"
@@ -628,7 +654,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                       <option value="RETAIL_STORE">Retail Store</option>
                       <option value="RESTAURANT">Restaurant</option>
                     </select>
-                    <button type="button" onClick={handleOpenCreateAdmin} className="inline-flex h-12 items-center gap-2 rounded-md bg-[#00a7a5] px-6 text-base font-bold text-white hover:bg-violet-800">
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateAdmin}
+                      className="inline-flex h-12 items-center gap-2 rounded-md bg-gradient-to-r from-[#008967] to-[#005656] px-6 text-base font-bold text-white"
+                    >
                       <Plus className="h-5 w-5" />
                       Create Admin Account
                     </button>
@@ -1217,7 +1247,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   onClick={() => setFormStoreType('RESTAURANT')}
                   className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-semibold ${
                     formStoreType === 'RESTAURANT'
-                      ? 'border-violet-300 bg-violet-50 text-[#00a7a5]'
+                      ? 'border-[#00a7a5] bg-[#00a7a5]/10 text-[#00a7a5]'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -1229,7 +1259,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   onClick={() => setFormStoreType('RETAIL_STORE')}
                   className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-semibold ${
                     formStoreType === 'RETAIL_STORE'
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      ? 'border-[#00a7a5] bg-[#00a7a5]/10 text-[#00a7a5]'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -1245,7 +1275,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <button
                 type="submit"
                 disabled={creating}
-                className="h-11 flex-1 rounded-md bg-[#00a7a5] px-4 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-11 flex-1 rounded-md bg-gradient-to-r from-[#008967] to-[#005656] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {creating ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin Account'}
               </button>

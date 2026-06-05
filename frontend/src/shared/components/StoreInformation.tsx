@@ -6,6 +6,7 @@ import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import { ThermalReceipt } from './ThermalReceipt';
+import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
 
 interface StoreInformationData {
   id: number;
@@ -50,6 +51,7 @@ const defaultStoreInfo: StoreInformationData = {
 
 export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpdate, onStoreBrandUpdate, storeBrand }: StoreInformationProps) {
   const { settings, discounts } = useStoreSettings();
+  const defaultLogo = getDefaultStoreLogo(currentUser?.store_type);
   const [storeInfo, setStoreInfo] = useState<StoreInformationData>(defaultStoreInfo);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,7 +149,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
       onUserUpdate({ store_name: normalized.business_name });
       onStoreBrandUpdate({
         name: normalized.business_name,
-        logo: normalized.logo,
+        logo: normalized.logo || defaultLogo,
         business_description: normalized.business_description,
         address: normalized.address,
         contact_number: normalized.contact_number,
@@ -164,13 +166,9 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
     }
   };
 
-  const logoPreview = storeInfo.logo ? (
-    <img src={storeInfo.logo} alt={storeInfo.business_name} className="h-full w-full object-contain" />
-  ) : (
-    <div className="flex h-full w-full flex-col items-center justify-center text-primary">
-      <div className="text-3xl font-bold leading-none">UKAY</div>
-      <div className="text-3xl font-bold leading-none">HUB</div>
-    </div>
+  const displayLogo = storeInfo.logo || defaultLogo;
+  const logoPreview = (
+    <img src={displayLogo} alt={storeInfo.business_name} className="h-full w-full object-contain" />
   );
   const sampleSubtotal = 370;
   const sampleDiscount = settings.enable_discount ? 20 : 0;
@@ -343,7 +341,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                       staffName="Staff Name"
                       storeBrand={{
                         name: storeInfo.business_name,
-                        logo: storeInfo.logo,
+                        logo: displayLogo,
                         business_description: storeInfo.business_description,
                         address: storeInfo.address,
                         contact_number: storeInfo.contact_number,

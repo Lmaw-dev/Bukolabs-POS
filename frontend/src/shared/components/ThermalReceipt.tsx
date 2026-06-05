@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../App';
 import { useStoreSettings } from '../context/StoreSettingsContext';
+import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
 
 interface ReceiptItem {
   name: string;
@@ -73,11 +74,9 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       >
         {/* Header */}
         <div className="text-center mb-4">
-          {storeBrand?.logo && (
-            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center">
-              <img src={storeBrand.logo} alt={storeBrand.name ?? 'Store logo'} className="h-full w-full object-contain" />
-            </div>
-          )}
+          <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center">
+            <img src={storeBrand?.logo || getDefaultStoreLogo('RESTAURANT')} alt={storeBrand?.name ?? 'Restaurant logo'} className="h-full w-full object-contain" />
+          </div>
           <p className="text-sm" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>{storeBrand?.name || 'N&Ns RESTAURANT'}</p>
           {storeBrand?.business_description && <p className="mt-1 text-xs text-gray-500">{storeBrand.business_description}</p>}
           <p className="text-xs text-gray-500">{storeBrand?.address || '123 Restaurant Ave., Manila, PH'}</p>
