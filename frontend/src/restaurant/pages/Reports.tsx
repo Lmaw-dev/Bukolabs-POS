@@ -117,7 +117,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     { id: 'order-takeout', name: 'Takeout', value: takeoutOrders.length, revenue: takeoutRevenue },
   ];
 
-  const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
+  const COLORS = ['#008967', '#3b82f6', '#f59e0b', '#ef4444'];
 
   // Product sales breakdown from filtered orders
   const productSales: Record<string, number> = {};
@@ -354,7 +354,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                   <YAxis />
                   <Tooltip formatter={(value) => `₱${Number(value).toFixed(2)}`} />
                   <Legend />
-                  <Line key="revenue-line" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} name="Revenue (₱)" />
+                  <Line key="revenue-line" type="monotone" dataKey="revenue" stroke="#008967" strokeWidth={2} name="Revenue (₱)" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -394,7 +394,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                 <BarChart data={dailySalesData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="day" />
-                  <YAxis yAxisId="left" orientation="left" stroke="#10b981" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#008967" />
                   <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" />
                   <Tooltip formatter={(value, name) => {
                     if (name === 'Sales (₱)') {
@@ -403,7 +403,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                     return value;
                   }} />
                   <Legend />
-                  <Bar key="sales-bar" yAxisId="left" dataKey="sales" fill="#10b981" name="Sales (₱)" />
+                  <Bar key="sales-bar" yAxisId="left" dataKey="sales" fill="#008967" name="Sales (₱)" />
                   <Bar key="orders-bar" yAxisId="right" dataKey="orders" fill="#3b82f6" name="Orders" />
                 </BarChart>
               </ResponsiveContainer>
@@ -613,3 +613,4 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     </div>
   );
 }
+

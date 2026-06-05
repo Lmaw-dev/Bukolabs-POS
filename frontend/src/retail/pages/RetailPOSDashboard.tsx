@@ -200,7 +200,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
                     }}
                     formatter={(value: number) => [`₱${value.toLocaleString()}`, 'Sales']}
                   />
-                  <Line key="sales-line" type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 4 }} />
+                  <Line key="sales-line" type="monotone" dataKey="sales" stroke="#008967" strokeWidth={2} dot={{ fill: '#008967', r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -324,5 +324,6 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
     </div>
   );
 }
+
 
 

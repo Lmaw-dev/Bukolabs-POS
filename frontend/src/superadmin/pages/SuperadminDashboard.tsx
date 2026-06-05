@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { getApiBaseUrl } from '../../auth/services/auth';
+import logoImage from '../../imports/logo1.png';
 import {
   CalendarDays,
   Ban,
@@ -46,7 +47,7 @@ const storeTypeStyles = (storeType: string | null | undefined) =>
   storeType === 'RETAIL_STORE'
     ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
     : storeType === 'RESTAURANT'
-      ? 'border-violet-100 bg-violet-50 text-violet-700'
+      ? 'border-violet-100 bg-violet-50 text-[#00a7a5]'
       : 'border-slate-100 bg-slate-50 text-slate-500';
 
 const formatStoreCount = (count: number, total: number) => (total === 0 ? '0 (0%)' : `${count} (${((count / total) * 100).toFixed(1)}%)`);
@@ -69,6 +70,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<DashboardSection>('stores');
   const [activeSummaryModal, setActiveSummaryModal] = useState<SummaryModal>(null);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [viewSummaryRecord, setViewSummaryRecord] = useState<AdminSummary | null>(null);
   const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
@@ -289,22 +291,22 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         ? 'bg-amber-600'
         : activeSummaryModal === 'restaurant-stores'
           ? 'bg-red-600'
-          : 'bg-violet-700';
+          : 'bg-[#00a7a5]';
   const isStoreSummaryModal = activeSummaryModal && activeSummaryModal !== 'all-admins';
   const isFilteredStoreSummaryModal = activeSummaryModal === 'retail-stores' || activeSummaryModal === 'restaurant-stores';
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#0f172a]">
+    <div className="min-h-screen bg-[#f8fafc] text-[#003534]">
       <aside
         className="fixed inset-y-0 left-0 z-30 flex w-80 flex-col overflow-y-auto text-white"
         style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
       >
-        <div className="border-b border-white/10 px-6 pb-8 pt-12">
+        <div className="border-b border-white/10 px-4 pb-6 pt-8">
           <div className="text-center">
-            <div className="mx-auto mb-8 flex h-20 w-24 items-center justify-center text-[#008967]">
-              <StoreIcon className="h-16 w-16" strokeWidth={1.6} />
+            <div className="mx-auto mb-2 flex h-28 w-28 items-center justify-center">
+              <img src={logoImage} alt="N&Ns logo" className="h-24 w-24 object-contain" />
             </div>
-            <h1 className="truncate text-2xl font-semibold tracking-tight text-white">Unified POS</h1>
+            <h1 className="truncate text-xl font-semibold tracking-tight text-white">Unified POS</h1>
             <p className="mt-1 text-lg leading-tight text-slate-200">Super Admin</p>
           </div>
         </div>
@@ -372,14 +374,23 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         {activeSection === 'stores' && (
           <header className="flex min-h-[96px] items-center justify-between border-b border-slate-200 bg-white px-8 py-5">
             <div>
-              <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-[#020617]">Store Management</h2>
+              <h2 className="text-[26px] font-extrabold leading-tight tracking-tight text-[#003534]">Store Management</h2>
               <p className="mt-1 text-base text-[#64748b]">Manage stores and admin accounts for the system.</p>
             </div>
             <div className="flex items-center gap-5">
-              <button type="button" className="flex h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-base text-[#0f172a]">
-                May 31, 2026
-                <CalendarDays className="h-4 w-4 text-slate-500" />
-              </button>
+              <div className="relative">
+                <button type="button" className="flex h-10 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 text-base text-[#003534]">
+                  {new Date(selectedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  <CalendarDays className="h-4 w-4 text-slate-500" />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Select date"
+                />
+              </div>
             </div>
           </header>
         )}
@@ -417,8 +428,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                           <Icon className="h-7 w-7" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-base font-bold text-[#334155]">{card.title}</p>
-                          <p className="mt-2 text-[32px] font-extrabold leading-none text-[#020617]">{card.value}</p>
+                          <p className="text-base font-bold text-[#003534]">{card.title}</p>
+                          <p className="mt-2 text-[32px] font-extrabold leading-none text-[#003534]">{card.value}</p>
                           {card.detail !== undefined && (
                             <p className="mt-2 min-h-5 text-base text-[#64748b]">{card.detail}</p>
                           )}
@@ -441,11 +452,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <section className="grid gap-6 xl:grid-cols-[minmax(0,1.85fr)_minmax(360px,1fr)]">
                 <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-md">
                   <div className="mb-4 flex items-center justify-between gap-4">
-                    <h3 className="text-xl font-extrabold text-[#0f172a]">Stores Overview</h3>
+                    <h3 className="text-xl font-extrabold text-[#003534]">Stores Overview</h3>
                     <select
                       value={storeFilter}
                       onChange={(event) => setStoreFilter(event.target.value as StoreFilter)}
-                      className="h-10 rounded-md border border-slate-200 bg-white px-4 text-base font-medium text-[#334155] outline-none focus:border-blue-400"
+                      className="h-10 rounded-md border border-slate-200 bg-white px-4 text-base font-medium text-[#003534] outline-none focus:border-blue-400"
                     >
                       <option value="ALL">All Store Types</option>
                       <option value="RETAIL_STORE">Retail Store</option>
@@ -477,7 +488,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                         ) : (
                           filteredStores.slice(0, 6).map((store) => (
                             <tr key={`${store.store_id ?? store.id}-store`} className="text-slate-700">
-                              <td className="px-3 py-3 font-medium text-[#0f172a]">{store.store_name ?? `${store.full_name}'s Store`}</td>
+                              <td className="px-3 py-3 font-medium text-[#003534]">{store.store_name ?? `${store.full_name}'s Store`}</td>
                               <td className="px-3 py-3">
                                 <span className={`inline-flex rounded px-2.5 py-1 text-xs font-medium ${storeTypeStyles(store.store_type)}`}>
                                   {storeTypeLabel(store.store_type)}
@@ -514,11 +525,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 </div>
 
                 <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-md">
-                  <h3 className="text-xl font-extrabold text-[#0f172a]">Store Type Distribution</h3>
+                  <h3 className="text-xl font-extrabold text-[#003534]">Store Type Distribution</h3>
                   <div className="mt-8 flex items-center justify-center gap-8">
                     <div
-                      className="relative h-56 w-56 rounded-full"
-                      style={{ background: `conic-gradient(#10b981 0 ${retailPercent}%, #6d28d9 ${retailPercent}% 100%)` }}
+                      className="relative aspect-square w-56 rounded-full overflow-hidden"
+                      style={{ background: `conic-gradient(#008967 0 ${retailPercent}%, #00a7a5 ${retailPercent}% 100%)` }}
                     >
                       <div className="absolute inset-8 flex flex-col items-center justify-center rounded-full bg-white">
                         <span className="text-3xl font-bold text-slate-900">{stores.length}</span>
@@ -528,14 +539,14 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                     <div className="space-y-5 text-sm">
                       <div>
                         <div className="flex items-center gap-3 font-semibold text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-[#008967]" />
                           Retail Store
                         </div>
                         <p className="mt-2 pl-6 text-slate-600">{formatStoreCount(retailStores.length, stores.length)}</p>
                       </div>
                       <div>
                         <div className="flex items-center gap-3 font-semibold text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full bg-violet-700" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-[#00a7a5]" />
                           Restaurant
                         </div>
                         <p className="mt-2 pl-6 text-slate-600">{formatStoreCount(restaurantStores.length, stores.length)}</p>
@@ -562,7 +573,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                       <option value="RETAIL_STORE">Retail Store</option>
                       <option value="RESTAURANT">Restaurant</option>
                     </select>
-                    <button type="button" onClick={handleOpenCreateAdmin} className="inline-flex h-12 items-center gap-2 rounded-md bg-violet-700 px-6 text-base font-bold text-white hover:bg-violet-800">
+                    <button type="button" onClick={handleOpenCreateAdmin} className="inline-flex h-12 items-center gap-2 rounded-md bg-[#00a7a5] px-6 text-base font-bold text-white hover:bg-violet-800">
                       <Plus className="h-5 w-5" />
                       Create Admin Account
                     </button>
@@ -707,7 +718,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   <button
                     type="button"
                     onClick={() => setAddStoreModalOpen(true)}
-                    className="ml-auto inline-flex h-11 items-center gap-2 rounded-md bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800"
+                    className="ml-auto inline-flex h-11 items-center gap-2 rounded-md bg-[#00a7a5] px-5 text-sm font-bold text-white hover:bg-violet-800"
                   >
                     <Plus className="h-4 w-4" />
                     Add Store
@@ -883,7 +894,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             </div>
 
             <div className="grid gap-6 md:grid-cols-[auto_minmax(0,1fr)]">
-              <div className={`flex h-20 w-20 items-center justify-center rounded-full ${viewSummaryRecord.store_type === 'RESTAURANT' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>
+              <div className={`flex h-20 w-20 items-center justify-center rounded-full ${viewSummaryRecord.store_type === 'RESTAURANT' ? 'bg-violet-50 text-[#00a7a5]' : 'bg-emerald-50 text-emerald-700'}`}>
                 {activeSummaryModal === 'all-admins' ? (
                   <UserPlus className="h-10 w-10" />
                 ) : viewSummaryRecord.store_type === 'RESTAURANT' ? (
@@ -972,7 +983,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <button type="button" onClick={() => setAddStoreModalOpen(false)} className="h-11 rounded-md border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 Cancel
               </button>
-              <button type="button" onClick={() => setAddStoreModalOpen(false)} className="h-11 rounded-md bg-violet-700 px-5 text-sm font-bold text-white hover:bg-violet-800">
+              <button type="button" onClick={() => setAddStoreModalOpen(false)} className="h-11 rounded-md bg-[#00a7a5] px-5 text-sm font-bold text-white hover:bg-violet-800">
                 Save Store
               </button>
             </div>
@@ -1128,7 +1139,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   onClick={() => setFormStoreType('RESTAURANT')}
                   className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-semibold ${
                     formStoreType === 'RESTAURANT'
-                      ? 'border-violet-300 bg-violet-50 text-violet-700'
+                      ? 'border-violet-300 bg-violet-50 text-[#00a7a5]'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
@@ -1156,7 +1167,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <button
                 type="submit"
                 disabled={creating}
-                className="h-11 flex-1 rounded-md bg-violet-700 px-4 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-11 flex-1 rounded-md bg-[#00a7a5] px-4 text-sm font-semibold text-white hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {creating ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin Account'}
               </button>

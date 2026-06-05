@@ -230,9 +230,9 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                     key={`line-${dateFilter}`}
                     type="monotone"
                     dataKey="sales"
-                    stroke="#10b981"
+                    stroke="#008967"
                     strokeWidth={2}
-                    dot={{ fill: '#10b981', strokeWidth: 2, r: 3 }}
+                    dot={{ fill: '#008967', strokeWidth: 2, r: 3 }}
                     activeDot={{ r: 5 }}
                   />
                 </LineChart>
@@ -360,10 +360,10 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
               <table className="w-full">
                 <thead>
                   <tr className="bg-[#0f172a]">
-                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#10b981]">Rank</th>
-                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#10b981]">Item</th>
-                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#10b981]">Sold</th>
-                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#10b981]">Revenue</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Rank</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Item</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Sold</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Revenue</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -399,3 +399,4 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
     </div>
   );
 }
+

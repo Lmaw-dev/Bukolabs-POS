@@ -94,8 +94,13 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                   onClick={() => onNavigate(item.page)}
                   className={`flex h-9 w-full items-center gap-3 rounded-lg border px-4 text-left transition ${
                     active
+<<<<<<< HEAD
                       ? 'border-[#00a7a5]/25 text-white'
                       : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
+=======
+                      ? 'border-[#00a7a5]/30 bg-[#00a7a5]/15 text-[#00a7a5]'
+                      : 'border-transparent text-slate-500 hover:bg-white/[0.04] hover:text-slate-300'
+>>>>>>> f67d1877798f4bc79400086fc6e9b998139beb1e
                   }`}
                   style={
                     active

@@ -63,7 +63,7 @@ SELECT
   'We appreciate your support. Come again!',
   'Mon-Sun, 9:00 AM - 8:00 PM',
   'PHP',
-  '#10b981',
+  '#008967',
   0,
   0
 FROM stores s
@@ -72,3 +72,4 @@ WHERE NOT EXISTS (
   FROM store_information si
   WHERE si.store_id = s.id
 );
+

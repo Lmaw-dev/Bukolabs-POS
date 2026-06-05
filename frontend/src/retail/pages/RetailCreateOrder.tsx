@@ -600,7 +600,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
           {hasHistory && recommendedProducts.length > 0 && (
             <div className="mb-4 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-4 border-2 border-emerald-200 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-[#00a7a5] rounded-full animate-pulse"></div>
                 <p className="text-sm font-medium text-emerald-900">
                   ⭐ Recommended for {customerName}
                 </p>
