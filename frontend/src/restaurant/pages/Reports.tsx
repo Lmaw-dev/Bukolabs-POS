@@ -39,6 +39,8 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   const { orders } = useOrders();
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year'>('today');
   const [revenueTrendFilter, setRevenueTrendFilter] = useState<'4weeks' | '3months' | 'year'>('4weeks');
+  const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Helper function to filter orders by date range
   const getFilteredOrders = (filter: typeof dateFilter) => {
@@ -139,6 +141,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     }))
     .sort((a, b) => b.sales - a.sales)
     .slice(0, 10);
+  const visibleProducts = showAllProducts ? topProducts : topProducts.slice(0, 5);
 
   // Generate revenue trend data based on filter
   const generateRevenueTrendData = () => {
@@ -488,7 +491,15 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
           {/* Product Sales Breakdown */}
           <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-            <h3 className="text-lg font-medium text-primary mb-4">Product Sales Breakdown</h3>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-medium text-primary">Product Sales Breakdown</h3>
+              <button
+                onClick={() => setShowAllProducts((current) => !current)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+              >
+                {showAllProducts ? 'See less' : 'See more'}
+              </button>
+            </div>
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full">
                 <thead>
@@ -508,7 +519,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-border">
-                  {topProducts.map((product, index) => (
+                  {visibleProducts.map((product, index) => (
                     <tr key={product.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
@@ -548,7 +559,15 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
           {/* Detailed Transaction Reports */}
           <div className="bg-card rounded-lg shadow-sm border border-border p-6 mt-8">
-            <h3 className="text-lg font-medium text-primary mb-4">Detailed Transaction Reports</h3>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="text-lg font-medium text-primary">Detailed Transaction Reports</h3>
+              <button
+                onClick={() => setShowAllTransactions((current) => !current)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-primary transition hover:bg-muted"
+              >
+                {showAllTransactions ? 'See less' : 'See more'}
+              </button>
+            </div>
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full">
                 <thead>
@@ -574,7 +593,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-border">
-                  {filteredOrders.slice(0, 10).map((order) => (
+                  {(showAllTransactions ? filteredOrders : filteredOrders.slice(0, 5)).map((order) => (
                     <tr key={order.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {order.orderNumber || order.id}
