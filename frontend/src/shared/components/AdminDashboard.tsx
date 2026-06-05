@@ -206,7 +206,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                       <td className="px-6 py-4">{user.full_name}</td>
                       <td className="px-6 py-4">{user.email}</td>
                       <td className="px-6 py-4">{user.role}</td>
-                      <td className="px-6 py-4">{user.staff_type === 'INVENTORY_STAFF' ? 'Inventory Staff' : 'POS Staff'}</td>
+                      <td className="px-6 py-4">POS Staff</td>
                       <td className="px-6 py-4">{user.store_id}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
@@ -297,7 +297,6 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                   className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-input-background"
                 >
                   <option value="POS_STAFF">POS Staff</option>
-                  <option value="INVENTORY_STAFF">Inventory Staff</option>
                 </select>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

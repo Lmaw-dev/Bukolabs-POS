@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsEmail, IsIn, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 import { AdminService } from './admin.service';
 
 class CreateStaffDto {
@@ -18,8 +18,8 @@ class CreateStaffDto {
   @MinLength(6)
   password!: string;
 
-  @IsIn(['POS_STAFF', 'INVENTORY_STAFF'])
-  staff_type!: 'POS_STAFF' | 'INVENTORY_STAFF';
+  @IsIn(['POS_STAFF'])
+  staff_type!: 'POS_STAFF';
 }
 
 class UpdateStaffDto {
@@ -38,8 +38,8 @@ class UpdateStaffDto {
   @MinLength(6)
   password?: string;
 
-  @IsIn(['POS_STAFF', 'INVENTORY_STAFF'])
-  staff_type!: 'POS_STAFF' | 'INVENTORY_STAFF';
+  @IsIn(['POS_STAFF'])
+  staff_type!: 'POS_STAFF';
 }
 
 class UpdateStoreInformationDto {
@@ -99,6 +99,139 @@ class UpdateStoreInformationDto {
   @Type(() => Number)
   @IsNumber()
   service_charge_rate?: number | null;
+}
+
+class UpdateStoreSettingsDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_customer_recommendation?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_table_management?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_refund?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_void?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_discount?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_service_charge?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  service_charge_percentage?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_dine_in?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_takeout?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_ingredient_customization?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  enable_receipt_printing?: boolean;
+}
+
+class CategoryDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+}
+
+class ProductDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  category_id?: number | null;
+
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @Type(() => Number)
+  @IsNumber()
+  price!: number;
+
+  @IsOptional()
+  @IsString()
+  image_url?: string | null;
+
+  @IsOptional()
+  @IsString()
+  meal_type?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  preparation_time_minutes?: number | null;
+
+  @IsOptional()
+  @IsString()
+  sku?: string | null;
+
+  @IsOptional()
+  @IsString()
+  barcode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  unit?: string | null;
+
+  @IsOptional()
+  @IsString()
+  size?: string | null;
+
+  @IsOptional()
+  @IsString()
+  color?: string | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  stock_quantity?: number | null;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  low_stock_limit?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  is_available?: boolean;
 }
 
 @Controller('admin')
@@ -163,6 +296,93 @@ export class AdminController {
       themeColor: body.theme_color ?? null,
       taxRate: body.tax_rate ?? null,
       serviceChargeRate: body.service_charge_rate ?? null,
+    });
+  }
+
+  @Get('store-settings')
+  getStoreSettings(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.getStoreSettings(Number(adminUserId));
+  }
+
+  @Post('store-settings')
+  updateStoreSettings(@Body() body: UpdateStoreSettingsDto) {
+    return this.adminService.updateStoreSettings({
+      adminUserId: Number(body.admin_user_id),
+      enableCustomerRecommendation: body.enable_customer_recommendation,
+      enableTableManagement: body.enable_table_management,
+      enableRefund: body.enable_refund,
+      enableVoid: body.enable_void,
+      enableDiscount: body.enable_discount,
+      enableServiceCharge: body.enable_service_charge,
+      serviceChargePercentage: body.service_charge_percentage,
+      enableDineIn: body.enable_dine_in,
+      enableTakeout: body.enable_takeout,
+      enableIngredientCustomization: body.enable_ingredient_customization,
+      enableReceiptPrinting: body.enable_receipt_printing,
+    });
+  }
+
+  @Get('categories')
+  listCategories(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listCategories(Number(adminUserId));
+  }
+
+  @Post('categories')
+  createCategory(@Body() body: CategoryDto) {
+    return this.adminService.createCategory({
+      adminUserId: Number(body.admin_user_id),
+      name: body.name,
+      description: body.description ?? null,
+    });
+  }
+
+  @Patch('categories/:id')
+  updateCategory(@Param('id') id: string, @Body() body: CategoryDto) {
+    return this.adminService.updateCategory({
+      adminUserId: Number(body.admin_user_id),
+      categoryId: Number(id),
+      name: body.name,
+      description: body.description ?? null,
+    });
+  }
+
+  @Delete('categories/:id')
+  deleteCategory(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteCategory({
+      adminUserId: Number(adminUserId),
+      categoryId: Number(id),
+    });
+  }
+
+  @Get('products')
+  listProducts(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listProducts(Number(adminUserId));
+  }
+
+  @Post('products')
+  createProduct(@Body() body: ProductDto) {
+    return this.adminService.createProduct({
+      ...body,
+      adminUserId: Number(body.admin_user_id),
+      categoryId: body.category_id ?? null,
+    });
+  }
+
+  @Patch('products/:id')
+  updateProduct(@Param('id') id: string, @Body() body: ProductDto) {
+    return this.adminService.updateProduct({
+      ...body,
+      adminUserId: Number(body.admin_user_id),
+      productId: Number(id),
+      categoryId: body.category_id ?? null,
+    });
+  }
+
+  @Delete('products/:id')
+  deleteProduct(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteProduct({
+      adminUserId: Number(adminUserId),
+      productId: Number(id),
     });
   }
 }

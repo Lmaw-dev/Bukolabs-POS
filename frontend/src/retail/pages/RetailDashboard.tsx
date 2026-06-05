@@ -1,4 +1,4 @@
-import { Boxes, ShoppingBag } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
@@ -34,12 +34,10 @@ export function RetailDashboard({
   staffType,
 }: RetailDashboardProps) {
   if (onNavigate) {
-    const isInventoryStaff = staffType === 'INVENTORY_STAFF';
-
     return (
       <div className="flex h-screen">
         <Sidebar
-          currentPage={isInventoryStaff ? 'retail-inventory-dashboard' : 'retail-pos-dashboard'}
+          currentPage="retail-pos-dashboard"
           onNavigate={onNavigate}
           onLogout={onLogout}
           storeBrand={storeBrand}
@@ -52,7 +50,7 @@ export function RetailDashboard({
           <main className="p-8">
             <div className="mb-6 flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {isInventoryStaff ? <Boxes className="h-5 w-5" /> : <ShoppingBag className="h-5 w-5" />}
+                <ShoppingBag className="h-5 w-5" />
               </div>
               <div>
                 <h1 className="text-primary">{title}</h1>

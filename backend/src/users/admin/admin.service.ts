@@ -14,7 +14,7 @@ export class AdminService {
     fullName: string;
     email: string;
     password: string;
-    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+    staffType: 'POS_STAFF';
   }) {
     return this.databaseService.createStaffAccount(input);
   }
@@ -25,7 +25,7 @@ export class AdminService {
     fullName: string;
     email: string;
     password?: string;
-    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+    staffType: 'POS_STAFF';
   }) {
     return this.databaseService.updateStaffAccountForAdmin(input);
   }
@@ -55,5 +55,58 @@ export class AdminService {
     serviceChargeRate: number | null;
   }) {
     return this.databaseService.updateStoreInformationForAdmin(input);
+  }
+
+  getStoreSettings(adminUserId: number) {
+    return this.databaseService.getStoreSettingsForAdmin(adminUserId);
+  }
+
+  updateStoreSettings(input: {
+    adminUserId: number;
+    enableCustomerRecommendation?: boolean;
+    enableTableManagement?: boolean;
+    enableRefund?: boolean;
+    enableVoid?: boolean;
+    enableDiscount?: boolean;
+    enableServiceCharge?: boolean;
+    serviceChargePercentage?: number;
+    enableDineIn?: boolean;
+    enableTakeout?: boolean;
+    enableIngredientCustomization?: boolean;
+    enableReceiptPrinting?: boolean;
+  }) {
+    return this.databaseService.updateStoreSettingsForAdmin(input);
+  }
+
+  listCategories(adminUserId: number) {
+    return this.databaseService.listCategoriesForAdmin(adminUserId);
+  }
+
+  createCategory(input: { adminUserId: number; name: string; description: string | null }) {
+    return this.databaseService.createCategoryForAdmin(input);
+  }
+
+  updateCategory(input: { adminUserId: number; categoryId: number; name: string; description: string | null }) {
+    return this.databaseService.updateCategoryForAdmin(input);
+  }
+
+  deleteCategory(input: { adminUserId: number; categoryId: number }) {
+    return this.databaseService.deleteCategoryForAdmin(input);
+  }
+
+  listProducts(adminUserId: number) {
+    return this.databaseService.listProductsForAdmin(adminUserId);
+  }
+
+  createProduct(input: any) {
+    return this.databaseService.createProductForAdmin(input);
+  }
+
+  updateProduct(input: any) {
+    return this.databaseService.updateProductForAdmin(input);
+  }
+
+  deleteProduct(input: { adminUserId: number; productId: number }) {
+    return this.databaseService.deleteProductForAdmin(input);
   }
 }

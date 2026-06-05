@@ -115,7 +115,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       email: string;
       role: string;
       store_id: number | null;
-      staff_type: 'POS_STAFF' | 'INVENTORY_STAFF' | null;
+      staff_type: 'POS_STAFF' | null;
       password_hash: string;
       store_type: string | null;
       store_name: string | null;
@@ -171,7 +171,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       store_id: number | null;
       store_type: string | null;
       store_name: string | null;
-      staff_type: 'POS_STAFF' | 'INVENTORY_STAFF' | null;
+      staff_type: 'POS_STAFF' | null;
     }>(
       `
         SELECT
@@ -257,7 +257,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         email: string;
         role: string;
         store_id: number | null;
-        staff_type: 'POS_STAFF' | 'INVENTORY_STAFF' | null;
+        staff_type: 'POS_STAFF' | null;
       }>(
         client,
         `
@@ -410,6 +410,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
           AND u.${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
+          ${userColumns.staffTypeColumn ? `AND u.${this.quoteIdentifier(userColumns.staffTypeColumn)} = 'POS_STAFF'` : ''}
         ORDER BY u.id ASC
       `,
       [admin.store_id],
@@ -421,7 +422,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     fullName: string;
     email: string;
     password: string;
-    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+    staffType: 'POS_STAFF';
   }) {
     const admin = await this.getUserStoreScope(input.adminUserId);
 
@@ -471,7 +472,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     fullName: string;
     email: string;
     password?: string;
-    staffType: 'POS_STAFF' | 'INVENTORY_STAFF';
+    staffType: 'POS_STAFF';
   }) {
     const admin = await this.getUserStoreScope(input.adminUserId);
 
@@ -704,6 +705,315 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return rows[0];
   }
 
+  async getStoreSettingsForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view store settings.');
+    }
+
+    await this.ensureStoreSettingsRow(admin.store_id);
+
+    const rows = await this.query(
+      `
+        SELECT *
+        FROM store_settings
+        WHERE store_id = $1
+        LIMIT 1
+      `,
+      [admin.store_id],
+    );
+
+    return rows[0];
+  }
+
+  async updateStoreSettingsForAdmin(input: {
+    adminUserId: number;
+    enableCustomerRecommendation?: boolean;
+    enableTableManagement?: boolean;
+    enableRefund?: boolean;
+    enableVoid?: boolean;
+    enableDiscount?: boolean;
+    enableServiceCharge?: boolean;
+    serviceChargePercentage?: number;
+    enableDineIn?: boolean;
+    enableTakeout?: boolean;
+    enableIngredientCustomization?: boolean;
+    enableReceiptPrinting?: boolean;
+  }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update store settings.');
+    }
+
+    await this.ensureStoreSettingsRow(admin.store_id);
+
+    const rows = await this.query(
+      `
+        UPDATE store_settings
+        SET
+          enable_customer_recommendation = COALESCE($1, enable_customer_recommendation),
+          enable_table_management = COALESCE($2, enable_table_management),
+          enable_refund = COALESCE($3, enable_refund),
+          enable_void = COALESCE($4, enable_void),
+          enable_discount = COALESCE($5, enable_discount),
+          enable_service_charge = COALESCE($6, enable_service_charge),
+          service_charge_percentage = COALESCE($7, service_charge_percentage),
+          enable_dine_in = COALESCE($8, enable_dine_in),
+          enable_takeout = COALESCE($9, enable_takeout),
+          enable_ingredient_customization = COALESCE($10, enable_ingredient_customization),
+          enable_receipt_printing = COALESCE($11, enable_receipt_printing),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE store_id = $12
+        RETURNING *
+      `,
+      [
+        input.enableCustomerRecommendation,
+        input.enableTableManagement,
+        input.enableRefund,
+        input.enableVoid,
+        input.enableDiscount,
+        input.enableServiceCharge,
+        input.serviceChargePercentage,
+        input.enableDineIn,
+        input.enableTakeout,
+        input.enableIngredientCustomization,
+        input.enableReceiptPrinting,
+        admin.store_id,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  async listCategoriesForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view categories.');
+    }
+
+    return this.query(
+      `
+        SELECT id, store_id, store_type, name, description, created_at, updated_at
+        FROM product_categories
+        WHERE store_id = $1
+          AND store_type = $2
+        ORDER BY name ASC
+      `,
+      [admin.store_id, admin.store_type],
+    );
+  }
+
+  async createCategoryForAdmin(input: { adminUserId: number; name: string; description: string | null }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id || !admin.store_type) {
+      throw new InternalServerErrorException('Only store admin accounts can create categories.');
+    }
+
+    const rows = await this.query(
+      `
+        INSERT INTO product_categories (store_id, store_type, name, description)
+        VALUES ($1, $2, $3, $4)
+        RETURNING id, store_id, store_type, name, description, created_at, updated_at
+      `,
+      [admin.store_id, admin.store_type, input.name, input.description],
+    );
+
+    return rows[0];
+  }
+
+  async updateCategoryForAdmin(input: { adminUserId: number; categoryId: number; name: string; description: string | null }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update categories.');
+    }
+
+    const rows = await this.query(
+      `
+        UPDATE product_categories
+        SET name = $1,
+            description = $2,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $3
+          AND store_id = $4
+        RETURNING id, store_id, store_type, name, description, created_at, updated_at
+      `,
+      [input.name, input.description, input.categoryId, admin.store_id],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Category was not found for this store.');
+    }
+
+    return rows[0];
+  }
+
+  async deleteCategoryForAdmin(input: { adminUserId: number; categoryId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete categories.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM product_categories
+        WHERE id = $1
+          AND store_id = $2
+        RETURNING id
+      `,
+      [input.categoryId, admin.store_id],
+    );
+
+    return { id: rows[0]?.id ?? input.categoryId, deleted: rows.length > 0 };
+  }
+
+  async listProductsForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view products.');
+    }
+
+    return this.query(
+      `
+        SELECT
+          p.*,
+          c.name AS category_name
+        FROM products p
+        LEFT JOIN product_categories c ON c.id = p.category_id
+        WHERE p.store_id = $1
+          AND p.store_type = $2
+        ORDER BY p.created_at DESC
+      `,
+      [admin.store_id, admin.store_type],
+    );
+  }
+
+  async createProductForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id || !admin.store_type) {
+      throw new InternalServerErrorException('Only store admin accounts can create products.');
+    }
+
+    const rows = await this.query(
+      `
+        INSERT INTO products (
+          store_id, category_id, store_type, name, description, price, image_url,
+          meal_type, preparation_time_minutes, sku, barcode, unit, size, color,
+          stock_quantity, low_stock_limit, is_available
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, TRUE))
+        RETURNING *
+      `,
+      [
+        admin.store_id,
+        input.categoryId,
+        admin.store_type,
+        input.name,
+        input.description ?? null,
+        input.price,
+        input.image_url ?? null,
+        input.meal_type ?? null,
+        input.preparation_time_minutes ?? null,
+        input.sku ?? null,
+        input.barcode ?? null,
+        input.unit ?? null,
+        input.size ?? null,
+        input.color ?? null,
+        input.stock_quantity ?? 0,
+        input.low_stock_limit ?? 5,
+        input.is_available,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  async updateProductForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update products.');
+    }
+
+    const rows = await this.query(
+      `
+        UPDATE products
+        SET
+          category_id = $1,
+          name = $2,
+          description = $3,
+          price = $4,
+          image_url = $5,
+          meal_type = $6,
+          preparation_time_minutes = $7,
+          sku = $8,
+          barcode = $9,
+          unit = $10,
+          size = $11,
+          color = $12,
+          stock_quantity = $13,
+          low_stock_limit = $14,
+          is_available = COALESCE($15, is_available),
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $16
+          AND store_id = $17
+        RETURNING *
+      `,
+      [
+        input.categoryId,
+        input.name,
+        input.description ?? null,
+        input.price,
+        input.image_url ?? null,
+        input.meal_type ?? null,
+        input.preparation_time_minutes ?? null,
+        input.sku ?? null,
+        input.barcode ?? null,
+        input.unit ?? null,
+        input.size ?? null,
+        input.color ?? null,
+        input.stock_quantity ?? 0,
+        input.low_stock_limit ?? 5,
+        input.is_available,
+        input.productId,
+        admin.store_id,
+      ],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Product was not found for this store.');
+    }
+
+    return rows[0];
+  }
+
+  async deleteProductForAdmin(input: { adminUserId: number; productId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete products.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM products
+        WHERE id = $1
+          AND store_id = $2
+        RETURNING id
+      `,
+      [input.productId, admin.store_id],
+    );
+
+    return { id: rows[0]?.id ?? input.productId, deleted: rows.length > 0 };
+  }
+
   private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null, client?: PoolClient) {
     const sql = `
       INSERT INTO store_information (
@@ -751,6 +1061,30 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ${sql}
       `,
       params,
+    );
+  }
+
+  private async ensureStoreSettingsRow(storeId: number) {
+    await this.query(
+      `
+        INSERT INTO store_settings (
+          store_id,
+          enable_customer_recommendation,
+          enable_table_management,
+          enable_refund,
+          enable_void,
+          enable_discount,
+          enable_service_charge,
+          service_charge_percentage,
+          enable_dine_in,
+          enable_takeout,
+          enable_ingredient_customization,
+          enable_receipt_printing
+        )
+        VALUES ($1, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, TRUE, TRUE, TRUE, TRUE)
+        ON CONFLICT (store_id) DO NOTHING
+      `,
+      [storeId],
     );
   }
 

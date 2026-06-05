@@ -8,7 +8,6 @@ import { RetailPOSDashboard } from '../retail/pages/RetailPOSDashboard';
 import { RetailCreateOrder } from '../retail/pages/RetailCreateOrder';
 import { RetailOrderList } from '../retail/pages/RetailOrderList';
 import { RetailReports } from '../retail/pages/RetailReports';
-import { InventoryDashboard } from '../restaurant/pages/InventoryDashboard';
 import { POSDashboard } from '../restaurant/pages/POSDashboard';
 import { CreateOrder } from '../restaurant/pages/CreateOrder';
 import { TableManagement } from '../restaurant/pages/TableManagement';
@@ -17,6 +16,9 @@ import { Receipt } from '../restaurant/pages/Receipt';
 import { OrderList } from '../restaurant/pages/OrderList';
 import { Reports } from '../restaurant/pages/Reports';
 import { StoreInformation } from './components/StoreInformation';
+import { StoreSettings } from './components/StoreSettings';
+import { CategoryManagement } from './components/CategoryManagement';
+import { ProductManagement } from './components/ProductManagement';
 import { OrderProvider } from './context/OrderContext';
 import { TableProvider } from './context/TableContext';
 import { getApiBaseUrl } from '../auth/services/auth';
@@ -28,11 +30,9 @@ export type Page =
   | 'admin-dashboard'
   | 'retail-dashboard'
   | 'retail-pos-dashboard'
-  | 'retail-inventory-dashboard'
   | 'retail-sales'
   | 'retail-transactions'
   | 'retail-reports'
-  | 'inventory-dashboard'
   | 'pos-dashboard'
   | 'create-order'
   | 'table-management'
@@ -40,7 +40,10 @@ export type Page =
   | 'receipt'
   | 'order-list'
   | 'reports'
-  | 'store-information';
+  | 'store-information'
+  | 'store-settings'
+  | 'category-management'
+  | 'product-management';
 
 export interface StoreBrand {
   name: string | null;
@@ -110,22 +113,12 @@ export default function App() {
       return;
     }
 
-    if (user.role === 'STAFF' && user.store_type === 'RETAIL_STORE' && user.staff_type === 'POS_STAFF') {
+    if (user.role === 'STAFF' && user.store_type === 'RETAIL_STORE') {
       setCurrentPage('retail-pos-dashboard');
       return;
     }
 
-    if (user.role === 'STAFF' && user.store_type === 'RETAIL_STORE' && user.staff_type === 'INVENTORY_STAFF') {
-      setCurrentPage('retail-inventory-dashboard');
-      return;
-    }
-
-    if (user.role === 'STAFF' && user.store_type === 'RESTAURANT' && user.staff_type === 'INVENTORY_STAFF') {
-      setCurrentPage('inventory-dashboard');
-      return;
-    }
-
-    if (user.role === 'STAFF' && user.store_type === 'RESTAURANT' && user.staff_type === 'POS_STAFF') {
+    if (user.role === 'STAFF' && user.store_type === 'RESTAURANT') {
       setCurrentPage('pos-dashboard');
       return;
     }
@@ -212,12 +205,6 @@ export default function App() {
               )}
             </RetailOrderProvider>
           )}
-          {currentPage === 'retail-inventory-dashboard' && (
-            <RetailDashboard title="Retail Inventory Dashboard" roleLabel="Retail Inventory Staff" currentUser={currentUser} onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
-          )}
-          {currentPage === 'inventory-dashboard' && (
-            <InventoryDashboard onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
-          )}
           {currentPage === 'pos-dashboard' && (
             <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
@@ -248,6 +235,15 @@ export default function App() {
               onStoreBrandUpdate={setStoreBrand}
               storeBrand={storeBrand}
             />
+          )}
+          {currentPage === 'store-settings' && (
+            <StoreSettings currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
+          )}
+          {currentPage === 'category-management' && (
+            <CategoryManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
+          )}
+          {currentPage === 'product-management' && (
+            <ProductManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
         </TableProvider>
       </OrderProvider>

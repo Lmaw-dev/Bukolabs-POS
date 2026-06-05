@@ -1,4 +1,4 @@
-import { Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed, Store, Utensils, ShoppingBag, Boxes } from 'lucide-react';
+import { Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed, Store, ShoppingBag, Settings, Tags, Package } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import type { StaffType } from '../../auth/types/auth';
 
@@ -15,13 +15,15 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RESTAURANT', staffType = 'POS_STAFF' }: SidebarProps) {
   const isRetail = storeType === 'RETAIL_STORE';
-  const isInventoryStaff = !isAdmin && staffType === 'INVENTORY_STAFF';
 
   const restaurantAdminMenuItems = [
     { icon: Home, label: 'Dashboard', page: 'pos-dashboard' as Page },
     { icon: List, label: 'Order List', page: 'order-list' as Page },
     { icon: BarChart3, label: 'Reports', page: 'reports' as Page },
     { icon: Store, label: 'Store Information', page: 'store-information' as Page },
+    { icon: Settings, label: 'Store Settings', page: 'store-settings' as Page },
+    { icon: Tags, label: 'Categories', page: 'category-management' as Page },
+    { icon: Package, label: 'Products', page: 'product-management' as Page },
     { icon: Users, label: 'User Management', page: 'admin-dashboard' as Page },
   ];
 
@@ -30,6 +32,9 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
     { icon: List, label: 'Transactions', page: 'retail-transactions' as Page },
     { icon: BarChart3, label: 'Reports', page: 'retail-reports' as Page },
     { icon: Store, label: 'Store Information', page: 'store-information' as Page },
+    { icon: Settings, label: 'Store Settings', page: 'store-settings' as Page },
+    { icon: Tags, label: 'Categories', page: 'category-management' as Page },
+    { icon: Package, label: 'Products', page: 'product-management' as Page },
     { icon: Users, label: 'User Management', page: 'admin-dashboard' as Page },
   ];
 
@@ -48,22 +53,12 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
     { icon: BarChart3, label: 'Reports', page: 'retail-reports' as Page },
   ];
 
-  const restaurantInventoryMenuItems = [
-    { icon: Boxes, label: 'Inventory Dashboard', page: 'inventory-dashboard' as Page },
-  ];
-
-  const retailInventoryMenuItems = [
-    { icon: Boxes, label: 'Inventory Dashboard', page: 'retail-inventory-dashboard' as Page },
-  ];
-
   const menuItems = isAdmin
     ? (isRetail ? retailAdminMenuItems : restaurantAdminMenuItems)
-    : isInventoryStaff
-      ? (isRetail ? retailInventoryMenuItems : restaurantInventoryMenuItems)
-      : (isRetail ? retailStaffMenuItems : restaurantStaffMenuItems);
+    : (isRetail ? retailStaffMenuItems : restaurantStaffMenuItems);
   const defaultTitle = isRetail ? 'Retail Store' : 'The Restaurant';
   const headerTitle = storeBrand?.name || defaultTitle;
-  const userRoleLabel = isAdmin ? 'Admin' : isInventoryStaff ? 'Inventory Staff' : 'POS Staff';
+  const userRoleLabel = isAdmin ? 'Admin' : 'POS Staff';
 
   return (
     <div className="flex h-screen w-80 shrink-0 flex-col bg-[#111827] text-[#f8fafc]">
