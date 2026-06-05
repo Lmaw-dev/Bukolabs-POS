@@ -5,6 +5,7 @@ import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
+import { ThermalReceipt } from './ThermalReceipt';
 
 interface StoreInformationData {
   id: number;
@@ -80,8 +81,6 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
 
     void loadStoreInformation();
   }, [currentUser?.id]);
-
-  const currencySymbol = storeInfo.currency === 'PHP' ? 'PHP' : storeInfo.currency || 'PHP';
 
   const updateField = (field: keyof StoreInformationData, value: string | number | null) => {
     setStoreInfo((current) => ({ ...current, [field]: value }));
@@ -174,11 +173,13 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
     </div>
   );
   const sampleSubtotal = 370;
-  const sampleDiscount = settings.enable_discount && discounts.some((discount) => discount.is_enabled) ? 20 : 0;
+  const sampleDiscount = settings.enable_discount ? 20 : 0;
   const sampleServiceCharge = settings.enable_service_charge ? (sampleSubtotal - sampleDiscount) * (settings.service_charge_rate / 100) : 0;
   const sampleTax = settings.enable_tax ? (sampleSubtotal - sampleDiscount + sampleServiceCharge) * (settings.tax_rate / 100) : 0;
   const sampleTotal = sampleSubtotal - sampleDiscount + sampleServiceCharge + sampleTax;
-  const sampleDiscountName = discounts.find((discount) => discount.is_enabled)?.discount_name ?? 'Discount';
+  const sampleDiscountName = discounts.find((discount) => discount.is_enabled && /senior/i.test(discount.discount_name))?.discount_name
+    ?? discounts.find((discount) => discount.is_enabled)?.discount_name
+    ?? 'Senior Citizen';
 
   return (
     <div className="flex h-screen">
@@ -317,66 +318,41 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                   <h2 className="text-lg text-primary">Receipt Preview</h2>
                   <p className="mt-2 text-sm text-muted-foreground">This is how your receipt header and footer will look.</p>
 
-                  <div className="mt-5 bg-white p-6 text-primary shadow-lg">
-                    <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-24 w-24 items-center justify-center p-2">
-                        {logoPreview}
-                      </div>
-                      <h3 className="font-semibold">{storeInfo.business_name}</h3>
-                      <p className="mt-1 text-xs">{storeInfo.address}</p>
-                      <p className="mt-1 text-xs">{storeInfo.contact_number} | {storeInfo.email}</p>
-                      <p className="mt-1 text-xs">{storeInfo.operating_hours}</p>
-                    </div>
-
-                    <div className="my-4 border-t border-dashed border-border" />
-
-                    <div className="flex justify-between text-xs">
-                      <span>Date: May 31, 2026</span>
-                      <span>Time: 10:30 AM</span>
-                    </div>
-
-                    <div className="my-4 border-t border-dashed border-border" />
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between font-medium">
-                        <span>Item</span>
-                        <span>Qty</span>
-                        <span>Amount</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>----------</span>
-                        <span>1</span>
-                        <span>{currencySymbol} 120.00</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>----------</span>
-                        <span>1</span>
-                        <span>{currencySymbol} 250.00</span>
-                      </div>
-                    </div>
-
-                    <div className="my-4 border-t border-dashed border-border" />
-
-                    <div className="space-y-1 text-xs">
-                      <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol} {sampleSubtotal.toFixed(2)}</span></div>
-                      {settings.enable_discount && sampleDiscount > 0 && (
-                        <div className="flex justify-between"><span>{sampleDiscountName}</span><span>- {currencySymbol} {sampleDiscount.toFixed(2)}</span></div>
-                      )}
-                      {settings.enable_service_charge && (
-                        <div className="flex justify-between"><span>Service ({settings.service_charge_rate}%)</span><span>{currencySymbol} {sampleServiceCharge.toFixed(2)}</span></div>
-                      )}
-                      {settings.enable_tax && (
-                        <div className="flex justify-between"><span>Tax ({settings.tax_rate}%)</span><span>{currencySymbol} {sampleTax.toFixed(2)}</span></div>
-                      )}
-                      <div className="flex justify-between font-semibold"><span>TOTAL</span><span>{currencySymbol} {sampleTotal.toFixed(2)}</span></div>
-                    </div>
-
-                    <div className="my-4 border-t border-dashed border-border" />
-
-                    <div className="text-center text-xs leading-6">
-                      <p>{storeInfo.receipt_thank_you_message}</p>
-                      <p>{storeInfo.receipt_footer_message}</p>
-                    </div>
+                  <div className="mt-5 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg">
+                    <ThermalReceipt
+                      orderNumber="PREVIEW-001"
+                      customerName=""
+                      orderType="Dine-In"
+                      table={null}
+                      items={[
+                        { name: '----------', quantity: 1, price: 120, itemType: 'dine-in' },
+                        { name: '----------', quantity: 1, price: 250, itemType: 'dine-in' },
+                      ]}
+                      subtotal={sampleSubtotal}
+                      serviceFee={sampleServiceCharge}
+                      tax={sampleTax}
+                      discount={sampleDiscount}
+                      discountType={sampleDiscountName}
+                      total={sampleTotal}
+                      cashReceived={500}
+                      changeGiven={500 - sampleTotal}
+                      date="2026-05-31"
+                      time="10:30 AM"
+                      receiptId="REC-PREVIEW"
+                      paymentId="PAY-PREVIEW"
+                      staffName="Staff Name"
+                      storeBrand={{
+                        name: storeInfo.business_name,
+                        logo: storeInfo.logo,
+                        business_description: storeInfo.business_description,
+                        address: storeInfo.address,
+                        contact_number: storeInfo.contact_number,
+                        email: storeInfo.email,
+                        receipt_thank_you_message: storeInfo.receipt_thank_you_message,
+                        receipt_footer_message: storeInfo.receipt_footer_message,
+                        operating_hours: storeInfo.operating_hours,
+                      }}
+                    />
                   </div>
                 </div>
 

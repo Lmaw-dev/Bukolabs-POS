@@ -439,13 +439,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           u.${this.quoteIdentifier(userColumns.storeIdColumn)} AS store_id,
           ${userColumns.staffTypeColumn ? `u.${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type` : 'NULL AS staff_type'},
           ${storeTypeSelect},
-          ${storeNameSelect}
+          ${storeNameSelect},
+          ${userColumns.statusColumn ? `u.${this.quoteIdentifier(userColumns.statusColumn)} AS status` : `'ACTIVE' AS status`}
         FROM users u
         ${storeJoin}
         WHERE u.${this.quoteIdentifier(userColumns.roleColumn)} = 'STAFF'
           AND u.${this.quoteIdentifier(userColumns.storeIdColumn)} = $1
           ${userColumns.staffTypeColumn ? `AND u.${this.quoteIdentifier(userColumns.staffTypeColumn)} = 'POS_STAFF'` : ''}
-          ${this.activeUsersWhereClause(userColumns)}
         ORDER BY u.id ASC
       `,
       [admin.store_id],
@@ -493,7 +493,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ${this.quoteIdentifier(userColumns.storeIdColumn)} AS store_id,
           ${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type,
           $6::text AS store_type,
-          $7::text AS store_name
+          $7::text AS store_name,
+          ${userColumns.statusColumn ? `${this.quoteIdentifier(userColumns.statusColumn)} AS status` : `'ACTIVE' AS status`}
       `,
       [input.fullName, input.email, passwordHash, admin.store_id, input.staffType, admin.store_type, admin.store_name],
     );
@@ -566,7 +567,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             u.${this.quoteIdentifier(userColumns.storeIdColumn)} AS store_id,
             u.${this.quoteIdentifier(userColumns.staffTypeColumn)} AS staff_type,
             ${storeTypeSelect},
-            ${storeNameSelect}
+            ${storeNameSelect},
+            ${userColumns.statusColumn ? `u.${this.quoteIdentifier(userColumns.statusColumn)} AS status` : `'ACTIVE' AS status`}
           FROM updated u
           ${storeJoin}
           LIMIT 1
@@ -631,6 +633,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.handleDatabaseWriteError(error, 'Unable to remove staff account.');
     }
+  }
+
+  async activateStaffAccountForAdmin(input: { adminUserId: number; staffUserId: number }) {
+    if (!Number.isFinite(input.adminUserId) || input.adminUserId <= 0) {
+      throw new BadRequestException('A valid admin_user_id is required.');
+    }
+
+    if (!Number.isFinite(input.staffUserId) || input.staffUserId <= 0) {
+      throw new BadRequestException('A valid staff user id is required.');
+    }
+
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new ForbiddenException('Only store admin accounts can activate staff for their store.');
+    }
+
+    const schema = await this.getSchemaColumns();
+    const userColumns = this.resolveUserColumns(schema.users);
+
+    if (!userColumns.statusColumn || !userColumns.roleColumn || !userColumns.storeIdColumn) {
+      throw new InternalServerErrorException('Users table is missing required columns for staff activation.');
+    }
+
+    const rows = await this.activateStaffForStore(input.staffUserId, admin.store_id, userColumns);
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Staff account was not found for this store.');
+    }
+
+    return { id: rows[0].id, status: 'ACTIVE', activated: true };
   }
 
   async getStoreInformationForAdmin(adminUserId: number): Promise<StoreInformation> {
@@ -1475,6 +1508,32 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       `
         UPDATE users
         SET ${statusColumn} = 'INACTIVE'
+        WHERE id = $1
+          AND ${roleColumn} = 'STAFF'
+          AND ${storeIdColumn} = $2
+        RETURNING id
+      `,
+      [staffUserId, storeId],
+    );
+  }
+
+  private async activateStaffForStore(
+    staffUserId: number,
+    storeId: number,
+    userColumns: ReturnType<DatabaseService['resolveUserColumns']>,
+  ) {
+    if (!userColumns.statusColumn || !userColumns.roleColumn || !userColumns.storeIdColumn) {
+      return [];
+    }
+
+    const statusColumn = this.quoteIdentifier(userColumns.statusColumn);
+    const roleColumn = this.quoteIdentifier(userColumns.roleColumn);
+    const storeIdColumn = this.quoteIdentifier(userColumns.storeIdColumn);
+
+    return this.query<{ id: number }>(
+      `
+        UPDATE users
+        SET ${statusColumn} = 'ACTIVE'
         WHERE id = $1
           AND ${roleColumn} = 'STAFF'
           AND ${storeIdColumn} = $2

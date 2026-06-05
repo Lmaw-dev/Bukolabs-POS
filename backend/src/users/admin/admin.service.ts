@@ -34,6 +34,10 @@ export class AdminService {
     return this.databaseService.deleteStaffAccountForAdmin(input);
   }
 
+  activateStaff(input: { adminUserId: number; staffUserId: number }) {
+    return this.databaseService.activateStaffAccountForAdmin(input);
+  }
+
   getStoreInformation(adminUserId: number) {
     return this.databaseService.getStoreInformationForAdmin(adminUserId);
   }

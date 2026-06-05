@@ -46,6 +46,7 @@ export function Receipt({ onNavigate, currentOrder, onLogout, storeBrand, userNa
                 time={currentOrder?.time}
                 receiptId={currentOrder?.receiptId}
                 paymentId={currentOrder?.paymentId}
+                staffName={currentOrder?.cashier ?? userName}
                 storeBrand={storeBrand}
               />
             </div>
