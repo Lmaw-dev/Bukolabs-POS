@@ -72,6 +72,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [viewSummaryRecord, setViewSummaryRecord] = useState<AdminSummary | null>(null);
   const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
+  const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -195,6 +196,29 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
     setCreateError('');
     setVisiblePassword(false);
     setAdminModalOpen(false);
+  };
+
+  const handleDeactivateAdmin = async (admin: AdminSummary) => {
+    setDeletingAdminId(admin.id);
+    setError('');
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/superadmin/admins/${admin.id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message ?? 'Unable to deactivate admin account.');
+      }
+
+      setAdmins((current) => current.filter((item) => item.id !== admin.id));
+      setAdminActionPreview(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to deactivate admin account.');
+    } finally {
+      setDeletingAdminId(null);
+    }
   };
 
   const summaryCards = [
@@ -998,8 +1022,13 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   Reset Password
                 </button>
               ) : (
-                <button type="button" onClick={() => setAdminActionPreview(null)} className="h-11 rounded-md bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700">
-                  Deactivate Account
+                <button
+                  type="button"
+                  onClick={() => void handleDeactivateAdmin(adminActionPreview.admin)}
+                  disabled={deletingAdminId === adminActionPreview.admin.id}
+                  className="h-11 rounded-md bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingAdminId === adminActionPreview.admin.id ? 'Deactivating...' : 'Deactivate Account'}
                 </button>
               )}
             </div>
