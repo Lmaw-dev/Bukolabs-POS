@@ -139,7 +139,10 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10">
+    <div
+      className="min-h-screen text-slate-100 p-6 md:p-10"
+      style={{ background: 'linear-gradient(135deg, #003534 0%, #005656 100%)' }}
+    >
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -153,7 +156,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             <button
               type="button"
               onClick={onLogout}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              style={{ background: 'rgba(255,255,255,0.12)' }}
             >
               Sign Out
             </button>
@@ -191,7 +195,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 value={formFullName}
                 onChange={(event) => setFormFullName(event.target.value)}
                 required
-                className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                style={{ background: 'rgba(50,59,66,0.15)' }}
               />
             </label>
             <label className="space-y-2 text-sm">
@@ -201,7 +206,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 value={formEmail}
                 onChange={(event) => setFormEmail(event.target.value)}
                 required
-                className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                style={{ background: 'rgba(50,59,66,0.15)' }}
               />
             </label>
             <label className="space-y-2 text-sm">
@@ -211,7 +217,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                 value={formPassword}
                 onChange={(event) => setFormPassword(event.target.value)}
                 placeholder={editingAdmin ? 'Leave blank to keep current password' : 'Leave blank to generate'}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                style={{ background: 'rgba(50,59,66,0.15)' }}
               />
             </label>
             <label className="space-y-2 text-sm">
@@ -219,7 +226,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
               <select
                 value={formStoreType}
                 onChange={(event) => setFormStoreType(event.target.value as 'RESTAURANT' | 'RETAIL_STORE')}
-                className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-white outline-none transition focus:border-emerald-300"
+                style={{ background: 'rgba(50,59,66,0.15)' }}
               >
                 <option value="RESTAURANT">Restaurant</option>
                 <option value="RETAIL_STORE">Retail Store</option>
@@ -234,7 +242,18 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
             <button
               type="submit"
               disabled={creating}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ background: 'linear-gradient(135deg, #00a7a5 0%, #009ba5 100%)' }}
+              onMouseEnter={(e) => {
+                if (!creating) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #00cfcf 0%, #00b6b6 100%)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!creating) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'linear-gradient(135deg, #00a7a5 0%, #009ba5 100%)';
+                }
+              }}
             >
               <UserPlus className="h-4 w-4" />
               {creating ? 'Saving...' : editingAdmin ? 'Save Changes' : 'Create Admin'}
@@ -271,8 +290,8 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           )}
 
           {!loading && !error && (
-            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
-              <table className="w-full text-left text-sm">
+            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10" style={{ background: 'rgba(50,59,66,0.15)' }}>
+              <table className="w-full text-left text-sm" style={{ background: 'rgba(50,59,66,0.15)' }}>
                 <thead className="bg-white/5 text-slate-300">
                   <tr>
                     <th className="px-4 py-3 font-medium">Name</th>
