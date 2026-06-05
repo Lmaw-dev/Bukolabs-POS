@@ -75,7 +75,7 @@ export function CategoryManagement({ currentUser, storeBrand, onLogout, onNaviga
       <div className="flex-1 overflow-auto bg-background">
         <main className="p-8">
           <div className="mb-6">
-            <h1 className="text-primary mb-2">Temporary Categories</h1>
+            <h1 className="text-primary mb-2">Categories</h1>
             <p className="text-muted-foreground">Manage categories for the current {currentUser?.store_type === 'RESTAURANT' ? 'restaurant' : 'retail'} store.</p>
           </div>
 

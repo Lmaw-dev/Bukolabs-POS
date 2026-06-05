@@ -68,7 +68,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001234',
     cashReceived: 700,
     changeGiven: 80,
-    cashier: 'Cashier 1',
+    cashier: 'Joseph Dalton',
   },
   {
     id: '000002',
@@ -90,7 +90,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001235',
     cashReceived: 900,
     changeGiven: 5,
-    cashier: 'Cashier 1',
+    cashier: 'Joseph Dalton',
   },
   {
     id: '000003',
@@ -112,7 +112,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001236',
     cashReceived: 400,
     changeGiven: 20,
-    cashier: 'Cashier 2',
+    cashier: 'Maria Santos',
   },
   {
     id: '000004',
@@ -133,7 +133,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001237',
     cashReceived: 600,
     changeGiven: 20,
-    cashier: 'Cashier 1',
+    cashier: 'Joseph Dalton',
   },
   {
     id: '000005',
@@ -155,7 +155,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001238',
     cashReceived: 720,
     changeGiven: 0,
-    cashier: 'Cashier 2',
+    cashier: 'Maria Santos',
   },
 ];
 

@@ -19,6 +19,7 @@ import { StoreInformation } from './components/StoreInformation';
 import { StoreSettings } from './components/StoreSettings';
 import { CategoryManagement } from './components/CategoryManagement';
 import { ProductManagement } from './components/ProductManagement';
+import { IngredientManagement } from './components/IngredientManagement';
 import { OrderProvider } from './context/OrderContext';
 import { TableProvider } from './context/TableContext';
 import { StoreSettingsProvider } from './context/StoreSettingsContext';
@@ -44,7 +45,8 @@ export type Page =
   | 'store-information'
   | 'store-settings'
   | 'category-management'
-  | 'product-management';
+  | 'product-management'
+  | 'ingredient-management';
 
 export interface StoreBrand {
   name: string | null;
@@ -246,6 +248,9 @@ export default function App() {
           )}
           {currentPage === 'product-management' && (
             <ProductManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
+          )}
+          {currentPage === 'ingredient-management' && (
+            <IngredientManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
           </TableProvider>
         </OrderProvider>

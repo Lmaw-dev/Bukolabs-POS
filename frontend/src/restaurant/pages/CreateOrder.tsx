@@ -227,7 +227,7 @@ function toOrderListFormat(order: any, paid: boolean) {
     order.discountType === 'senior' ? 'Senior Citizen' :
     order.discountType === 'pwd' ? 'PWD' :
     order.discountType === 'promo' ? 'Promo Discount' :
-    order.discountType === 'custom' ? 'Custom Discount' : undefined;
+    order.discountType === 'custom' ? 'Custom Discount' : order.discountType;
 
   return {
     orderNumber: order.orderNumber,
@@ -590,8 +590,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       items: cart,
       subtotal,
       discount,
-      discountType,
-      customDiscountPercent: discountType === 'custom' ? customDiscountPercent : undefined,
+      discountType: selectedDiscountName || undefined,
       serviceFee,
       tax,
       total,
@@ -1695,6 +1694,24 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                       />
                       <span className="text-sm">No Discount</span>
                     </label>
+                    {enabledDiscounts.map((discountSetting) => (
+                      <label key={discountSetting.id} className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                        <input
+                          type="radio"
+                          name="discount"
+                          value={discountSetting.id}
+                          checked={discountType === String(discountSetting.id)}
+                          onChange={() => {
+                            setDiscountType(String(discountSetting.id));
+                            setDiscountIdNumber('');
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">{discountSetting.discount_name} - {Number(discountSetting.discount_rate).toFixed(2)}%</span>
+                      </label>
+                    ))}
+                    {false && (
+                    <>
                     <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
                       <input
                         type="radio"
@@ -1745,10 +1762,30 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                       />
                       <span className="text-sm">Custom Discount</span>
                     </label>
+                    </>
+                    )}
                   </div>
                 </div>
 
-                {(discountType === 'senior' || discountType === 'pwd') && (
+                {selectedDiscountNeedsId && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      {selectedDiscountName} ID Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={discountIdNumber}
+                      onChange={(e) => setDiscountIdNumber(e.target.value)}
+                      placeholder="Enter ID number"
+                      className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ID number is required for {selectedDiscountName}.
+                    </p>
+                  </div>
+                )}
+                {false && (discountType === 'senior' || discountType === 'pwd') && (
                   <div>
                     <label className="block text-sm font-medium mb-2">
                       {discountType === 'senior' ? 'Senior Citizen' : 'PWD'} ID Number *
@@ -1767,7 +1804,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                   </div>
                 )}
 
-                {discountType === 'custom' && (
+                {false && discountType === 'custom' && (
                   <div>
                     <label className="block text-sm font-medium mb-2">Discount Percentage *</label>
                     <input
@@ -1796,14 +1833,8 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                 </button>
                 <button
                   onClick={() => {
-                    // Validation for Senior/PWD
-                    if ((discountType === 'senior' || discountType === 'pwd') && !discountIdNumber.trim()) {
+                    if (selectedDiscountNeedsId && !discountIdNumber.trim()) {
                       alert('Please enter ID number');
-                      return;
-                    }
-                    // Validation for Custom
-                    if (discountType === 'custom' && (customDiscountPercent <= 0 || customDiscountPercent > 100)) {
-                      alert('Please enter a valid discount percentage (1-100)');
                       return;
                     }
                     setShowDiscountModal(false);
@@ -2064,7 +2095,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
         const discountTypeLabel = successOrderDetails.discountType === 'senior' ? 'Senior Citizen' :
           successOrderDetails.discountType === 'pwd' ? 'PWD' :
           successOrderDetails.discountType === 'promo' ? 'Promo' :
-          successOrderDetails.discountType === 'custom' ? 'Custom' : '';
+          successOrderDetails.discountType === 'custom' ? 'Custom' : successOrderDetails.discountType ?? '';
 
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-y-auto">

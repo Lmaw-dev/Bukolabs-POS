@@ -159,7 +159,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       <div className="flex-1 overflow-auto bg-background">
         <main className="p-8">
           <div className="mb-6">
-            <h1 className="text-primary mb-2">Temporary Products</h1>
+            <h1 className="text-primary mb-2">Products</h1>
             <p className="text-muted-foreground">Add products for POS testing until the inventory API is integrated.</p>
           </div>
 

@@ -28,6 +28,7 @@ export interface Order {
   receiptId?: string;
   cashReceived?: number;
   changeGiven?: number;
+  cashier?: string;
   queuePosition?: number;
   isQueued?: boolean;
   partySize?: number;
@@ -77,6 +78,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001234',
     cashReceived: 1500,
     changeGiven: 70,
+    cashier: 'Maria Santos',
   },
   {
     id: '000002',
@@ -103,6 +105,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001235',
     cashReceived: 3000,
     changeGiven: 150,
+    cashier: 'Joseph Dalton',
   },
   {
     id: '000003',
@@ -126,6 +129,7 @@ const initialOrders: Order[] = [
     receiptId: 'REC-001236',
     cashReceived: 350,
     changeGiven: 30,
+    cashier: 'Maria Santos',
   },
   {
     id: '000004',
@@ -217,7 +221,7 @@ interface OrderContextType {
   updateOrder: (id: string, updates: Partial<Order>) => void;
   removeOrder: (id: string) => void;
   removeFromQueue: (id: string) => void;
-  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number }) => void;
+  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => void;
   paymentCompletedSignal: number; // Signal for when payment is completed
 }
 
@@ -264,7 +268,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     ));
   };
 
-  const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number }) => {
+  const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => {
     // Update order to paid status
     setOrders(prev => prev.map(o =>
       o.id === orderId
@@ -274,6 +278,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             orderStatus: 'Completed' as const,
             cashReceived: paymentData.cashReceived,
             changeGiven: paymentData.changeGiven,
+            cashier: paymentData.cashier,
             paymentId: `PAY-${Date.now()}`,
             receiptId: `REC-${Date.now()}`,
           }

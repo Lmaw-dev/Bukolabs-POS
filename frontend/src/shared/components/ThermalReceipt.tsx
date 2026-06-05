@@ -27,6 +27,7 @@ interface ThermalReceiptProps {
   time?: string;
   receiptId?: string;
   paymentId?: string;
+  cashier?: string;
   storeBrand?: StoreBrand;
 }
 
@@ -50,6 +51,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       time,
       receiptId,
       paymentId,
+      cashier,
       storeBrand,
     },
     ref

@@ -137,7 +137,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
           </div>
           {cashier && (
             <div className="flex justify-between">
-              <span className="text-gray-500">Cashier:</span>
+              <span className="text-gray-500">Staff:</span>
               <span className="font-medium text-right">{cashier}</span>
             </div>
           )}

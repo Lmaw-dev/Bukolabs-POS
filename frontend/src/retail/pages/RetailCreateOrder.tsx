@@ -241,10 +241,6 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   const { addOrder, orders, getCustomerHistory, getRecommendedProducts } = useOrders();
   const { settings, discounts } = useStoreSettings();
   const enabledDiscounts = discounts.filter((discount) => discount.is_enabled);
-  const findDiscountRate = (name: string, fallback: number) => {
-    const discount = enabledDiscounts.find((item) => item.discount_name.toLowerCase().includes(name.toLowerCase()));
-    return discount ? Number(discount.discount_rate) / 100 : fallback;
-  };
   const transactionNumberRef = useRef(100001);
   const [currentTransactionNumber, setCurrentTransactionNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
@@ -261,7 +257,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card' | 'GCash' | 'PayMaya'>('Cash');
   const [cashAmount, setCashAmount] = useState('');
   const [changeAmount, setChangeAmount] = useState(0);
-  const [discountType, setDiscountType] = useState<'none' | 'senior' | 'pwd' | 'custom'>('none');
+  const [discountType, setDiscountType] = useState<string>('none');
   const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
@@ -444,18 +440,12 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
   const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
+  const selectedDiscount = enabledDiscounts.find((item) => String(item.id) === discountType);
+  const selectedDiscountName = selectedDiscount?.discount_name ?? '';
+  const selectedDiscountRate = selectedDiscount ? Number(selectedDiscount.discount_rate) : 0;
 
   // Calculate discount
-  let discountRate = 0;
-  if (!settings.enable_discount) {
-    discountRate = 0;
-  } else if (discountType === 'senior') {
-    discountRate = findDiscountRate('Senior', 0.2);
-  } else if (discountType === 'pwd') {
-    discountRate = findDiscountRate('PWD', 0.2);
-  } else if (discountType === 'custom') {
-    discountRate = customDiscountPercent > 0 ? customDiscountPercent / 100 : findDiscountRate('Custom', 0);
-  }
+  const discountRate = settings.enable_discount && selectedDiscount ? selectedDiscountRate / 100 : 0;
   const discount = subtotal * discountRate;
   const total = subtotal + serviceFee + tax - discount;
 
@@ -510,11 +500,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       subtotal,
       serviceFee,
       discount,
-      discountType: discountType !== 'none' ? (
-        discountType === 'senior' ? 'Senior Citizen (20%)' :
-        discountType === 'pwd' ? 'PWD (20%)' :
-        `Custom (${customDiscountPercent}%)`
-      ) : undefined,
+      discountType: selectedDiscount ? `${selectedDiscountName} (${selectedDiscountRate}%)` : undefined,
       tax,
       amountNumber: total,
       paymentMethod,
@@ -523,7 +509,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       cashReceived: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
       changeGiven: paymentMethod === 'Cash' ? changeAmount : 0,
-      cashier: 'Cashier 1', // This would come from user context in a real app
+      cashier: userName || 'Staff',
     };
 
     addOrder(order);
@@ -813,9 +799,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
             {discount > 0 ? (
               <div className="flex justify-between text-destructive text-xs">
                 <span>
-                  {discountType === 'senior' ? 'Senior Citizen (20%)' :
-                   discountType === 'pwd' ? 'PWD (20%)' :
-                   `Custom (${customDiscountPercent}%)`}
+                  {selectedDiscountName} ({selectedDiscountRate}%)
                 </span>
                 <span>- ₱ {discount.toFixed(2)}</span>
               </div>
@@ -884,7 +868,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
                   <span>₱{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Tax (12%):</span>
+                  <span>Tax ({settings.tax_rate}%):</span>
                   <span>₱{tax.toFixed(2)}</span>
                 </div>
                 {discount > 0 && (
@@ -1066,26 +1050,32 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
             </div>
             <div className="p-5">
               <div className="space-y-3">
-                {[
-                  { value: 'none', label: 'No Discount' },
-                  { value: 'senior', label: 'Senior Citizen (20%)' },
-                  { value: 'pwd', label: 'PWD (20%)' },
-                  { value: 'custom', label: 'Custom Discount' },
-                ].map(option => (
-                  <label key={option.value} className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                <label className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
+                  <input
+                    type="radio"
+                    name="discount"
+                    value="none"
+                    checked={discountType === 'none'}
+                    onChange={() => setDiscountType('none')}
+                    className="accent-primary"
+                  />
+                  <span className="text-sm">No Discount</span>
+                </label>
+                {enabledDiscounts.map((discountSetting) => (
+                  <label key={discountSetting.id} className="flex items-center gap-2 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted">
                     <input
                       type="radio"
                       name="discount"
-                      value={option.value}
-                      checked={discountType === option.value}
-                      onChange={(e) => setDiscountType(e.target.value as any)}
+                      value={discountSetting.id}
+                      checked={discountType === String(discountSetting.id)}
+                      onChange={() => setDiscountType(String(discountSetting.id))}
                       className="accent-primary"
                     />
-                    <span className="text-sm">{option.label}</span>
+                    <span className="text-sm">{discountSetting.discount_name} - {Number(discountSetting.discount_rate).toFixed(2)}%</span>
                   </label>
                 ))}
 
-                {discountType === 'custom' && (
+                {false && discountType === 'custom' && (
                   <div className="mt-3">
                     <label className="block text-sm font-medium mb-2">Discount Percentage</label>
                     <input
