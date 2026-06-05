@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../App';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 interface ReceiptItem {
   name: string;
@@ -53,6 +54,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     },
     ref
   ) => {
+    const { settings } = useStoreSettings();
     const currentDate = date || new Date().toISOString().split('T')[0];
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -180,17 +182,21 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span>Subtotal</span>
             <span>₱{subtotal.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-gray-600">
-            <span>Service Fee (1%)</span>
-            <span>₱{serviceFee.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-gray-600">
-            <span>Tax (12%)</span>
-            <span>₱{tax.toFixed(2)}</span>
-          </div>
-          {discount > 0 && (
+          {settings.enable_service_charge && (
+            <div className="flex justify-between text-gray-600">
+              <span>Service Fee ({settings.service_charge_rate}%)</span>
+              <span>₱{serviceFee.toFixed(2)}</span>
+            </div>
+          )}
+          {settings.enable_tax && (
+            <div className="flex justify-between text-gray-600">
+              <span>Tax ({settings.tax_rate}%)</span>
+              <span>₱{tax.toFixed(2)}</span>
+            </div>
+          )}
+          {settings.enable_discount && discount > 0 && (
             <div className="flex justify-between text-red-500">
-              <span>Discount{discountType ? ` (${discountType} 20%)` : ''}</span>
+              <span>Discount{discountType ? ` (${discountType})` : ''}</span>
               <span>− ₱{discount.toFixed(2)}</span>
             </div>
           )}
@@ -228,3 +234,4 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
 );
 
 ThermalReceipt.displayName = 'ThermalReceipt';
+

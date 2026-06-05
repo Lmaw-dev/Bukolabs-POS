@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { useStoreSettings } from '../context/StoreSettingsContext';
 
 interface StoreInformationData {
   id: number;
@@ -19,8 +20,6 @@ interface StoreInformationData {
   operating_hours: string | null;
   currency: string | null;
   theme_color: string | null;
-  tax_rate: number | string | null;
-  service_charge_rate: number | string | null;
 }
 
 interface StoreInformationProps {
@@ -46,11 +45,10 @@ const defaultStoreInfo: StoreInformationData = {
   operating_hours: 'Mon-Sun, 9:00 AM - 8:00 PM',
   currency: 'PHP',
   theme_color: '#008967',
-  tax_rate: 0,
-  service_charge_rate: 0,
 };
 
 export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpdate, onStoreBrandUpdate, storeBrand }: StoreInformationProps) {
+  const { settings, discounts } = useStoreSettings();
   const [storeInfo, setStoreInfo] = useState<StoreInformationData>(defaultStoreInfo);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -137,8 +135,6 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
           operating_hours: textOrNull(storeInfo.operating_hours),
           currency: textOrNull(storeInfo.currency),
           theme_color: textOrNull(storeInfo.theme_color),
-          tax_rate: numberOrNull(storeInfo.tax_rate),
-          service_charge_rate: numberOrNull(storeInfo.service_charge_rate),
         }),
       });
       const data = await response.json();
@@ -177,6 +173,12 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
       <div className="text-3xl font-bold leading-none">HUB</div>
     </div>
   );
+  const sampleSubtotal = 370;
+  const sampleDiscount = settings.enable_discount && discounts.some((discount) => discount.is_enabled) ? 20 : 0;
+  const sampleServiceCharge = settings.enable_service_charge ? (sampleSubtotal - sampleDiscount) * (settings.service_charge_rate / 100) : 0;
+  const sampleTax = settings.enable_tax ? (sampleSubtotal - sampleDiscount + sampleServiceCharge) * (settings.tax_rate / 100) : 0;
+  const sampleTotal = sampleSubtotal - sampleDiscount + sampleServiceCharge + sampleTax;
+  const sampleDiscountName = discounts.find((discount) => discount.is_enabled)?.discount_name ?? 'Discount';
 
   return (
     <div className="flex h-screen">
@@ -306,8 +308,6 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                         />
                       </div>
                     </div>
-                    <NumberInput label="Tax Rate (%)" value={storeInfo.tax_rate ?? ''} onChange={(value) => updateField('tax_rate', value)} />
-                    <NumberInput label="Service Charge Rate (%)" value={storeInfo.service_charge_rate ?? ''} onChange={(value) => updateField('service_charge_rate', value)} />
                   </div>
                 </div>
               </section>
@@ -344,12 +344,12 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                         <span>Amount</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Oversized Shirt</span>
+                        <span>----------</span>
                         <span>1</span>
                         <span>{currencySymbol} 120.00</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Denim Pants</span>
+                        <span>----------</span>
                         <span>1</span>
                         <span>{currencySymbol} 250.00</span>
                       </div>
@@ -358,10 +358,17 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                     <div className="my-4 border-t border-dashed border-border" />
 
                     <div className="space-y-1 text-xs">
-                      <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol} 370.00</span></div>
-                      <div className="flex justify-between"><span>Tax ({numberOrNull(storeInfo.tax_rate) ?? 0}%)</span><span>{currencySymbol} 0.00</span></div>
-                      <div className="flex justify-between"><span>Service ({numberOrNull(storeInfo.service_charge_rate) ?? 0}%)</span><span>{currencySymbol} 0.00</span></div>
-                      <div className="flex justify-between font-semibold"><span>TOTAL</span><span>{currencySymbol} 370.00</span></div>
+                      <div className="flex justify-between"><span>Subtotal</span><span>{currencySymbol} {sampleSubtotal.toFixed(2)}</span></div>
+                      {settings.enable_discount && sampleDiscount > 0 && (
+                        <div className="flex justify-between"><span>{sampleDiscountName}</span><span>- {currencySymbol} {sampleDiscount.toFixed(2)}</span></div>
+                      )}
+                      {settings.enable_service_charge && (
+                        <div className="flex justify-between"><span>Service ({settings.service_charge_rate}%)</span><span>{currencySymbol} {sampleServiceCharge.toFixed(2)}</span></div>
+                      )}
+                      {settings.enable_tax && (
+                        <div className="flex justify-between"><span>Tax ({settings.tax_rate}%)</span><span>{currencySymbol} {sampleTax.toFixed(2)}</span></div>
+                      )}
+                      <div className="flex justify-between font-semibold"><span>TOTAL</span><span>{currencySymbol} {sampleTotal.toFixed(2)}</span></div>
                     </div>
 
                     <div className="my-4 border-t border-dashed border-border" />
@@ -379,7 +386,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                     <div>
                       <h3 className="font-medium">Important</h3>
                       <p className="mt-2 text-sm leading-6">
-                        These values are saved in store_information and are used for store identity, printed receipts, POS settings, tax, and service charge calculations.
+                        These values are saved in store_information and are used for store identity and printed receipt details.
                       </p>
                     </div>
                   </div>
@@ -420,39 +427,11 @@ function TextInput({
   );
 }
 
-function NumberInput({ label, value, onChange }: { label: string; value: string | number; onChange: (value: string) => void }) {
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-primary">{label}</label>
-      <input
-        type="number"
-        step="0.01"
-        min="0"
-        max="99.99"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-border bg-input-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-      />
-    </div>
-  );
-}
-
 function normalizeStoreInfo(data: Partial<StoreInformationData>): StoreInformationData {
   return {
     ...defaultStoreInfo,
     ...data,
-    tax_rate: data.tax_rate ?? defaultStoreInfo.tax_rate,
-    service_charge_rate: data.service_charge_rate ?? defaultStoreInfo.service_charge_rate,
   };
-}
-
-function numberOrNull(value: string | number | null) {
-  if (value === null || value === '') {
-    return null;
-  }
-
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function textOrNull(value: string | null) {

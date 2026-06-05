@@ -234,42 +234,45 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                     </div>
                   ))}
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="block rounded-lg border border-border p-4">
-                      <span className="mb-2 block font-medium">Service Charge Rate (%)</span>
-                      <input
-                        type="number"
-                        value={settings.service_charge_rate}
-                        onChange={(event) => setSettings((current) => ({ ...current, service_charge_rate: Number(event.target.value) }))}
-                        className="w-full rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                        min="0"
-                        max="100"
-                        disabled={!settings.enable_service_charge}
-                      />
-                    </label>
-                    <label className="block rounded-lg border border-border p-4">
-                      <span className="mb-2 block font-medium">Tax Rate (%)</span>
-                      <input
-                        type="number"
-                        value={settings.tax_rate}
-                        onChange={(event) => setSettings((current) => ({ ...current, tax_rate: Number(event.target.value) }))}
-                        className="w-full rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
-                        min="0"
-                        max="100"
-                        disabled={!settings.enable_tax}
-                      />
-                    </label>
-                  </div>
+                  {(settings.enable_service_charge || settings.enable_tax) && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {settings.enable_service_charge && (
+                        <label className="block rounded-lg border border-border p-4">
+                          <span className="mb-2 block font-medium">Service Charge Rate (%)</span>
+                          <input
+                            type="number"
+                            value={settings.service_charge_rate}
+                            onChange={(event) => setSettings((current) => ({ ...current, service_charge_rate: Number(event.target.value) }))}
+                            className="w-full rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                            min="0"
+                            max="100"
+                          />
+                        </label>
+                      )}
+                      {settings.enable_tax && (
+                        <label className="block rounded-lg border border-border p-4">
+                          <span className="mb-2 block font-medium">Tax Rate (%)</span>
+                          <input
+                            type="number"
+                            value={settings.tax_rate}
+                            onChange={(event) => setSettings((current) => ({ ...current, tax_rate: Number(event.target.value) }))}
+                            className="w-full rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+                            min="0"
+                            max="100"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </section>
 
-            <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-1 text-xl font-semibold">Discount Settings</h2>
-              <p className="mb-5 text-sm text-muted-foreground">Manage discount types and rates used by staff during checkout.</p>
+            {settings.enable_discount && (
+              <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
+                <h2 className="mb-1 text-xl font-semibold">Discount Settings</h2>
+                <p className="mb-5 text-sm text-muted-foreground">Manage discount types and rates used by staff during checkout.</p>
 
-              {settings.enable_discount ? (
-                <>
                   <div className="space-y-3 rounded-lg border border-border p-4">
                     <input
                       value={discountForm.discount_name}
@@ -319,13 +322,8 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                       </div>
                     ))}
                   </div>
-                </>
-              ) : (
-                <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                  Discount management is hidden because discounts are disabled.
-                </div>
-              )}
-            </section>
+              </section>
+            )}
           </div>
         </main>
       </div>
