@@ -305,6 +305,14 @@ export class AdminController {
     });
   }
 
+  @Patch('staff/:id/activate')
+  activateStaff(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.activateStaff({
+      adminUserId: Number(adminUserId),
+      staffUserId: Number(id),
+    });
+  }
+
   @Get('store-information')
   getStoreInformation(@Query('admin_user_id') adminUserId: string) {
     return this.adminService.getStoreInformation(Number(adminUserId));

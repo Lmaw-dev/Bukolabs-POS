@@ -17,32 +17,30 @@ type DiscountForm = {
   id: number | null;
   discount_name: string;
   discount_rate: number;
-  is_enabled: boolean;
 };
 
 const restaurantSettings: Array<[keyof StoreSettingValues, string, string]> = [
-  ['enable_customer_recommendation', 'Enable Customer Recommendation', 'Show previous-customer suggestions while staff types customer names.'],
-  ['enable_table_management', 'Enable Table Management', 'Require and process table selection, status, assignment, and history for dine-in orders.'],
-  ['enable_refund', 'Enable Refund', 'Show and allow refund processing.'],
-  ['enable_void', 'Enable Void', 'Show and allow void transaction processing.'],
-  ['enable_service_charge', 'Enable Service Charge', 'Show and include service charge in totals.'],
-  ['enable_tax', 'Enable Tax', 'Show and include tax in totals.'],
-  ['enable_discount', 'Enable Discount', 'Allow discount management and staff discount selection.'],
+  ['enable_customer_recommendation', 'Customer Recommendations', 'Previous-customer suggestions while staff types names.'],
+  ['enable_table_management', 'Table Management', 'Table selection, status, assignment, and history for dine-in orders.'],
+  ['enable_refund', 'Refund Processing', 'Refund actions in paid order workflows.'],
+  ['enable_void', 'Void Transactions', 'Void actions for transactions that need cancellation.'],
+  ['enable_service_charge', 'Service Charge', 'Service charge line and calculation in order totals.'],
+  ['enable_tax', 'Tax', 'Tax line and calculation in order totals.'],
+  ['enable_discount', 'Discounts', 'Discount management and staff discount selection.'],
 ];
 
 const retailSettings: Array<[keyof StoreSettingValues, string, string]> = [
-  ['enable_refund', 'Enable Refund', 'Show and allow refund processing.'],
-  ['enable_void', 'Enable Void', 'Show and allow void transaction processing.'],
-  ['enable_service_charge', 'Enable Service Fee / Service Charge', 'Show and include service fee in totals.'],
-  ['enable_tax', 'Enable Tax', 'Show and include tax in totals.'],
-  ['enable_discount', 'Enable Discount', 'Allow discount management and staff discount selection.'],
+  ['enable_refund', 'Refund Processing', 'Refund actions in paid order workflows.'],
+  ['enable_void', 'Void Transactions', 'Void actions for transactions that need cancellation.'],
+  ['enable_service_charge', 'Service Fee / Service Charge', 'Service fee line and calculation in order totals.'],
+  ['enable_tax', 'Tax', 'Tax line and calculation in order totals.'],
+  ['enable_discount', 'Discounts', 'Discount management and staff discount selection.'],
 ];
 
 const blankDiscountForm: DiscountForm = {
   id: null,
   discount_name: '',
   discount_rate: 0,
-  is_enabled: true,
 };
 
 function SettingToggle({
@@ -159,7 +157,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
           admin_user_id: currentUser.id,
           discount_name: discountForm.discount_name,
           discount_rate: discountForm.discount_rate,
-          is_enabled: discountForm.is_enabled,
+          is_enabled: true,
         }),
       });
       const data = await response.json();
@@ -280,7 +278,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                       placeholder="Discount name"
                       className="w-full rounded-lg border border-border bg-input-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     />
-                    <div className="grid grid-cols-[1fr_auto] gap-3">
+                    <div>
                       <input
                         type="number"
                         value={discountForm.discount_rate}
@@ -290,13 +288,6 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                         min="0"
                         max="100"
                       />
-                      <label className="inline-flex items-center gap-2 rounded-lg border border-border px-3 text-sm">
-                        <SettingToggle
-                          checked={discountForm.is_enabled}
-                          onChange={(checked) => setDiscountForm((current) => ({ ...current, is_enabled: checked }))}
-                        />
-                        <span>Enabled</span>
-                      </label>
                     </div>
                     <button onClick={saveDiscount} disabled={saving || !discountForm.discount_name.trim()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60">
                       <Plus className="h-4 w-4" />
@@ -309,10 +300,10 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                       <div key={discount.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
                         <div>
                           <p className="font-medium">{discount.discount_name}</p>
-                          <p className="text-sm text-muted-foreground">{Number(discount.discount_rate).toFixed(2)}% · {discount.is_enabled ? 'Enabled' : 'Disabled'}</p>
+                          <p className="text-sm text-muted-foreground">{Number(discount.discount_rate).toFixed(2)}%</p>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button type="button" onClick={() => setDiscountForm({ id: discount.id, discount_name: discount.discount_name, discount_rate: Number(discount.discount_rate), is_enabled: discount.is_enabled })} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Edit discount">
+                          <button type="button" onClick={() => setDiscountForm({ id: discount.id, discount_name: discount.discount_name, discount_rate: Number(discount.discount_rate) })} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Edit discount">
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button type="button" onClick={() => void deleteDiscount(discount)} className="rounded-md p-2 text-destructive hover:bg-destructive/10" title="Delete discount">

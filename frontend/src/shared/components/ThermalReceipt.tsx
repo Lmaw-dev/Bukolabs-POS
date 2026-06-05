@@ -27,6 +27,7 @@ interface ThermalReceiptProps {
   time?: string;
   receiptId?: string;
   paymentId?: string;
+  staffName?: string | null;
   storeBrand?: StoreBrand;
 }
 
@@ -50,6 +51,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       time,
       receiptId,
       paymentId,
+      staffName,
       storeBrand,
     },
     ref
@@ -101,6 +103,12 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
               <span>{paymentId}</span>
             </div>
           )}
+          {staffName?.trim() && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Cashier:</span>
+              <span>{staffName.trim()}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-gray-500">Order #:</span>
             <span>{orderNumber}</span>
@@ -113,10 +121,12 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span className="text-gray-500">Time:</span>
             <span>{currentTime}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-500">Customer:</span>
-            <span>{customerName}</span>
-          </div>
+          {customerName.trim() && (
+            <div className="flex justify-between">
+              <span className="text-gray-500">Customer:</span>
+              <span>{customerName}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-gray-500">Type:</span>
             <span>{orderType}</span>
@@ -196,7 +206,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
           )}
           {settings.enable_discount && discount > 0 && (
             <div className="flex justify-between text-red-500">
-              <span>Discount{discountType ? ` (${discountType})` : ''}</span>
+              <span>Discount{discountType ? `(${discountType})` : ''}</span>
               <span>− ₱{discount.toFixed(2)}</span>
             </div>
           )}

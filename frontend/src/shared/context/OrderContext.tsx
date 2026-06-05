@@ -28,6 +28,7 @@ export interface Order {
   receiptId?: string;
   cashReceived?: number;
   changeGiven?: number;
+  cashier?: string;
   queuePosition?: number;
   isQueued?: boolean;
   partySize?: number;
@@ -217,7 +218,7 @@ interface OrderContextType {
   updateOrder: (id: string, updates: Partial<Order>) => void;
   removeOrder: (id: string) => void;
   removeFromQueue: (id: string) => void;
-  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number }) => void;
+  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => void;
   paymentCompletedSignal: number; // Signal for when payment is completed
 }
 
@@ -264,7 +265,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     ));
   };
 
-  const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number }) => {
+  const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => {
     // Update order to paid status
     setOrders(prev => prev.map(o =>
       o.id === orderId
@@ -274,6 +275,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             orderStatus: 'Completed' as const,
             cashReceived: paymentData.cashReceived,
             changeGiven: paymentData.changeGiven,
+            cashier: paymentData.cashier,
             paymentId: `PAY-${Date.now()}`,
             receiptId: `REC-${Date.now()}`,
           }

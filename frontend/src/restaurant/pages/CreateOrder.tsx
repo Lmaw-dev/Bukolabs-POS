@@ -539,10 +539,6 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
   const total = subtotal + serviceFee + tax - discount;
 
   const validateOrder = (): boolean => {
-    if (!customerName.trim()) {
-      setValidationError('Please enter customer name.');
-      return false;
-    }
     if (!diningOption) {
       setValidationError('Please select a dining option.');
       return false;
@@ -586,7 +582,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
 
     const order = {
       orderNumber: currentOrderNumber,
-      customerName,
+      customerName: customerName.trim(),
       items: cart,
       subtotal,
       discount,
@@ -816,14 +812,14 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       {/* Right sidebar - Order Summary */}
       <div className="w-80 bg-white border-l border-border p-5 flex flex-col">
         <div className="mb-4">
-          <label className="block text-xs text-muted-foreground mb-1.5">Customer Name:</label>
+          <label className="block text-xs text-muted-foreground mb-1.5">Customer Name (Optional):</label>
           <div ref={customerInputRef} className="relative">
             <input
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               onKeyDown={handleCustomerKeyDown}
-              placeholder="Enter customer name"
+              placeholder="Enter customer name if available"
               className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-gray-50"
               autoComplete="off"
             />
@@ -1182,7 +1178,9 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
             <div className="overflow-y-auto flex-1 p-5">
               <div className="mb-4 space-y-1">
                 <p className="text-sm"><strong>Order Number:</strong> {currentOrderNumber}</p>
-                <p className="text-sm"><strong>Customer Name:</strong> {customerName}</p>
+                {customerName.trim() && (
+                  <p className="text-sm"><strong>Customer Name:</strong> {customerName.trim()}</p>
+                )}
                 <p className="text-sm"><strong>Dining Type:</strong> {diningOption === 'dine-in' ? 'Dine-In' : 'Takeout'}</p>
                 {partySize && parseInt(partySize) > 0 && (
                   <p className="text-sm"><strong>Party Size:</strong> {partySize} {parseInt(partySize) === 1 ? 'person' : 'people'}</p>
@@ -1589,7 +1587,9 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
               </h2>
               <div className="bg-muted rounded-lg p-4 mb-4 text-left">
                 <p className="text-sm mb-2"><strong>Order Number:</strong> {successOrderDetails.orderNumber}</p>
-                <p className="text-sm mb-2"><strong>Customer Name:</strong> {successOrderDetails.customerName}</p>
+                {successOrderDetails.customerName?.trim() && (
+                  <p className="text-sm mb-2"><strong>Customer Name:</strong> {successOrderDetails.customerName.trim()}</p>
+                )}
                 {successOrderDetails.tableNumber && (
                   <p className="text-sm mb-2"><strong>Table Number:</strong> {successOrderDetails.tableNumber}</p>
                 )}
@@ -2093,6 +2093,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                 total={successOrderDetails.total}
                 cashReceived={successOrderDetails.cashReceived}
                 changeGiven={successOrderDetails.changeGiven}
+                staffName={userName}
                 storeBrand={storeBrand}
               />
 

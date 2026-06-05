@@ -523,7 +523,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       cashReceived: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
       changeGiven: paymentMethod === 'Cash' ? changeAmount : 0,
-      cashier: 'Cashier 1', // This would come from user context in a real app
+      cashier: userName ?? 'Staff',
     };
 
     addOrder(order);

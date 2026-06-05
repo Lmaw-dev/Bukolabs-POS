@@ -72,9 +72,9 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     setCurrentReceiptId(rId);
 
     // Use completePayment to trigger table release and queue notifications
-    completePayment(selectedOrder.id, { cashReceived: cash, changeGiven: change });
+    completePayment(selectedOrder.id, { cashReceived: cash, changeGiven: change, cashier: userName ?? undefined });
 
-    const updates = { paymentStatus: 'Paid' as const, orderStatus: 'Completed' as const, paymentId: pId, receiptId: rId, cashReceived: cash, changeGiven: change };
+    const updates = { paymentStatus: 'Paid' as const, orderStatus: 'Completed' as const, paymentId: pId, receiptId: rId, cashReceived: cash, changeGiven: change, cashier: userName ?? undefined };
     setSelectedOrder(prev => prev ? { ...prev, ...updates } : null);
     setActiveModal('payment-success');
   };
@@ -682,6 +682,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               time={selectedOrder.time}
               receiptId={selectedOrder.receiptId || currentReceiptId}
               paymentId={selectedOrder.paymentId || currentPaymentId}
+              staffName={selectedOrder.cashier ?? userName}
               storeBrand={storeBrand}
             />
 
