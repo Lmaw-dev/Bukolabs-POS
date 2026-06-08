@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
@@ -46,6 +46,15 @@ interface RetailProduct {
   price: number;
   image: string;
   stockQuantity?: number;
+}
+
+interface RetailProductGroup extends RetailProduct {
+  variants: RetailProduct[];
+  totalStockQuantity?: number;
+  minPrice: number;
+  maxPrice: number;
+  sizes: string[];
+  colors: string[];
 }
 
 const productCategories = [
@@ -268,6 +277,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   const [dynamicProductCategories, setDynamicProductCategories] = useState([{ id: 'all', name: 'All Items' }]);
   const [recommendedProducts, setRecommendedProducts] = useState<RetailProduct[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedProductGroup, setSelectedProductGroup] = useState<RetailProductGroup | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState(false);
@@ -304,7 +314,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
         const mappedProducts: RetailProduct[] = data.map((product: any) => ({
           id: Number(product.id),
           variantId: Number(product.variant_id),
-          code: product.sku || product.barcode || `SKU-${product.id}`,
+          code: product.barcode || product.sku || String(product.variant_id || product.id),
           name: product.name,
           category: product.category_name ?? 'Uncategorized',
           categoryName: product.category_name ?? null,
@@ -507,6 +517,42 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                          p.code.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const groupedProducts = useMemo<RetailProductGroup[]>(() => {
+    const groups = new Map<string, RetailProduct[]>();
+
+    filteredProducts.forEach((product) => {
+      const groupKey = `${product.id}-${product.category}-${product.name}`;
+      groups.set(groupKey, [...(groups.get(groupKey) ?? []), product]);
+    });
+
+    return Array.from(groups.values()).map((variants) => {
+      const primaryVariant = variants[0];
+      const prices = variants.map((variant) => variant.price);
+      const stockValues = variants
+        .map((variant) => variant.stockQuantity)
+        .filter((stock): stock is number => stock !== undefined);
+
+      return {
+        ...primaryVariant,
+        variants,
+        totalStockQuantity: stockValues.length > 0 ? stockValues.reduce((sum, stock) => sum + stock, 0) : undefined,
+        minPrice: Math.min(...prices),
+        maxPrice: Math.max(...prices),
+        sizes: Array.from(new Set(variants.map((variant) => variant.size).filter((size): size is string => !!size))),
+        colors: Array.from(new Set(variants.map((variant) => variant.color).filter((color): color is string => !!color))),
+      };
+    });
+  }, [filteredProducts]);
+
+  const handleProductCardClick = (productGroup: RetailProductGroup) => {
+    if (productGroup.variants.length === 1) {
+      addToCart(productGroup.variants[0]);
+      return;
+    }
+
+    setSelectedProductGroup(productGroup);
+  };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
@@ -739,11 +785,11 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {filteredProducts.map(product => (
+            {groupedProducts.map(product => (
               <button
-                key={`${product.id}-${product.variantId}`}
-                onClick={() => addToCart(product)}
-                disabled={product.stockQuantity !== undefined && product.stockQuantity <= 0}
+                key={`${product.id}-${product.category}-${product.name}`}
+                onClick={() => handleProductCardClick(product)}
+                disabled={product.totalStockQuantity !== undefined && product.totalStockQuantity <= 0}
                 className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden relative">
@@ -754,21 +800,29 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                   />
                   <div
                     className="absolute bottom-1 right-1 max-w-[78%] truncate rounded border border-gray-200 bg-white/90 px-1 py-0.5 font-mono text-[9px] leading-none text-gray-500"
-                    title={`SKU/Barcode: ${product.code}`}
+                    title={product.variants.length === 1 ? `SKU/Barcode: ${product.code}` : `${product.variants.length} variants available`}
                   >
-                    {product.code}
+                    {product.variants.length === 1 ? product.code : `${product.variants.length} variants`}
                   </div>
                 </div>
                 <h3 className="text-xs font-medium mb-0.5 line-clamp-1">{product.name}</h3>
                 <div className="flex gap-1 mb-1 flex-wrap">
-                  {product.size && (
-                    <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">Size: {product.size}</span>
+                  {product.sizes.length > 0 && (
+                    <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                      {product.sizes.length === 1 ? `Size: ${product.sizes[0]}` : `${product.sizes.length} sizes`}
+                    </span>
                   )}
-                  {product.color && (
-                    <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{product.color}</span>
+                  {product.colors.length > 0 && (
+                    <span className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                      {product.colors.length === 1 ? product.colors[0] : `${product.colors.length} colors`}
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-primary font-medium">₱ {product.price.toFixed(2)}</p>
+                <p className="text-xs text-primary font-medium">
+                  {product.minPrice === product.maxPrice
+                    ? `₱ ${product.minPrice.toFixed(2)}`
+                    : `₱ ${product.minPrice.toFixed(2)} - ₱ ${product.maxPrice.toFixed(2)}`}
+                </p>
               </button>
             ))}
           </div>
@@ -942,6 +996,60 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           Proceed to Checkout
         </button>
       </div>
+
+      {/* Variant Picker Modal */}
+      {selectedProductGroup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
+              <div>
+                <h2 className="text-lg text-primary">{selectedProductGroup.name}</h2>
+                <p className="text-xs text-muted-foreground">{selectedProductGroup.variants.length} variants available</p>
+              </div>
+              <button onClick={() => setSelectedProductGroup(null)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto">
+              <div className="space-y-2">
+                {selectedProductGroup.variants.map((variant) => (
+                  <button
+                    key={`${variant.id}-${variant.variantId}`}
+                    onClick={() => {
+                      addToCart(variant);
+                      setSelectedProductGroup(null);
+                    }}
+                    disabled={variant.stockQuantity !== undefined && variant.stockQuantity <= 0}
+                    className="w-full border border-border rounded-lg p-3 text-left hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                        <img src={variant.image} alt={variant.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{variant.name}</p>
+                            <p className="font-mono text-[10px] text-gray-500 truncate">{variant.code}</p>
+                          </div>
+                          <p className="text-sm font-medium text-primary flex-shrink-0">PHP {variant.price.toFixed(2)}</p>
+                        </div>
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {variant.size && <span className="text-xs bg-white px-1.5 py-0.5 rounded border">Size: {variant.size}</span>}
+                          {variant.color && <span className="text-xs bg-white px-1.5 py-0.5 rounded border">{variant.color}</span>}
+                          {variant.stockQuantity !== undefined && (
+                            <span className="text-xs bg-white px-1.5 py-0.5 rounded border">{variant.stockQuantity} stock</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview Modal */}
       {showPreview && (

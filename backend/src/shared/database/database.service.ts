@@ -2048,18 +2048,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async replaceProductVariants(client: PoolClient, productId: number, variants: any[]) {
-    const productRows = await this.queryWithClient<{ name: string }>(
-      client,
-      `
-        SELECT name
-        FROM products
-        WHERE id = $1
-        LIMIT 1
-      `,
-      [productId],
-    );
-    const productCode = this.buildProductCode(productRows[0]?.name ?? `ITEM-${productId}`);
-
     await this.queryWithClient(
       client,
       `
@@ -2075,7 +2063,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
 
-      const generatedCode = this.buildVariantCode(productCode, variant, index);
+      const generatedCode = this.buildVariantCode(productId, index);
 
       await this.queryWithClient(
         client,
@@ -2090,7 +2078,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           variant.size ?? null,
           variant.color ?? null,
           variant.sku || generatedCode,
-          variant.barcode || `${generatedCode}-BAR`,
+          variant.barcode || generatedCode,
           variant.image_url ?? null,
           Number(variant.price ?? 0),
           Number(variant.stock_quantity ?? 0),
@@ -2101,26 +2089,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private buildProductCode(name: string) {
-    const normalized = name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24);
-
-    return normalized || 'ITEM';
-  }
-
-  private buildVariantCode(productCode: string, variant: any, index: number) {
-    const optionCode = [variant.size, variant.color]
-      .filter(Boolean)
-      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8))
-      .filter(Boolean)
-      .join('-');
-
-    return [productCode, optionCode, String(index + 1).padStart(3, '0')]
-      .filter(Boolean)
-      .join('-');
+  private buildVariantCode(productId: number, index: number) {
+    return `${String(productId).padStart(8, '0')}${String(index + 1).padStart(4, '0')}`;
   }
 
   private async deductRetailProduct(client: PoolClient, storeId: number, orderId: number, orderItemId: number, productId: number, variantId: number, quantity: number) {

@@ -112,6 +112,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Record<string, string | boolean>>(emptyProduct);
   const [message, setMessage] = useState('');
+  const [codeSeed, setCodeSeed] = useState(() => Date.now());
   const isRestaurant = currentUser?.store_type === 'RESTAURANT';
   const productImagePreview = String(form.image_url || storeBrand?.logo || '');
 
@@ -119,35 +120,18 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const buildProductCode = (name: string) => {
-    const words = name.toUpperCase().match(/[A-Z0-9]+/g) ?? [];
-    const compact = words.length <= 1
-      ? words[0]?.slice(0, 8)
-      : words.map((word) => word.slice(0, 3)).join('').slice(0, 8);
-
-    return compact || 'ITEM';
-  };
-
-  const buildVariantCode = (variant: ProductVariant, index: number) => {
-    const optionCode = [variant.size, variant.color]
-      .filter(Boolean)
-      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 3))
-      .filter(Boolean)
-      .join('-');
-
-    return [buildProductCode(String(form.name || 'ITEM')), optionCode, String(index + 1).padStart(2, '0')]
-      .filter(Boolean)
-      .join('-');
+  const buildVariantCode = (index: number) => {
+    return `${codeSeed}${String(index + 1).padStart(3, '0')}`;
   };
 
   const getProductCodes = (product: Product) => {
     const variantCodes = (product.variants ?? [])
-      .flatMap((variant) => [variant.sku, variant.barcode])
+      .flatMap((variant) => [variant.barcode, variant.sku])
       .filter((code): code is string => Boolean(code));
 
     return variantCodes.length
       ? variantCodes
-      : [product.sku, product.barcode].filter((code): code is string => Boolean(code));
+      : [product.barcode, product.sku].filter((code): code is string => Boolean(code));
   };
 
   const handleProductImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -223,6 +207,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setForm(emptyProduct);
     setProductIngredients([]);
     setVariants([{ ...emptyVariant }]);
+    setCodeSeed(Date.now());
   };
 
   const addIngredientRow = () => {
@@ -259,13 +244,13 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     const cleanedVariants = variants
       .filter((variant) => variant.size || variant.color || variant.image_url || variant.price || variant.stock_quantity)
       .map((variant, index) => {
-        const generatedCode = buildVariantCode(variant, index);
+        const generatedCode = buildVariantCode(index);
 
         return {
         size: variant.size || null,
         color: variant.color || null,
         sku: generatedCode,
-        barcode: `B-${generatedCode}`,
+        barcode: generatedCode,
         image_url: variant.image_url || null,
         price: Number(variant.price || 0),
         stock_quantity: Number(variant.stock_quantity || 0),
@@ -324,6 +309,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
 
   const edit = async (product: Product) => {
     setEditing(product);
+    setCodeSeed(Date.now());
     setForm({
       category_id: product.category_id ? String(product.category_id) : '',
       name: product.name,
@@ -440,8 +426,8 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                         <input value={variant.size} onChange={(event) => updateVariantRow(index, { size: event.target.value })} placeholder="Size" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <input value={variant.color} onChange={(event) => updateVariantRow(index, { color: event.target.value })} placeholder="Color" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <div className="min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
-                          <div className="truncate font-medium text-foreground" title={buildVariantCode(variant, index)}>{buildVariantCode(variant, index)}</div>
-                          <div className="truncate text-muted-foreground" title={`B-${buildVariantCode(variant, index)}`}>B-{buildVariantCode(variant, index)}</div>
+                          <div className="truncate font-medium text-foreground" title={buildVariantCode(index)}>{buildVariantCode(index)}</div>
+                          <div className="truncate text-muted-foreground" title="SKU and barcode use the same numeric code">Numeric SKU / Barcode</div>
                         </div>
                         <input type="number" value={variant.price} onChange={(event) => updateVariantRow(index, { price: event.target.value })} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <input type="number" value={variant.stock_quantity} onChange={(event) => updateVariantRow(index, { stock_quantity: event.target.value })} placeholder="Stock" className="rounded-lg border border-border bg-input-background px-3 py-2" />
