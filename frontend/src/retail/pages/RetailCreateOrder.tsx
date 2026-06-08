@@ -308,7 +308,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           size: product.size ?? undefined,
           color: product.color ?? undefined,
           price: Number(product.price ?? 0),
-          image: product.image_url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
+          image: product.image_url || storeBrand?.logo || '',
           stockQuantity: Number(product.available_quantity ?? product.stock_quantity ?? 0),
         }));
 

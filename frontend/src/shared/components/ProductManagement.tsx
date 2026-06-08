@@ -25,8 +25,6 @@ interface Product {
   description: string | null;
   price: string | number;
   image_url: string | null;
-  meal_type: string | null;
-  preparation_time_minutes: number | null;
   sku: string | null;
   barcode: string | null;
   unit: string | null;
@@ -48,7 +46,6 @@ interface Ingredient {
 interface ProductIngredientForm {
   ingredient_id: string;
   quantity_required: string;
-  unit: string;
   is_required: boolean;
   is_removable: boolean;
 }
@@ -71,8 +68,6 @@ const emptyProduct = {
   description: '',
   price: '',
   image_url: '',
-  meal_type: '',
-  preparation_time_minutes: '',
   sku: '',
   barcode: '',
   unit: '',
@@ -93,6 +88,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const [form, setForm] = useState<Record<string, string | boolean>>(emptyProduct);
   const [message, setMessage] = useState('');
   const isRestaurant = currentUser?.store_type === 'RESTAURANT';
+  const productImagePreview = String(form.image_url || storeBrand?.logo || '');
 
   const setField = (field: string, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -158,7 +154,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const addIngredientRow = () => {
     setProductIngredients((current) => [
       ...current,
-      { ingredient_id: '', quantity_required: '', unit: '', is_required: true, is_removable: true },
+      { ingredient_id: '', quantity_required: '', is_required: true, is_removable: true },
     ]);
   };
 
@@ -181,8 +177,6 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       description: form.description || null,
       price: Number(form.price),
       image_url: form.image_url || null,
-      meal_type: form.meal_type || null,
-      preparation_time_minutes: form.preparation_time_minutes ? Number(form.preparation_time_minutes) : null,
       sku: form.sku || null,
       barcode: form.barcode || null,
       unit: form.unit || null,
@@ -197,7 +191,6 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
             .map((ingredient) => ({
               ingredient_id: Number(ingredient.ingredient_id),
               quantity_required: Number(ingredient.quantity_required),
-              unit: ingredient.unit,
               is_required: ingredient.is_required,
               is_removable: ingredient.is_removable,
             }))
@@ -229,8 +222,6 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       description: product.description ?? '',
       price: String(product.price ?? ''),
       image_url: product.image_url ?? '',
-      meal_type: product.meal_type ?? '',
-      preparation_time_minutes: product.preparation_time_minutes ? String(product.preparation_time_minutes) : '',
       sku: product.sku ?? '',
       barcode: product.barcode ?? '',
       unit: product.unit ?? '',
@@ -247,7 +238,6 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       setProductIngredients(rows.map((row: any) => ({
         ingredient_id: String(row.ingredient_id ?? ''),
         quantity_required: String(row.quantity_required ?? row.default_quantity ?? ''),
-        unit: row.unit ?? '',
         is_required: row.is_required ?? true,
         is_removable: row.is_removable ?? true,
       })));
@@ -284,8 +274,8 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
               <div className="md:col-span-1">
                 <div className="flex gap-3">
                   <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
-                    {form.image_url ? (
-                      <img src={String(form.image_url)} alt={String(form.name || 'Product')} className="h-full w-full object-cover" />
+                    {productImagePreview ? (
+                      <img src={productImagePreview} alt={String(form.name || 'Product')} className="h-full w-full object-cover" />
                     ) : (
                       <span className="px-2 text-center text-xs text-muted-foreground">No image</span>
                     )}
@@ -305,12 +295,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                 </div>
               </div>
 
-              {isRestaurant ? (
-                <>
-                  <input value={String(form.meal_type)} onChange={(event) => setField('meal_type', event.target.value)} placeholder="Meal type" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input type="number" value={String(form.preparation_time_minutes)} onChange={(event) => setField('preparation_time_minutes', event.target.value)} placeholder="Preparation minutes" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                </>
-              ) : (
+              {!isRestaurant && (
                 <>
                   <input value={String(form.sku)} onChange={(event) => setField('sku', event.target.value)} placeholder="SKU" className="rounded-lg border border-border bg-input-background px-4 py-2" />
                   <input value={String(form.barcode)} onChange={(event) => setField('barcode', event.target.value)} placeholder="Barcode" className="rounded-lg border border-border bg-input-background px-4 py-2" />
@@ -335,12 +320,11 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
 
                 <div className="space-y-3">
                   {productIngredients.map((ingredient, index) => (
-                    <div key={index} className="grid gap-3 md:grid-cols-[1fr_140px_100px_120px_120px_auto]">
+                    <div key={index} className="grid gap-3 md:grid-cols-[1fr_140px_120px_120px_auto]">
                       <select
                         value={ingredient.ingredient_id}
                         onChange={(event) => {
-                          const selected = ingredients.find((item) => item.id === Number(event.target.value));
-                          updateIngredientRow(index, { ingredient_id: event.target.value, unit: selected?.unit ?? ingredient.unit });
+                          updateIngredientRow(index, { ingredient_id: event.target.value });
                         }}
                         className="rounded-lg border border-border bg-input-background px-4 py-2"
                       >
@@ -351,8 +335,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                           </option>
                         ))}
                       </select>
-                      <input type="number" value={ingredient.quantity_required} onChange={(event) => updateIngredientRow(index, { quantity_required: event.target.value })} placeholder="Qty/order" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                      <input value={ingredient.unit} onChange={(event) => updateIngredientRow(index, { unit: event.target.value })} placeholder="Unit" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+                      <input type="number" value={ingredient.quantity_required} onChange={(event) => updateIngredientRow(index, { quantity_required: event.target.value })} placeholder="Quantity" className="rounded-lg border border-border bg-input-background px-4 py-2" />
                       <label className="flex items-center gap-2 text-sm">
                         <input type="checkbox" checked={ingredient.is_required} onChange={(event) => updateIngredientRow(index, { is_required: event.target.checked })} className="h-5 w-5 accent-primary" />
                         Required

@@ -73,6 +73,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       const result = await this.pool.query<T>(sql, params);
       return result.rows;
     } catch (error) {
+      const databaseError = error as { code?: string };
+      const connectionErrorCodes = new Set(['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', '28P01', '3D000']);
+
+      if (databaseError.code && !connectionErrorCodes.has(databaseError.code)) {
+        throw error;
+      }
+
       throw new ServiceUnavailableException('PostgreSQL is not reachable or is missing credentials. Check backend/.env and database status.');
     }
   }

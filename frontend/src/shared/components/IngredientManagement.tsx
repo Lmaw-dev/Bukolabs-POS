@@ -28,8 +28,6 @@ interface IngredientAlternative {
   parent_ingredient_name: string;
   alternative_ingredient_id: number;
   alternative_ingredient_name: string;
-  alternative_quantity_available: string | number;
-  alternative_unit: string;
   additional_price: string | number;
   is_available: boolean;
 }
@@ -217,14 +215,12 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
 
           {message && <div className="mb-4 rounded-lg border border-border bg-card p-4 text-sm">{message}</div>}
 
-          <form onSubmit={submit} className="mb-6 grid gap-4 rounded-lg border border-border bg-card p-6 shadow-sm md:grid-cols-6">
+          <form onSubmit={submit} className="mb-6 grid gap-4 rounded-lg border border-border bg-card p-6 shadow-sm md:grid-cols-[1fr_140px_160px_auto]">
             <input value={name} onChange={(event) => setName(event.target.value)} required placeholder="Ingredient name" className="rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
             <input value={unit} onChange={(event) => setUnit(event.target.value)} required placeholder="Unit" className="rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
             <input type="number" value={stock} onChange={(event) => setStock(event.target.value)} required placeholder="Stock" className="rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
-            <input type="number" value={lowStockLimit} onChange={(event) => setLowStockLimit(event.target.value)} placeholder="Low stock" className="rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
-            <input type="number" value={costPerUnit} onChange={(event) => setCostPerUnit(event.target.value)} placeholder="Cost/unit" className="rounded-lg border border-border bg-input-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary" />
             <button className="rounded-lg bg-primary px-5 py-2 text-primary-foreground hover:bg-primary/90">{editing ? 'Save' : 'Add'}</button>
-            <label className="flex items-center gap-2 text-sm md:col-span-6">
+            <label className="flex items-center gap-2 text-sm md:col-span-4">
               <input type="checkbox" checked={isAvailable} onChange={(event) => setIsAvailable(event.target.checked)} className="h-5 w-5 accent-primary" />
               Available for production
             </label>
@@ -317,9 +313,7 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                 {ingredients
                   .filter((ingredient) => String(ingredient.id) !== parentIngredientId)
                   .map((ingredient) => (
-                    <option key={ingredient.id} value={ingredient.id}>
-                      {ingredient.ingredient_name} ({Number(ingredient.quantity_available).toLocaleString()} {ingredient.unit})
-                    </option>
+                    <option key={ingredient.id} value={ingredient.id}>{ingredient.ingredient_name}</option>
                   ))}
               </select>
               <input type="number" value={additionalPrice} onChange={(event) => setAdditionalPrice(event.target.value)} placeholder="Extra price" className="rounded-lg border border-border bg-input-background px-4 py-2" />
@@ -340,7 +334,6 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                     <th className="px-6 py-4 text-left">Original</th>
                     <th className="px-6 py-4 text-left">Alternative</th>
                     <th className="px-6 py-4 text-left">Extra Price</th>
-                    <th className="px-6 py-4 text-left">Alt Stock</th>
                     <th className="px-6 py-4 text-left">Status</th>
                     <th className="px-6 py-4 text-left">Actions</th>
                   </tr>
@@ -351,7 +344,6 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                       <td className="px-6 py-4">{alternative.parent_ingredient_name}</td>
                       <td className="px-6 py-4">{alternative.alternative_ingredient_name}</td>
                       <td className="px-6 py-4">PHP {Number(alternative.additional_price).toFixed(2)}</td>
-                      <td className="px-6 py-4">{Number(alternative.alternative_quantity_available).toLocaleString()} {alternative.alternative_unit}</td>
                       <td className="px-6 py-4">{alternative.is_available ? 'Available' : 'Hidden'}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
@@ -363,7 +355,7 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                   ))}
                   {alternatives.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-6 text-center text-sm text-muted-foreground">No alternatives configured yet.</td>
+                      <td colSpan={5} className="px-6 py-6 text-center text-sm text-muted-foreground">No alternatives configured yet.</td>
                     </tr>
                   )}
                 </tbody>

@@ -348,7 +348,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
           price: Number(product.price ?? 0),
           category: product.category_name ?? 'Uncategorized',
           categoryName: product.category_name ?? null,
-          image: product.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
+          image: product.image_url || storeBrand?.logo || '',
           availableQuantity: Number(product.available_quantity ?? 0),
           ingredients: (product.ingredients ?? []).map((ingredient: any) => ({
             id: Number(ingredient.id),
