@@ -5,6 +5,7 @@ import logoImage from '../../imports/logo1.png';
 import {
   CalendarDays,
   Ban,
+  ChevronsRight,
   ChevronRight,
   CircleCheck,
   Eye,
@@ -519,11 +520,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                       <button
                         type="button"
                         onClick={card.onClick}
-                        className="mt-auto inline-flex h-11 w-full items-center justify-center rounded-md border border-blue-100 bg-blue-50 px-4 text-[#0b5cff] transition hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                        className="mt-auto inline-flex h-11 w-full items-center justify-center rounded-md bg-[#f9bd18] px-4 text-white shadow-sm transition hover:bg-[#e9ad0c]"
                         aria-label={card.link}
                         title={card.link}
                       >
-                        <Eye className="h-5 w-5" />
+                        <ChevronsRight className="h-6 w-6" strokeWidth={3} />
                       </button>
                     </article>
                   );
