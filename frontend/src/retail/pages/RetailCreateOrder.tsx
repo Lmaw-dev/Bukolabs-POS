@@ -22,6 +22,7 @@ interface RetailCreateOrderProps {
 
 interface CartItem {
   id: number;
+  variantId: number;
   code: string;
   name: string;
   category: string;
@@ -35,6 +36,7 @@ interface CartItem {
 
 interface RetailProduct {
   id: number;
+  variantId: number;
   code: string;
   name: string;
   category: string;
@@ -301,6 +303,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
         const mappedProducts: RetailProduct[] = data.map((product: any) => ({
           id: Number(product.id),
+          variantId: Number(product.variant_id),
           code: product.sku || product.barcode || `SKU-${product.id}`,
           name: product.name,
           category: product.category_name ?? 'Uncategorized',
@@ -423,7 +426,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
   const addToCart = (product: RetailProduct) => {
     const currentQuantity = cart
-      .filter((item) => item.id === product.id)
+      .filter((item) => item.variantId === product.variantId)
       .reduce((sum, item) => sum + item.quantity, 0);
     if (product.stockQuantity !== undefined && currentQuantity >= product.stockQuantity) {
       setScanFeedback({ type: 'error', message: `${product.name} is out of stock.` });
@@ -432,6 +435,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
     const existingItemIndex = cart.findIndex(item =>
       item.id === product.id &&
+      item.variantId === product.variantId &&
       item.size === product.size &&
       item.color === product.color
     );
@@ -445,6 +449,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
     } else {
       const newItem: CartItem = {
         id: product.id,
+        variantId: product.variantId,
         code: product.code,
         name: product.name,
         category: product.category,
@@ -597,6 +602,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           items: cart.map((item) => ({
             ...item,
             productId: item.id,
+            variantId: item.variantId,
             categoryName: item.category,
           })),
           payment: {
@@ -735,7 +741,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {filteredProducts.map(product => (
               <button
-                key={`${product.id}-${product.size}-${product.color}`}
+                key={`${product.id}-${product.variantId}`}
                 onClick={() => addToCart(product)}
                 disabled={product.stockQuantity !== undefined && product.stockQuantity <= 0}
                 className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left disabled:cursor-not-allowed disabled:opacity-50"

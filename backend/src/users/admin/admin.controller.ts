@@ -213,6 +213,14 @@ class ProductDto {
   @IsString()
   description?: string | null;
 
+  @IsOptional()
+  @IsString()
+  brand?: string | null;
+
+  @IsOptional()
+  @IsString()
+  material?: string | null;
+
   @Type(() => Number)
   @IsNumber()
   price!: number;
@@ -266,6 +274,9 @@ class ProductDto {
 
   @IsOptional()
   ingredients?: any[];
+
+  @IsOptional()
+  variants?: any[];
 }
 
 class IngredientDto {

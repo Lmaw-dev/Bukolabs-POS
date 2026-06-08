@@ -23,6 +23,8 @@ interface Product {
   category_name: string | null;
   name: string;
   description: string | null;
+  brand: string | null;
+  material: string | null;
   price: string | number;
   image_url: string | null;
   sku: string | null;
@@ -34,6 +36,7 @@ interface Product {
   low_stock_limit: number | null;
   is_available: boolean;
   available_quantity?: number | string;
+  variants?: ProductVariant[];
 }
 
 interface Ingredient {
@@ -48,6 +51,19 @@ interface ProductIngredientForm {
   quantity_required: string;
   is_required: boolean;
   is_removable: boolean;
+}
+
+interface ProductVariant {
+  id?: number;
+  size: string;
+  color: string;
+  sku: string;
+  barcode: string;
+  image_url: string;
+  price: string | number;
+  stock_quantity: string | number;
+  low_stock_limit: string | number;
+  is_active: boolean;
 }
 
 interface InventoryDeduction {
@@ -66,16 +82,24 @@ const emptyProduct = {
   category_id: '',
   name: '',
   description: '',
+  brand: '',
+  material: '',
   price: '',
   image_url: '',
-  sku: '',
-  barcode: '',
   unit: '',
+  is_available: true,
+};
+
+const emptyVariant: ProductVariant = {
   size: '',
   color: '',
+  sku: '',
+  barcode: '',
+  image_url: '',
+  price: '',
   stock_quantity: '0',
   low_stock_limit: '5',
-  is_available: true,
+  is_active: true,
 };
 
 export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigate }: ProductManagementProps) {
@@ -83,6 +107,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const [products, setProducts] = useState<Product[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [productIngredients, setProductIngredients] = useState<ProductIngredientForm[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([{ ...emptyVariant }]);
   const [deductions, setDeductions] = useState<InventoryDeduction[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Record<string, string | boolean>>(emptyProduct);
@@ -92,6 +117,28 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
 
   const setField = (field: string, value: string | boolean) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const buildProductCode = (name: string) => {
+    const normalized = name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24);
+
+    return normalized || 'ITEM';
+  };
+
+  const buildVariantCode = (variant: ProductVariant, index: number) => {
+    const optionCode = [variant.size, variant.color]
+      .filter(Boolean)
+      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8))
+      .filter(Boolean)
+      .join('-');
+
+    return [buildProductCode(String(form.name || 'ITEM')), optionCode, String(index + 1).padStart(3, '0')]
+      .filter(Boolean)
+      .join('-');
   };
 
   const handleProductImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +155,23 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
 
     const reader = new FileReader();
     reader.onload = () => setField('image_url', String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
+  const handleVariantImageUpload = (index: number, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage('Variant image must be 2MB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => updateVariantRow(index, { image_url: String(reader.result) });
     reader.readAsDataURL(file);
   };
 
@@ -149,6 +213,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setEditing(null);
     setForm(emptyProduct);
     setProductIngredients([]);
+    setVariants([{ ...emptyVariant }]);
   };
 
   const addIngredientRow = () => {
@@ -166,25 +231,59 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setProductIngredients((current) => current.filter((_, rowIndex) => rowIndex !== index));
   };
 
+  const addVariantRow = () => {
+    setVariants((current) => [...current, { ...emptyVariant }]);
+  };
+
+  const updateVariantRow = (index: number, updates: Partial<ProductVariant>) => {
+    setVariants((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...updates } : row));
+  };
+
+  const removeVariantRow = (index: number) => {
+    setVariants((current) => current.length <= 1 ? current : current.filter((_, rowIndex) => rowIndex !== index));
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!currentUser?.id) return;
+
+    const cleanedVariants = variants
+      .filter((variant) => variant.size || variant.color || variant.image_url || variant.price || variant.stock_quantity)
+      .map((variant, index) => {
+        const generatedCode = buildVariantCode(variant, index);
+
+        return {
+        size: variant.size || null,
+        color: variant.color || null,
+        sku: generatedCode,
+        barcode: `${generatedCode}-BAR`,
+        image_url: variant.image_url || null,
+        price: Number(variant.price || 0),
+        stock_quantity: Number(variant.stock_quantity || 0),
+        low_stock_limit: Number(variant.low_stock_limit || 5),
+        is_active: variant.is_active,
+        };
+      });
+
+    if (!isRestaurant && cleanedVariants.length === 0) {
+      setMessage('Add at least one product variant for retail items.');
+      return;
+    }
 
     const body = {
       admin_user_id: currentUser.id,
       category_id: form.category_id ? Number(form.category_id) : null,
       name: form.name,
       description: form.description || null,
-      price: Number(form.price),
+      brand: form.brand || null,
+      material: form.material || null,
+      price: isRestaurant ? Number(form.price) : Number(cleanedVariants[0]?.price ?? 0),
       image_url: form.image_url || null,
-      sku: form.sku || null,
-      barcode: form.barcode || null,
       unit: form.unit || null,
-      size: form.size || null,
-      color: form.color || null,
-      stock_quantity: Number(form.stock_quantity || 0),
-      low_stock_limit: Number(form.low_stock_limit || 5),
+      stock_quantity: isRestaurant ? 0 : cleanedVariants.reduce((sum, variant) => sum + Number(variant.stock_quantity || 0), 0),
+      low_stock_limit: 0,
       is_available: Boolean(form.is_available),
+      variants: isRestaurant ? undefined : cleanedVariants,
       ingredients: isRestaurant
         ? productIngredients
             .filter((ingredient) => ingredient.ingredient_id && ingredient.quantity_required)
@@ -220,17 +319,25 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       category_id: product.category_id ? String(product.category_id) : '',
       name: product.name,
       description: product.description ?? '',
+      brand: product.brand ?? '',
+      material: product.material ?? '',
       price: String(product.price ?? ''),
       image_url: product.image_url ?? '',
-      sku: product.sku ?? '',
-      barcode: product.barcode ?? '',
       unit: product.unit ?? '',
-      size: product.size ?? '',
-      color: product.color ?? '',
-      stock_quantity: String(product.stock_quantity ?? 0),
-      low_stock_limit: String(product.low_stock_limit ?? 5),
       is_available: product.is_available,
     });
+    setVariants((product.variants?.length ? product.variants : [{ ...emptyVariant }]).map((variant) => ({
+      id: variant.id,
+      size: String(variant.size ?? ''),
+      color: String(variant.color ?? ''),
+      sku: String(variant.sku ?? ''),
+      barcode: String(variant.barcode ?? ''),
+      image_url: String(variant.image_url ?? ''),
+      price: String(variant.price ?? ''),
+      stock_quantity: String(variant.stock_quantity ?? 0),
+      low_stock_limit: String(variant.low_stock_limit ?? 5),
+      is_active: variant.is_active ?? true,
+    })));
 
     if (currentUser?.id && isRestaurant) {
       const response = await fetch(`${getApiBaseUrl()}/admin/products/${product.id}/ingredients?admin_user_id=${currentUser.id}`);
@@ -269,8 +376,15 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                 <option value="">No category</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
-              <input type="number" value={String(form.price)} onChange={(event) => setField('price', event.target.value)} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+              {isRestaurant ? (
+                <input type="number" value={String(form.price)} onChange={(event) => setField('price', event.target.value)} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+              ) : (
+                <input value={String(form.brand)} onChange={(event) => setField('brand', event.target.value)} placeholder="Brand" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+              )}
               <input value={String(form.description)} onChange={(event) => setField('description', event.target.value)} placeholder="Description" className="rounded-lg border border-border bg-input-background px-4 py-2 md:col-span-2" />
+              {!isRestaurant && (
+                <input value={String(form.material)} onChange={(event) => setField('material', event.target.value)} placeholder="Material" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+              )}
               <div className="md:col-span-1">
                 <div className="flex gap-3">
                   <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
@@ -296,15 +410,46 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
               </div>
 
               {!isRestaurant && (
-                <>
-                  <input value={String(form.sku)} onChange={(event) => setField('sku', event.target.value)} placeholder="SKU" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input value={String(form.barcode)} onChange={(event) => setField('barcode', event.target.value)} placeholder="Barcode" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input value={String(form.unit)} onChange={(event) => setField('unit', event.target.value)} placeholder="Unit" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input value={String(form.size)} onChange={(event) => setField('size', event.target.value)} placeholder="Size" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input value={String(form.color)} onChange={(event) => setField('color', event.target.value)} placeholder="Color" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input type="number" value={String(form.stock_quantity)} onChange={(event) => setField('stock_quantity', event.target.value)} placeholder="Stock quantity" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                  <input type="number" value={String(form.low_stock_limit)} onChange={(event) => setField('low_stock_limit', event.target.value)} placeholder="Low stock limit" className="rounded-lg border border-border bg-input-background px-4 py-2" />
-                </>
+                <div className="rounded-lg border border-border p-4 md:col-span-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-medium">Product Variants</h2>
+                      <p className="text-xs text-muted-foreground">Size, color, price, and stock are managed per variant.</p>
+                    </div>
+                    <button type="button" onClick={addVariantRow} className="rounded-lg border border-border px-3 py-1.5 text-sm text-primary">Add Variant</button>
+                  </div>
+                  <div className="space-y-3">
+                    {variants.map((variant, index) => (
+                      <div key={index} className="grid gap-3 md:grid-cols-[72px_90px_110px_1fr_120px_110px_110px_90px_80px_auto]">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
+                          {(variant.image_url || form.image_url || storeBrand?.logo) ? (
+                            <img src={String(variant.image_url || form.image_url || storeBrand?.logo)} alt={`${String(form.name || 'Variant')} variant`} className="h-full w-full object-cover" />
+                          ) : (
+                            <Upload className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <input value={variant.size} onChange={(event) => updateVariantRow(index, { size: event.target.value })} placeholder="Size" className="rounded-lg border border-border bg-input-background px-3 py-2" />
+                        <input value={variant.color} onChange={(event) => updateVariantRow(index, { color: event.target.value })} placeholder="Color" className="rounded-lg border border-border bg-input-background px-3 py-2" />
+                        <div className="min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                          <div className="truncate font-medium text-foreground">{buildVariantCode(variant, index)}</div>
+                          <div className="truncate text-muted-foreground">{buildVariantCode(variant, index)}-BAR</div>
+                        </div>
+                        <input type="number" value={variant.price} onChange={(event) => updateVariantRow(index, { price: event.target.value })} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-3 py-2" />
+                        <input type="number" value={variant.stock_quantity} onChange={(event) => updateVariantRow(index, { stock_quantity: event.target.value })} placeholder="Stock" className="rounded-lg border border-border bg-input-background px-3 py-2" />
+                        <input type="number" value={variant.low_stock_limit} onChange={(event) => updateVariantRow(index, { low_stock_limit: event.target.value })} placeholder="Low stock" className="rounded-lg border border-border bg-input-background px-3 py-2" />
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={variant.is_active} onChange={(event) => updateVariantRow(index, { is_active: event.target.checked })} className="h-5 w-5 accent-primary" />
+                          Active
+                        </label>
+                        <label className="cursor-pointer rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-primary hover:bg-muted">
+                          Photo
+                          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleVariantImageUpload(index, event)} className="hidden" />
+                        </label>
+                        <button type="button" onClick={() => removeVariantRow(index)} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 

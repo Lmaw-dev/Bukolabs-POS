@@ -1143,17 +1143,26 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Only store admin accounts can view products.');
     }
 
-    return this.query(
+    const products = await this.query<any>(
       `
         SELECT
           p.*,
           c.name AS category_name,
           CASE
             WHEN p.store_type = 'RESTAURANT' THEN COALESCE(availability.available_quantity, 0)
-            ELSE COALESCE(p.stock_quantity, 0)
-          END AS available_quantity
+            ELSE COALESCE(variant_summary.stock_quantity, p.stock_quantity, 0)
+          END AS available_quantity,
+          variant_summary.min_price
         FROM products p
         LEFT JOIN product_categories c ON c.id = p.category_id
+        LEFT JOIN LATERAL (
+          SELECT
+            SUM(COALESCE(pv.stock_quantity, 0)) AS stock_quantity,
+            MIN(pv.price) AS min_price
+          FROM product_variants pv
+          WHERE pv.product_id = p.id
+            AND COALESCE(pv.is_active, TRUE) = TRUE
+        ) variant_summary ON TRUE
         LEFT JOIN LATERAL (
           SELECT MIN(FLOOR(ii.quantity_available / NULLIF(pi.quantity_required, 0))) AS available_quantity
           FROM product_ingredients pi
@@ -1168,6 +1177,36 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       `,
       [admin.store_id, admin.store_type],
     );
+
+    if (admin.store_type !== 'RETAIL_STORE' || products.length === 0) {
+      return products;
+    }
+
+    const variants = await this.query<any>(
+      `
+        SELECT pv.*
+        FROM product_variants pv
+        JOIN products p ON p.id = pv.product_id
+        WHERE p.store_id = $1
+          AND p.store_type = 'RETAIL_STORE'
+        ORDER BY pv.id ASC
+      `,
+      [admin.store_id],
+    );
+
+    const variantsByProduct = new Map<number, any[]>();
+    for (const variant of variants) {
+      const list = variantsByProduct.get(Number(variant.product_id)) ?? [];
+      list.push(variant);
+      variantsByProduct.set(Number(variant.product_id), list);
+    }
+
+    return products.map((product) => ({
+      ...product,
+      price: product.min_price ?? product.price,
+      stock_quantity: product.available_quantity,
+      variants: variantsByProduct.get(Number(product.id)) ?? [],
+    }));
   }
 
   async createProductForAdmin(input: any) {
@@ -1184,9 +1223,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         INSERT INTO products (
           store_id, category_id, store_type, name, description, price, image_url,
           meal_type, preparation_time_minutes, sku, barcode, unit, size, color,
-          stock_quantity, low_stock_limit, is_available
+          stock_quantity, low_stock_limit, is_available, brand, material
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, TRUE))
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, COALESCE($17, TRUE), $18, $19)
         RETURNING *
       `,
       [
@@ -1195,7 +1234,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         admin.store_type,
         input.name,
         input.description ?? null,
-        input.price,
+        admin.store_type === 'RETAIL_STORE' ? 0 : input.price,
         input.image_url ?? null,
         input.meal_type ?? null,
         input.preparation_time_minutes ?? null,
@@ -1207,10 +1246,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.stock_quantity ?? 0,
         input.low_stock_limit ?? 5,
         input.is_available,
+        input.brand ?? null,
+        input.material ?? null,
       ],
       );
 
-      await this.replaceProductIngredients(client, admin.store_id!, rows[0].id, input.ingredients ?? []);
+      if (admin.store_type === 'RETAIL_STORE') {
+        await this.replaceProductVariants(client, rows[0].id, input.variants ?? []);
+      } else {
+        await this.replaceProductIngredients(client, admin.store_id!, rows[0].id, input.ingredients ?? []);
+      }
       return rows[0];
     });
 
@@ -1245,16 +1290,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           stock_quantity = $13,
           low_stock_limit = $14,
           is_available = COALESCE($15, is_available),
+          brand = $16,
+          material = $17,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $16
-          AND store_id = $17
+        WHERE id = $18
+          AND store_id = $19
         RETURNING *
       `,
       [
         input.categoryId,
         input.name,
         input.description ?? null,
-        input.price,
+        admin.store_type === 'RETAIL_STORE' ? 0 : input.price,
         input.image_url ?? null,
         input.meal_type ?? null,
         input.preparation_time_minutes ?? null,
@@ -1266,6 +1313,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.stock_quantity ?? 0,
         input.low_stock_limit ?? 5,
         input.is_available,
+        input.brand ?? null,
+        input.material ?? null,
         input.productId,
         admin.store_id,
       ],
@@ -1275,7 +1324,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         throw new InternalServerErrorException('Product was not found for this store.');
       }
 
-      if (Array.isArray(input.ingredients)) {
+      if (admin.store_type === 'RETAIL_STORE' && Array.isArray(input.variants)) {
+        await this.replaceProductVariants(client, input.productId, input.variants);
+      } else if (Array.isArray(input.ingredients)) {
         await this.replaceProductIngredients(client, admin.store_id!, input.productId, input.ingredients);
       }
 
@@ -1588,7 +1639,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           d.ingredient_id,
           ii.ingredient_name,
           d.product_id,
-          p.name AS product_name,
+          d.variant_id,
+          CASE
+            WHEN pv.id IS NOT NULL THEN CONCAT(p.name, ' - ', COALESCE(pv.size, 'No size'), ' / ', COALESCE(pv.color, 'No color'))
+            ELSE p.name
+          END AS product_name,
           d.deduction_type,
           d.quantity_deducted,
           d.unit,
@@ -1598,6 +1653,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         LEFT JOIN order_items oi ON oi.id = d.order_item_id
         LEFT JOIN ingredients_inventory ii ON ii.id = d.ingredient_id
         LEFT JOIN products p ON p.id = d.product_id
+        LEFT JOIN product_variants pv ON pv.id = d.variant_id
         WHERE d.store_id = $1
         ORDER BY d.created_at DESC, d.id DESC
         LIMIT 200
@@ -1635,6 +1691,44 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     if (!user.store_id || !user.store_type) {
       throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    if (user.store_type === 'RETAIL_STORE') {
+      return this.query<any>(
+        `
+          SELECT
+            p.id,
+            pv.id AS variant_id,
+            p.store_id,
+            p.store_type,
+            p.category_id,
+            p.name,
+            p.description,
+            p.brand,
+            p.material,
+            COALESCE(pv.image_url, p.image_url) AS image_url,
+            p.is_available,
+            c.name AS category_name,
+            pv.size,
+            pv.color,
+            pv.sku,
+            pv.barcode,
+            pv.price,
+            pv.stock_quantity,
+            pv.low_stock_limit,
+            pv.is_active,
+            pv.stock_quantity AS available_quantity
+          FROM products p
+          JOIN product_variants pv ON pv.product_id = p.id
+          LEFT JOIN product_categories c ON c.id = p.category_id
+          WHERE p.store_id = $1
+            AND p.store_type = 'RETAIL_STORE'
+            AND COALESCE(p.is_available, TRUE) = TRUE
+            AND COALESCE(pv.is_active, TRUE) = TRUE
+          ORDER BY p.name ASC, pv.color ASC NULLS LAST, pv.size ASC NULLS LAST
+        `,
+        [user.store_id],
+      );
     }
 
     const products = await this.query<any>(
@@ -1772,15 +1866,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           client,
           `
             INSERT INTO order_items (
-              order_id, product_id, product_name, category_name, size, color,
+              order_id, product_id, variant_id, product_name, category_name, size, color,
               quantity, unit_price, line_total, item_type, notes
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id
           `,
           [
             orderId,
             item.productId ?? item.id ?? null,
+            item.variantId ?? item.variant_id ?? null,
             item.name,
             item.categoryName ?? item.category ?? null,
             item.size ?? null,
@@ -1795,7 +1890,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         const orderItemId = itemRows[0].id;
 
         if (user.store_type === 'RETAIL_STORE') {
-          await this.deductRetailProduct(client, user.store_id!, orderId, orderItemId, item.productId ?? item.id, item.quantity ?? 1);
+          await this.deductRetailProduct(client, user.store_id!, orderId, orderItemId, item.productId ?? item.id, item.variantId ?? item.variant_id, item.quantity ?? 1);
         } else {
           await this.deductRestaurantIngredients(client, user.store_id!, orderId, orderItemId, item);
         }
@@ -1862,6 +1957,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
               json_build_object(
                 'id', oi.id,
                 'product_id', oi.product_id,
+                'variant_id', oi.variant_id,
                 'product_name', oi.product_name,
                 'category_name', oi.category_name,
                 'size', oi.size,
@@ -1951,49 +2047,137 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async deductRetailProduct(client: PoolClient, storeId: number, orderId: number, orderItemId: number, productId: number, quantity: number) {
-    const productRows = await this.queryWithClient<{ stock_quantity: number; unit: string | null }>(
+  private async replaceProductVariants(client: PoolClient, productId: number, variants: any[]) {
+    const productRows = await this.queryWithClient<{ name: string }>(
       client,
       `
-        SELECT stock_quantity, unit
+        SELECT name
         FROM products
         WHERE id = $1
-          AND store_id = $2
-        FOR UPDATE
+        LIMIT 1
       `,
-      [productId, storeId],
+      [productId],
+    );
+    const productCode = this.buildProductCode(productRows[0]?.name ?? `ITEM-${productId}`);
+
+    await this.queryWithClient(
+      client,
+      `
+        DELETE FROM product_variants
+        WHERE product_id = $1
+      `,
+      [productId],
     );
 
-    const product = productRows[0];
-    if (!product) {
-      throw new NotFoundException('Product was not found for this store.');
+    for (const [index, variant] of variants.entries()) {
+      const hasVariantValue = variant.size || variant.color || variant.image_url || variant.sku || variant.barcode || variant.price || variant.stock_quantity;
+      if (!hasVariantValue) {
+        continue;
+      }
+
+      const generatedCode = this.buildVariantCode(productCode, variant, index);
+
+      await this.queryWithClient(
+        client,
+        `
+          INSERT INTO product_variants (
+            product_id, size, color, sku, barcode, image_url, price, stock_quantity, low_stock_limit, is_active
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($10, TRUE))
+        `,
+        [
+          productId,
+          variant.size ?? null,
+          variant.color ?? null,
+          variant.sku || generatedCode,
+          variant.barcode || `${generatedCode}-BAR`,
+          variant.image_url ?? null,
+          Number(variant.price ?? 0),
+          Number(variant.stock_quantity ?? 0),
+          Number(variant.low_stock_limit ?? 5),
+          variant.is_active ?? true,
+        ],
+      );
+    }
+  }
+
+  private buildProductCode(name: string) {
+    const normalized = name
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 24);
+
+    return normalized || 'ITEM';
+  }
+
+  private buildVariantCode(productCode: string, variant: any, index: number) {
+    const optionCode = [variant.size, variant.color]
+      .filter(Boolean)
+      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8))
+      .filter(Boolean)
+      .join('-');
+
+    return [productCode, optionCode, String(index + 1).padStart(3, '0')]
+      .filter(Boolean)
+      .join('-');
+  }
+
+  private async deductRetailProduct(client: PoolClient, storeId: number, orderId: number, orderItemId: number, productId: number, variantId: number, quantity: number) {
+    const variantRows = await this.queryWithClient<{ stock_quantity: number; product_id: number; size: string | null; color: string | null }>(
+      client,
+      `
+        SELECT pv.stock_quantity, pv.product_id, pv.size, pv.color
+        FROM product_variants pv
+        JOIN products p ON p.id = pv.product_id
+        WHERE pv.id = $1
+          AND p.id = $2
+          AND p.store_id = $3
+        FOR UPDATE
+      `,
+      [variantId, productId, storeId],
+    );
+
+    const variant = variantRows[0];
+    if (!variant) {
+      throw new NotFoundException('Product variant was not found for this store.');
     }
 
-    if (Number(product.stock_quantity ?? 0) < quantity) {
-      throw new BadRequestException('Not enough product stock for this order.');
+    if (Number(variant.stock_quantity ?? 0) < quantity) {
+      throw new BadRequestException('Not enough variant stock for this order.');
     }
 
     await this.queryWithClient(
       client,
       `
-        UPDATE products
+        UPDATE product_variants
         SET stock_quantity = stock_quantity - $1,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $2
-          AND store_id = $3
       `,
-      [quantity, productId, storeId],
+      [quantity, variantId],
     );
 
     await this.queryWithClient(
       client,
       `
         INSERT INTO inventory_deductions (
-          store_id, order_id, order_item_id, product_id, deduction_type, quantity_deducted, unit
+          store_id, order_id, order_item_id, product_id, variant_id, deduction_type, quantity_deducted, unit
         )
-        VALUES ($1, $2, $3, $4, 'RETAIL_PRODUCT_SALE', $5, $6)
+        VALUES ($1, $2, $3, $4, $5, 'RETAIL_VARIANT_SALE', $6, $7)
       `,
-      [storeId, orderId, orderItemId, productId, quantity, product.unit ?? 'pcs'],
+      [storeId, orderId, orderItemId, productId, variantId, quantity, 'pcs'],
+    );
+
+    await this.queryWithClient(
+      client,
+      `
+        INSERT INTO inventory_transactions (
+          store_id, product_id, variant_id, transaction_type, quantity, remarks
+        )
+        VALUES ($1, $2, $3, 'SALE', $4, $5)
+      `,
+      [storeId, productId, variantId, quantity, `Order ${orderId}`],
     );
   }
 

@@ -104,6 +104,63 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS brand VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS material VARCHAR(100);
+
+CREATE TABLE IF NOT EXISTS product_variants (
+  id BIGSERIAL PRIMARY KEY,
+  product_id BIGINT REFERENCES products(id) ON DELETE CASCADE,
+  size VARCHAR(50),
+  color VARCHAR(50),
+  sku VARCHAR(50),
+  barcode VARCHAR(100),
+  image_url TEXT,
+  price DECIMAL(10,2) NOT NULL DEFAULT 0,
+  stock_quantity INT DEFAULT 0,
+  low_stock_limit INT DEFAULT 5,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE product_variants
+  ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+CREATE TABLE IF NOT EXISTS inventory_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+  variant_id BIGINT REFERENCES product_variants(id) ON DELETE SET NULL,
+  transaction_type VARCHAR(50) NOT NULL
+    CHECK (transaction_type IN ('SALE', 'RESTOCK', 'ADJUSTMENT', 'REFUND', 'VOID')),
+  quantity INT NOT NULL,
+  remarks TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO product_variants (
+  product_id, size, color, sku, barcode, image_url, price, stock_quantity, low_stock_limit, is_active
+)
+SELECT
+  p.id,
+  p.size,
+  p.color,
+  p.sku,
+  p.barcode,
+  p.image_url,
+  p.price,
+  COALESCE(p.stock_quantity, 0),
+  COALESCE(p.low_stock_limit, 5),
+  COALESCE(p.is_available, TRUE)
+FROM products p
+WHERE p.store_type = 'RETAIL_STORE'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM product_variants pv
+    WHERE pv.product_id = p.id
+  );
+
 CREATE TABLE IF NOT EXISTS ingredients_inventory (
   id BIGSERIAL PRIMARY KEY,
   store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
@@ -207,6 +264,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT REFERENCES orders(id) ON DELETE CASCADE,
   product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+  variant_id BIGINT REFERENCES product_variants(id) ON DELETE SET NULL,
   product_name VARCHAR(150) NOT NULL,
   category_name VARCHAR(100),
   size VARCHAR(50),
@@ -218,6 +276,9 @@ CREATE TABLE IF NOT EXISTS order_items (
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE order_items
+  ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS order_item_customizations (
   id BIGSERIAL PRIMARY KEY,
@@ -251,11 +312,15 @@ CREATE TABLE IF NOT EXISTS inventory_deductions (
   order_item_id BIGINT REFERENCES order_items(id) ON DELETE CASCADE,
   ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
   product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+  variant_id BIGINT REFERENCES product_variants(id) ON DELETE SET NULL,
   deduction_type VARCHAR(50) NOT NULL,
   quantity_deducted DECIMAL(12,3) NOT NULL DEFAULT 0,
   unit VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE inventory_deductions
+  ADD COLUMN IF NOT EXISTS variant_id BIGINT REFERENCES product_variants(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS order_queue (
   id BIGSERIAL PRIMARY KEY,
@@ -348,6 +413,11 @@ CREATE TABLE IF NOT EXISTS voided_transactions (
 CREATE INDEX IF NOT EXISTS product_categories_store_id_idx ON product_categories(store_id);
 CREATE INDEX IF NOT EXISTS discount_types_store_id_idx ON discount_types(store_id);
 CREATE INDEX IF NOT EXISTS products_store_id_idx ON products(store_id);
+CREATE INDEX IF NOT EXISTS product_variants_product_id_idx ON product_variants(product_id);
+CREATE INDEX IF NOT EXISTS product_variants_sku_idx ON product_variants(sku);
+CREATE INDEX IF NOT EXISTS product_variants_barcode_idx ON product_variants(barcode);
+CREATE INDEX IF NOT EXISTS inventory_transactions_store_id_idx ON inventory_transactions(store_id);
+CREATE INDEX IF NOT EXISTS inventory_transactions_variant_id_idx ON inventory_transactions(variant_id);
 CREATE INDEX IF NOT EXISTS ingredients_inventory_store_id_idx ON ingredients_inventory(store_id);
 CREATE INDEX IF NOT EXISTS product_ingredients_product_id_idx ON product_ingredients(product_id);
 CREATE INDEX IF NOT EXISTS product_ingredients_ingredient_id_idx ON product_ingredients(ingredient_id);
@@ -358,6 +428,7 @@ CREATE INDEX IF NOT EXISTS restaurant_tables_store_id_idx ON restaurant_tables(s
 CREATE INDEX IF NOT EXISTS orders_store_id_idx ON orders(store_id);
 CREATE INDEX IF NOT EXISTS orders_cashier_id_idx ON orders(cashier_id);
 CREATE INDEX IF NOT EXISTS order_items_order_id_idx ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS order_items_variant_id_idx ON order_items(variant_id);
 CREATE INDEX IF NOT EXISTS order_item_customizations_order_item_id_idx ON order_item_customizations(order_item_id);
 CREATE INDEX IF NOT EXISTS order_queue_store_id_idx ON order_queue(store_id);
 CREATE INDEX IF NOT EXISTS order_queue_order_id_idx ON order_queue(order_id);
@@ -369,3 +440,4 @@ CREATE INDEX IF NOT EXISTS inventory_movements_store_id_idx ON inventory_movemen
 CREATE INDEX IF NOT EXISTS inventory_movements_product_id_idx ON inventory_movements(product_id);
 CREATE INDEX IF NOT EXISTS inventory_deductions_store_id_idx ON inventory_deductions(store_id);
 CREATE INDEX IF NOT EXISTS inventory_deductions_order_id_idx ON inventory_deductions(order_id);
+CREATE INDEX IF NOT EXISTS inventory_deductions_variant_id_idx ON inventory_deductions(variant_id);
