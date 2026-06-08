@@ -504,7 +504,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                           : 'bg-orange-50 text-orange-500';
 
                   return (
-                    <article key={card.title} className="flex min-h-[178px] flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-md">
+                    <article key={card.title} className="relative flex min-h-[178px] flex-col rounded-lg border border-slate-200 bg-white p-6 pb-12 shadow-md">
                       <div className="flex items-start gap-5">
                         <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${tone}`}>
                           <Icon className="h-7 w-7" />
@@ -520,11 +520,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                       <button
                         type="button"
                         onClick={card.onClick}
-                        className="mt-auto inline-flex h-11 w-full items-center justify-center rounded-md bg-[#f9bd18] px-4 text-white shadow-sm transition hover:bg-[#e9ad0c]"
+                        className="absolute bottom-4 right-4 inline-flex h-8 w-8 items-center justify-center text-[#0b5cff] transition hover:text-blue-700"
                         aria-label={card.link}
                         title={card.link}
                       >
-                        <ChevronsRight className="h-6 w-6" strokeWidth={3} />
+                        <ChevronsRight className="h-7 w-7" strokeWidth={3} />
                       </button>
                     </article>
                   );
