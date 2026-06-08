@@ -120,25 +120,34 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   };
 
   const buildProductCode = (name: string) => {
-    const normalized = name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24);
+    const words = name.toUpperCase().match(/[A-Z0-9]+/g) ?? [];
+    const compact = words.length <= 1
+      ? words[0]?.slice(0, 8)
+      : words.map((word) => word.slice(0, 3)).join('').slice(0, 8);
 
-    return normalized || 'ITEM';
+    return compact || 'ITEM';
   };
 
   const buildVariantCode = (variant: ProductVariant, index: number) => {
     const optionCode = [variant.size, variant.color]
       .filter(Boolean)
-      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 8))
+      .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '').slice(0, 3))
       .filter(Boolean)
       .join('-');
 
-    return [buildProductCode(String(form.name || 'ITEM')), optionCode, String(index + 1).padStart(3, '0')]
+    return [buildProductCode(String(form.name || 'ITEM')), optionCode, String(index + 1).padStart(2, '0')]
       .filter(Boolean)
       .join('-');
+  };
+
+  const getProductCodes = (product: Product) => {
+    const variantCodes = (product.variants ?? [])
+      .flatMap((variant) => [variant.sku, variant.barcode])
+      .filter((code): code is string => Boolean(code));
+
+    return variantCodes.length
+      ? variantCodes
+      : [product.sku, product.barcode].filter((code): code is string => Boolean(code));
   };
 
   const handleProductImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
@@ -256,7 +265,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
         size: variant.size || null,
         color: variant.color || null,
         sku: generatedCode,
-        barcode: `${generatedCode}-BAR`,
+        barcode: `B-${generatedCode}`,
         image_url: variant.image_url || null,
         price: Number(variant.price || 0),
         stock_quantity: Number(variant.stock_quantity || 0),
@@ -431,8 +440,8 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                         <input value={variant.size} onChange={(event) => updateVariantRow(index, { size: event.target.value })} placeholder="Size" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <input value={variant.color} onChange={(event) => updateVariantRow(index, { color: event.target.value })} placeholder="Color" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <div className="min-w-0 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
-                          <div className="truncate font-medium text-foreground">{buildVariantCode(variant, index)}</div>
-                          <div className="truncate text-muted-foreground">{buildVariantCode(variant, index)}-BAR</div>
+                          <div className="truncate font-medium text-foreground" title={buildVariantCode(variant, index)}>{buildVariantCode(variant, index)}</div>
+                          <div className="truncate text-muted-foreground" title={`B-${buildVariantCode(variant, index)}`}>B-{buildVariantCode(variant, index)}</div>
                         </div>
                         <input type="number" value={variant.price} onChange={(event) => updateVariantRow(index, { price: event.target.value })} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-3 py-2" />
                         <input type="number" value={variant.stock_quantity} onChange={(event) => updateVariantRow(index, { stock_quantity: event.target.value })} placeholder="Stock" className="rounded-lg border border-border bg-input-background px-3 py-2" />
@@ -517,6 +526,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                   <th className="px-6 py-4 text-left">Name</th>
                   <th className="px-6 py-4 text-left">Category</th>
                   <th className="px-6 py-4 text-left">Price</th>
+                  {!isRestaurant && <th className="px-6 py-4 text-left">SKU / Barcode</th>}
                   <th className="px-6 py-4 text-left">{isRestaurant ? 'Can Make' : 'Stock'}</th>
                   <th className="px-6 py-4 text-left">Status</th>
                   <th className="px-6 py-4 text-left">Actions</th>
@@ -528,6 +538,23 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                     <td className="px-6 py-4">{product.name}</td>
                     <td className="px-6 py-4">{product.category_name ?? '-'}</td>
                     <td className="px-6 py-4">₱ {Number(product.price).toFixed(2)}</td>
+                    {!isRestaurant && (
+                      <td className="max-w-52 px-6 py-4">
+                        <div className="flex flex-wrap gap-1">
+                          {getProductCodes(product).slice(0, 4).map((code) => (
+                            <span key={code} title={code} className="max-w-24 truncate rounded border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-muted-foreground">
+                              {code}
+                            </span>
+                          ))}
+                          {getProductCodes(product).length > 4 && (
+                            <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] leading-tight text-muted-foreground">
+                              +{getProductCodes(product).length - 4}
+                            </span>
+                          )}
+                          {getProductCodes(product).length === 0 && <span className="text-xs text-muted-foreground">-</span>}
+                        </div>
+                      </td>
+                    )}
                     <td className="px-6 py-4">{isRestaurant ? Number(product.available_quantity ?? 0).toLocaleString() : Number(product.stock_quantity ?? 0).toLocaleString()}</td>
                     <td className="px-6 py-4">{product.is_available ? 'Available' : 'Unavailable'}</td>
                     <td className="px-6 py-4">

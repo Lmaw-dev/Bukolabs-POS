@@ -752,7 +752,10 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                     alt={product.name}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute top-1 right-1 bg-white/95 px-1.5 py-0.5 rounded text-xs font-mono text-gray-600 border border-gray-200">
+                  <div
+                    className="absolute bottom-1 right-1 max-w-[78%] truncate rounded border border-gray-200 bg-white/90 px-1 py-0.5 font-mono text-[9px] leading-none text-gray-500"
+                    title={`SKU/Barcode: ${product.code}`}
+                  >
                     {product.code}
                   </div>
                 </div>
@@ -834,7 +837,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{item.name}</p>
-                      <p className="text-xs font-mono text-gray-500 mb-0.5">{item.code}</p>
+                      <p className="mb-0.5 max-w-full truncate font-mono text-[10px] leading-tight text-gray-500" title={`SKU/Barcode: ${item.code}`}>{item.code}</p>
                       <div className="flex gap-1 mb-1 flex-wrap">
                         {item.size && (
                           <span className="text-xs bg-white px-1 py-0.5 rounded border">{item.size}</span>
