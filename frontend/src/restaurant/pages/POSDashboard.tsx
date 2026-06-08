@@ -137,6 +137,72 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
 
   const topSellingItems = allTopSellingItems.slice(0, 4);
 
+  const databaseSalesData = useMemo(() => {
+    const paidOrders = orders.filter((order) => order.paymentStatus === 'Paid');
+    const now = new Date();
+
+    if (dateFilter === 'this-week') {
+      return Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(now);
+        date.setDate(now.getDate() - (6 - index));
+        const dateKey = date.toISOString().split('T')[0];
+        return {
+          id: `day-${dateKey}`,
+          label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          sales: paidOrders.filter((order) => order.date === dateKey).reduce((sum, order) => sum + order.amountNumber, 0),
+        };
+      });
+    }
+
+    if (dateFilter === 'this-year') {
+      return Array.from({ length: 12 }, (_, month) => {
+        const date = new Date(now.getFullYear(), month, 1);
+        return {
+          id: `month-${month}`,
+          label: date.toLocaleDateString('en-US', { month: 'short' }),
+          sales: paidOrders
+            .filter((order) => {
+              const orderDate = new Date(order.date);
+              return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === month;
+            })
+            .reduce((sum, order) => sum + order.amountNumber, 0),
+        };
+      });
+    }
+
+    const target = new Date(now.getFullYear(), now.getMonth() - (dateFilter === 'last-month' ? 1 : 0), 1);
+    return Array.from({ length: 5 }, (_, week) => ({
+      id: `week-${week + 1}`,
+      label: `Week ${week + 1}`,
+      sales: paidOrders
+        .filter((order) => {
+          const orderDate = new Date(order.date);
+          return orderDate.getFullYear() === target.getFullYear()
+            && orderDate.getMonth() === target.getMonth()
+            && Math.floor((orderDate.getDate() - 1) / 7) === week;
+        })
+        .reduce((sum, order) => sum + order.amountNumber, 0),
+    }));
+  }, [dateFilter, orders]);
+
+  const databaseTopSellingItems = useMemo(() => {
+    const itemMap = new Map<string, { id: string; name: string; sold: number; revenue: string; revenueValue: number; image: string }>();
+
+    orders.filter((order) => order.paymentStatus === 'Paid').forEach((order) => {
+      order.items.forEach((item) => {
+        const current = itemMap.get(item.name) ?? { id: item.name, name: item.name, sold: 0, revenue: 'PHP 0.00', revenueValue: 0, image: '' };
+        current.sold += item.quantity;
+        current.revenueValue += item.price * item.quantity;
+        current.revenue = `PHP ${current.revenueValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        itemMap.set(item.name, current);
+      });
+    });
+
+    return Array.from(itemMap.values()).sort((a, b) => b.sold - a.sold);
+  }, [orders]);
+
+  const visibleTopSellingItems = databaseTopSellingItems.slice(0, 4);
+
 
   return (
     <div className="flex h-screen">
@@ -204,7 +270,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={salesData} key={dateFilter}>
+                <LineChart data={databaseSalesData} key={dateFilter}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
                     dataKey="label"
@@ -242,7 +308,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
             <div className="bg-card rounded-xl shadow-sm border border-border p-5">
               <h3 className="text-base text-primary mb-4">Top Selling Items</h3>
               <div className="space-y-2 mb-3">
-                {topSellingItems.map((item) => (
+                {visibleTopSellingItems.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors">
                     <div className="flex items-center gap-2.5">
                       <div className="w-12 h-12 rounded-lg overflow-hidden shadow-sm border border-border flex-shrink-0">
@@ -367,7 +433,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                   </tr>
                 </thead>
                 <tbody>
-                  {allTopSellingItems.map((item, index) => (
+                  {databaseTopSellingItems.map((item, index) => (
                     <tr key={item.id} className="border-t border-border hover:bg-muted/50">
                       <td className="px-3 py-3">
                         <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs">

@@ -104,11 +104,26 @@ CREATE TABLE IF NOT EXISTS products (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS ingredients_inventory (
+  id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  ingredient_name VARCHAR(150) NOT NULL,
+  quantity_available DECIMAL(12,3) NOT NULL DEFAULT 0,
+  unit VARCHAR(50) NOT NULL,
+  low_stock_limit DECIMAL(12,3) DEFAULT 0,
+  cost_per_unit DECIMAL(10,2) DEFAULT 0,
+  is_available BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS product_ingredients (
   id BIGSERIAL PRIMARY KEY,
   store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
   product_id BIGINT REFERENCES products(id) ON DELETE CASCADE,
+  ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
   ingredient_name VARCHAR(150) NOT NULL,
+  quantity_required DECIMAL(10,3) DEFAULT 0,
   default_quantity DECIMAL(10,2) NOT NULL DEFAULT 0,
   unit VARCHAR(50) NOT NULL,
   additional_cost DECIMAL(10,2) DEFAULT 0,
@@ -118,9 +133,21 @@ CREATE TABLE IF NOT EXISTS product_ingredients (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE product_ingredients
+  ADD COLUMN IF NOT EXISTS ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS quantity_required DECIMAL(10,3) DEFAULT 0;
+
+UPDATE product_ingredients
+SET quantity_required = COALESCE(NULLIF(quantity_required, 0), default_quantity, 0)
+WHERE quantity_required IS NULL
+   OR quantity_required = 0;
+
 CREATE TABLE IF NOT EXISTS ingredient_alternatives (
   id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
   product_ingredient_id BIGINT REFERENCES product_ingredients(id) ON DELETE CASCADE,
+  parent_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE CASCADE,
+  alternative_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE CASCADE,
   alternative_name VARCHAR(150) NOT NULL,
   default_quantity DECIMAL(10,2),
   unit VARCHAR(50),
@@ -129,6 +156,11 @@ CREATE TABLE IF NOT EXISTS ingredient_alternatives (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE ingredient_alternatives
+  ADD COLUMN IF NOT EXISTS store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS parent_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS alternative_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS restaurant_tables (
   id BIGSERIAL PRIMARY KEY,
@@ -184,11 +216,14 @@ CREATE TABLE IF NOT EXISTS order_items (
 
 CREATE TABLE IF NOT EXISTS order_item_customizations (
   id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
   order_item_id BIGINT REFERENCES order_items(id) ON DELETE CASCADE,
   product_ingredient_id BIGINT REFERENCES product_ingredients(id) ON DELETE SET NULL,
   ingredient_alternative_id BIGINT REFERENCES ingredient_alternatives(id) ON DELETE SET NULL,
+  original_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
+  replacement_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
   customization_type VARCHAR(50) NOT NULL
-    CHECK (customization_type IN ('REMOVE', 'EXTRA', 'QUANTITY_CHANGE', 'REPLACE', 'NOTE')),
+    CHECK (customization_type IN ('REMOVE', 'ADD', 'EXTRA', 'CHANGE_QUANTITY', 'QUANTITY_CHANGE', 'REPLACE', 'NOTE')),
   original_ingredient_name VARCHAR(150),
   replacement_ingredient_name VARCHAR(150),
   original_quantity DECIMAL(10,2),
@@ -196,6 +231,24 @@ CREATE TABLE IF NOT EXISTS order_item_customizations (
   unit VARCHAR(50),
   additional_cost DECIMAL(10,2) DEFAULT 0,
   notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE order_item_customizations
+  ADD COLUMN IF NOT EXISTS store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS original_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS replacement_ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS inventory_deductions (
+  id BIGSERIAL PRIMARY KEY,
+  store_id BIGINT REFERENCES stores(id) ON DELETE CASCADE,
+  order_id BIGINT REFERENCES orders(id) ON DELETE CASCADE,
+  order_item_id BIGINT REFERENCES order_items(id) ON DELETE CASCADE,
+  ingredient_id BIGINT REFERENCES ingredients_inventory(id) ON DELETE SET NULL,
+  product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
+  deduction_type VARCHAR(50) NOT NULL,
+  quantity_deducted DECIMAL(12,3) NOT NULL DEFAULT 0,
+  unit VARCHAR(50),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -290,8 +343,12 @@ CREATE TABLE IF NOT EXISTS voided_transactions (
 CREATE INDEX IF NOT EXISTS product_categories_store_id_idx ON product_categories(store_id);
 CREATE INDEX IF NOT EXISTS discount_types_store_id_idx ON discount_types(store_id);
 CREATE INDEX IF NOT EXISTS products_store_id_idx ON products(store_id);
+CREATE INDEX IF NOT EXISTS ingredients_inventory_store_id_idx ON ingredients_inventory(store_id);
 CREATE INDEX IF NOT EXISTS product_ingredients_product_id_idx ON product_ingredients(product_id);
+CREATE INDEX IF NOT EXISTS product_ingredients_ingredient_id_idx ON product_ingredients(ingredient_id);
 CREATE INDEX IF NOT EXISTS ingredient_alternatives_product_ingredient_id_idx ON ingredient_alternatives(product_ingredient_id);
+CREATE INDEX IF NOT EXISTS ingredient_alternatives_parent_ingredient_id_idx ON ingredient_alternatives(parent_ingredient_id);
+CREATE INDEX IF NOT EXISTS ingredient_alternatives_alternative_ingredient_id_idx ON ingredient_alternatives(alternative_ingredient_id);
 CREATE INDEX IF NOT EXISTS restaurant_tables_store_id_idx ON restaurant_tables(store_id);
 CREATE INDEX IF NOT EXISTS orders_store_id_idx ON orders(store_id);
 CREATE INDEX IF NOT EXISTS orders_cashier_id_idx ON orders(cashier_id);
@@ -305,3 +362,5 @@ CREATE INDEX IF NOT EXISTS payments_order_id_idx ON payments(order_id);
 CREATE INDEX IF NOT EXISTS receipts_order_id_idx ON receipts(order_id);
 CREATE INDEX IF NOT EXISTS inventory_movements_store_id_idx ON inventory_movements(store_id);
 CREATE INDEX IF NOT EXISTS inventory_movements_product_id_idx ON inventory_movements(product_id);
+CREATE INDEX IF NOT EXISTS inventory_deductions_store_id_idx ON inventory_deductions(store_id);
+CREATE INDEX IF NOT EXISTS inventory_deductions_order_id_idx ON inventory_deductions(order_id);

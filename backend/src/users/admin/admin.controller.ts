@@ -263,6 +263,62 @@ class ProductDto {
   @IsOptional()
   @IsBoolean()
   is_available?: boolean;
+
+  @IsOptional()
+  ingredients?: any[];
+}
+
+class IngredientDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @IsString()
+  ingredient_name!: string;
+
+  @Type(() => Number)
+  @IsNumber()
+  quantity_available!: number;
+
+  @IsString()
+  unit!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  low_stock_limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  cost_per_unit?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_available?: boolean;
+}
+
+class IngredientAlternativeDto {
+  @Type(() => Number)
+  @IsNumber()
+  admin_user_id!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  parent_ingredient_id!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  alternative_ingredient_id!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  additional_price?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  is_available?: boolean;
 }
 
 @Controller('admin')
@@ -466,6 +522,113 @@ export class AdminController {
     return this.adminService.deleteProduct({
       adminUserId: Number(adminUserId),
       productId: Number(id),
+    });
+  }
+
+  @Get('ingredients')
+  listIngredients(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listIngredients(Number(adminUserId));
+  }
+
+  @Post('ingredients')
+  createIngredient(@Body() body: IngredientDto) {
+    return this.adminService.createIngredient({
+      adminUserId: Number(body.admin_user_id),
+      ingredientName: body.ingredient_name,
+      quantityAvailable: body.quantity_available,
+      unit: body.unit,
+      lowStockLimit: body.low_stock_limit ?? 0,
+      costPerUnit: body.cost_per_unit ?? 0,
+      isAvailable: body.is_available ?? true,
+    });
+  }
+
+  @Patch('ingredients/:id')
+  updateIngredient(@Param('id') id: string, @Body() body: IngredientDto) {
+    return this.adminService.updateIngredient({
+      adminUserId: Number(body.admin_user_id),
+      ingredientId: Number(id),
+      ingredientName: body.ingredient_name,
+      quantityAvailable: body.quantity_available,
+      unit: body.unit,
+      lowStockLimit: body.low_stock_limit ?? 0,
+      costPerUnit: body.cost_per_unit ?? 0,
+      isAvailable: body.is_available ?? true,
+    });
+  }
+
+  @Delete('ingredients/:id')
+  deleteIngredient(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteIngredient({
+      adminUserId: Number(adminUserId),
+      ingredientId: Number(id),
+    });
+  }
+
+  @Get('ingredient-alternatives')
+  listIngredientAlternatives(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listIngredientAlternatives(Number(adminUserId));
+  }
+
+  @Post('ingredient-alternatives')
+  createIngredientAlternative(@Body() body: IngredientAlternativeDto) {
+    return this.adminService.createIngredientAlternative({
+      adminUserId: Number(body.admin_user_id),
+      parentIngredientId: body.parent_ingredient_id,
+      alternativeIngredientId: body.alternative_ingredient_id,
+      additionalPrice: body.additional_price ?? 0,
+      isAvailable: body.is_available ?? true,
+    });
+  }
+
+  @Patch('ingredient-alternatives/:id')
+  updateIngredientAlternative(@Param('id') id: string, @Body() body: IngredientAlternativeDto) {
+    return this.adminService.updateIngredientAlternative({
+      adminUserId: Number(body.admin_user_id),
+      alternativeId: Number(id),
+      parentIngredientId: body.parent_ingredient_id,
+      alternativeIngredientId: body.alternative_ingredient_id,
+      additionalPrice: body.additional_price ?? 0,
+      isAvailable: body.is_available ?? true,
+    });
+  }
+
+  @Delete('ingredient-alternatives/:id')
+  deleteIngredientAlternative(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.deleteIngredientAlternative({
+      adminUserId: Number(adminUserId),
+      alternativeId: Number(id),
+    });
+  }
+
+  @Get('inventory-deductions')
+  listInventoryDeductions(@Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listInventoryDeductions(Number(adminUserId));
+  }
+
+  @Get('products/:id/ingredients')
+  listProductIngredients(@Param('id') id: string, @Query('admin_user_id') adminUserId: string) {
+    return this.adminService.listProductIngredients({
+      adminUserId: Number(adminUserId),
+      productId: Number(id),
+    });
+  }
+
+  @Get('pos/products')
+  listPosProducts(@Query('user_id') userId: string) {
+    return this.adminService.listPosProducts(Number(userId));
+  }
+
+  @Get('pos/orders')
+  listPosOrders(@Query('user_id') userId: string) {
+    return this.adminService.listPosOrders(Number(userId));
+  }
+
+  @Post('pos/orders')
+  createPaidPosOrder(@Body() body: any) {
+    return this.adminService.createPaidPosOrder({
+      ...body,
+      userId: Number(body.user_id),
     });
   }
 }

@@ -1140,9 +1140,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       `
         SELECT
           p.*,
-          c.name AS category_name
+          c.name AS category_name,
+          CASE
+            WHEN p.store_type = 'RESTAURANT' THEN COALESCE(availability.available_quantity, 0)
+            ELSE COALESCE(p.stock_quantity, 0)
+          END AS available_quantity
         FROM products p
         LEFT JOIN product_categories c ON c.id = p.category_id
+        LEFT JOIN LATERAL (
+          SELECT MIN(FLOOR(ii.quantity_available / NULLIF(pi.quantity_required, 0))) AS available_quantity
+          FROM product_ingredients pi
+          JOIN ingredients_inventory ii ON ii.id = pi.ingredient_id
+          WHERE pi.product_id = p.id
+            AND pi.is_required = TRUE
+            AND COALESCE(ii.is_available, TRUE) = TRUE
+        ) availability ON TRUE
         WHERE p.store_id = $1
           AND p.store_type = $2
         ORDER BY p.created_at DESC
@@ -1158,7 +1170,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Only store admin accounts can create products.');
     }
 
-    const rows = await this.query(
+    const product = await this.withTransaction(async (client) => {
+      const rows = await this.queryWithClient(
+        client,
       `
         INSERT INTO products (
           store_id, category_id, store_type, name, description, price, image_url,
@@ -1187,9 +1201,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.low_stock_limit ?? 5,
         input.is_available,
       ],
-    );
+      );
 
-    return rows[0];
+      await this.replaceProductIngredients(client, admin.store_id!, rows[0].id, input.ingredients ?? []);
+      return rows[0];
+    });
+
+    return product;
   }
 
   async updateProductForAdmin(input: any) {
@@ -1199,7 +1217,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('Only store admin accounts can update products.');
     }
 
-    const rows = await this.query(
+    const product = await this.withTransaction(async (client) => {
+      const rows = await this.queryWithClient(
+        client,
       `
         UPDATE products
         SET
@@ -1242,13 +1262,20 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.productId,
         admin.store_id,
       ],
-    );
+      );
 
-    if (rows.length === 0) {
-      throw new InternalServerErrorException('Product was not found for this store.');
-    }
+      if (rows.length === 0) {
+        throw new InternalServerErrorException('Product was not found for this store.');
+      }
 
-    return rows[0];
+      if (Array.isArray(input.ingredients)) {
+        await this.replaceProductIngredients(client, admin.store_id!, input.productId, input.ingredients);
+      }
+
+      return rows[0];
+    });
+
+    return product;
   }
 
   async deleteProductForAdmin(input: { adminUserId: number; productId: number }) {
@@ -1269,6 +1296,788 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     );
 
     return { id: rows[0]?.id ?? input.productId, deleted: rows.length > 0 };
+  }
+
+  async listIngredientsForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view ingredients.');
+    }
+
+    return this.query(
+      `
+        SELECT *
+        FROM ingredients_inventory
+        WHERE store_id = $1
+        ORDER BY ingredient_name ASC
+      `,
+      [admin.store_id],
+    );
+  }
+
+  async createIngredientForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can create ingredients.');
+    }
+
+    const rows = await this.query(
+      `
+        INSERT INTO ingredients_inventory (
+          store_id, ingredient_name, quantity_available, unit, low_stock_limit, cost_per_unit, is_available
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, TRUE))
+        RETURNING *
+      `,
+      [
+        admin.store_id,
+        input.ingredientName,
+        input.quantityAvailable ?? 0,
+        input.unit,
+        input.lowStockLimit ?? 0,
+        input.costPerUnit ?? 0,
+        input.isAvailable,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  async updateIngredientForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update ingredients.');
+    }
+
+    const rows = await this.query(
+      `
+        UPDATE ingredients_inventory
+        SET ingredient_name = $1,
+            quantity_available = $2,
+            unit = $3,
+            low_stock_limit = $4,
+            cost_per_unit = $5,
+            is_available = COALESCE($6, is_available),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $7
+          AND store_id = $8
+        RETURNING *
+      `,
+      [
+        input.ingredientName,
+        input.quantityAvailable ?? 0,
+        input.unit,
+        input.lowStockLimit ?? 0,
+        input.costPerUnit ?? 0,
+        input.isAvailable,
+        input.ingredientId,
+        admin.store_id,
+      ],
+    );
+
+    if (rows.length === 0) {
+      throw new InternalServerErrorException('Ingredient was not found for this store.');
+    }
+
+    return rows[0];
+  }
+
+  async deleteIngredientForAdmin(input: { adminUserId: number; ingredientId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete ingredients.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM ingredients_inventory
+        WHERE id = $1
+          AND store_id = $2
+        RETURNING id
+      `,
+      [input.ingredientId, admin.store_id],
+    );
+
+    return { id: rows[0]?.id ?? input.ingredientId, deleted: rows.length > 0 };
+  }
+
+  async listIngredientAlternativesForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view ingredient alternatives.');
+    }
+
+    return this.query(
+      `
+        SELECT
+          ia.id,
+          ia.store_id,
+          ia.parent_ingredient_id,
+          parent.ingredient_name AS parent_ingredient_name,
+          ia.alternative_ingredient_id,
+          alternative.ingredient_name AS alternative_ingredient_name,
+          alternative.quantity_available AS alternative_quantity_available,
+          alternative.unit AS alternative_unit,
+          ia.additional_price,
+          ia.is_available,
+          ia.created_at,
+          ia.updated_at
+        FROM ingredient_alternatives ia
+        JOIN ingredients_inventory parent ON parent.id = ia.parent_ingredient_id
+        JOIN ingredients_inventory alternative ON alternative.id = ia.alternative_ingredient_id
+        WHERE ia.store_id = $1
+        ORDER BY parent.ingredient_name ASC, alternative.ingredient_name ASC
+      `,
+      [admin.store_id],
+    );
+  }
+
+  async createIngredientAlternativeForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can create ingredient alternatives.');
+    }
+
+    if (Number(input.parentIngredientId) === Number(input.alternativeIngredientId)) {
+      throw new BadRequestException('Alternative ingredient must be different from the parent ingredient.');
+    }
+
+    const ingredientRows = await this.query<{ id: number; ingredient_name: string }>(
+      `
+        SELECT id, ingredient_name
+        FROM ingredients_inventory
+        WHERE store_id = $1
+          AND id IN ($2, $3)
+      `,
+      [admin.store_id, input.parentIngredientId, input.alternativeIngredientId],
+    );
+
+    if (ingredientRows.length !== 2) {
+      throw new NotFoundException('Both parent and alternative ingredients must exist in this store inventory.');
+    }
+
+    const alternative = ingredientRows.find((row) => Number(row.id) === Number(input.alternativeIngredientId));
+    const rows = await this.query(
+      `
+        INSERT INTO ingredient_alternatives (
+          store_id, parent_ingredient_id, alternative_ingredient_id, alternative_name,
+          additional_price, is_available
+        )
+        VALUES ($1, $2, $3, $4, $5, COALESCE($6, TRUE))
+        RETURNING *
+      `,
+      [
+        admin.store_id,
+        input.parentIngredientId,
+        input.alternativeIngredientId,
+        alternative?.ingredient_name ?? 'Alternative',
+        input.additionalPrice ?? 0,
+        input.isAvailable,
+      ],
+    );
+
+    return rows[0];
+  }
+
+  async updateIngredientAlternativeForAdmin(input: any) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can update ingredient alternatives.');
+    }
+
+    if (Number(input.parentIngredientId) === Number(input.alternativeIngredientId)) {
+      throw new BadRequestException('Alternative ingredient must be different from the parent ingredient.');
+    }
+
+    const ingredientRows = await this.query<{ id: number; ingredient_name: string }>(
+      `
+        SELECT id, ingredient_name
+        FROM ingredients_inventory
+        WHERE store_id = $1
+          AND id IN ($2, $3)
+      `,
+      [admin.store_id, input.parentIngredientId, input.alternativeIngredientId],
+    );
+
+    if (ingredientRows.length !== 2) {
+      throw new NotFoundException('Both parent and alternative ingredients must exist in this store inventory.');
+    }
+
+    const alternative = ingredientRows.find((row) => Number(row.id) === Number(input.alternativeIngredientId));
+    const rows = await this.query(
+      `
+        UPDATE ingredient_alternatives
+        SET parent_ingredient_id = $1,
+            alternative_ingredient_id = $2,
+            alternative_name = $3,
+            additional_price = $4,
+            is_available = COALESCE($5, is_available),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $6
+          AND store_id = $7
+        RETURNING *
+      `,
+      [
+        input.parentIngredientId,
+        input.alternativeIngredientId,
+        alternative?.ingredient_name ?? 'Alternative',
+        input.additionalPrice ?? 0,
+        input.isAvailable,
+        input.alternativeId,
+        admin.store_id,
+      ],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Ingredient alternative was not found for this store.');
+    }
+
+    return rows[0];
+  }
+
+  async deleteIngredientAlternativeForAdmin(input: { adminUserId: number; alternativeId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can delete ingredient alternatives.');
+    }
+
+    const rows = await this.query<{ id: number }>(
+      `
+        DELETE FROM ingredient_alternatives
+        WHERE id = $1
+          AND store_id = $2
+        RETURNING id
+      `,
+      [input.alternativeId, admin.store_id],
+    );
+
+    return { id: rows[0]?.id ?? input.alternativeId, deleted: rows.length > 0 };
+  }
+
+  async listInventoryDeductionsForAdmin(adminUserId: number) {
+    const admin = await this.getUserStoreScope(adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view inventory history.');
+    }
+
+    return this.query(
+      `
+        SELECT
+          d.id,
+          d.store_id,
+          d.order_id,
+          o.order_number,
+          d.order_item_id,
+          oi.product_name AS order_item_name,
+          d.ingredient_id,
+          ii.ingredient_name,
+          d.product_id,
+          p.name AS product_name,
+          d.deduction_type,
+          d.quantity_deducted,
+          d.unit,
+          d.created_at
+        FROM inventory_deductions d
+        LEFT JOIN orders o ON o.id = d.order_id
+        LEFT JOIN order_items oi ON oi.id = d.order_item_id
+        LEFT JOIN ingredients_inventory ii ON ii.id = d.ingredient_id
+        LEFT JOIN products p ON p.id = d.product_id
+        WHERE d.store_id = $1
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT 200
+      `,
+      [admin.store_id],
+    );
+  }
+
+  async listProductIngredientsForAdmin(input: { adminUserId: number; productId: number }) {
+    const admin = await this.getUserStoreScope(input.adminUserId);
+
+    if (admin.role !== 'ADMIN' || !admin.store_id) {
+      throw new InternalServerErrorException('Only store admin accounts can view product ingredients.');
+    }
+
+    return this.query(
+      `
+        SELECT
+          pi.*,
+          ii.ingredient_name,
+          ii.quantity_available,
+          ii.low_stock_limit
+        FROM product_ingredients pi
+        LEFT JOIN ingredients_inventory ii ON ii.id = pi.ingredient_id
+        WHERE pi.store_id = $1
+          AND pi.product_id = $2
+        ORDER BY pi.id ASC
+      `,
+      [admin.store_id, input.productId],
+    );
+  }
+
+  async listPosProducts(userId: number) {
+    const user = await this.getUserStoreScope(userId);
+
+    if (!user.store_id || !user.store_type) {
+      throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    const products = await this.query<any>(
+      `
+        SELECT
+          p.*,
+          c.name AS category_name,
+          CASE
+            WHEN p.store_type = 'RESTAURANT' THEN COALESCE(availability.available_quantity, 0)
+            ELSE COALESCE(p.stock_quantity, 0)
+          END AS available_quantity
+        FROM products p
+        LEFT JOIN product_categories c ON c.id = p.category_id
+        LEFT JOIN LATERAL (
+          SELECT MIN(FLOOR(ii.quantity_available / NULLIF(pi.quantity_required, 0))) AS available_quantity
+          FROM product_ingredients pi
+          JOIN ingredients_inventory ii ON ii.id = pi.ingredient_id
+          WHERE pi.product_id = p.id
+            AND pi.is_required = TRUE
+            AND COALESCE(ii.is_available, TRUE) = TRUE
+        ) availability ON TRUE
+        WHERE p.store_id = $1
+          AND p.store_type = $2
+          AND COALESCE(p.is_available, TRUE) = TRUE
+        ORDER BY p.name ASC
+      `,
+      [user.store_id, user.store_type],
+    );
+
+    const ingredientRows = user.store_type === 'RESTAURANT'
+      ? await this.query<any>(
+          `
+            SELECT
+              pi.id,
+              pi.product_id,
+              pi.ingredient_id,
+              COALESCE(ii.ingredient_name, pi.ingredient_name) AS name,
+              pi.quantity_required AS quantity,
+              pi.unit,
+              pi.additional_cost,
+              pi.is_required,
+              pi.is_removable,
+              ii.quantity_available,
+              COALESCE(ii.is_available, TRUE) AS is_available
+            FROM product_ingredients pi
+            LEFT JOIN ingredients_inventory ii ON ii.id = pi.ingredient_id
+            WHERE pi.store_id = $1
+            ORDER BY pi.id ASC
+          `,
+          [user.store_id],
+        )
+      : [];
+
+    const alternatives = user.store_type === 'RESTAURANT'
+      ? await this.query<any>(
+          `
+            SELECT
+              ia.*,
+              ii.ingredient_name,
+              ii.quantity_available,
+              ii.unit
+            FROM ingredient_alternatives ia
+            JOIN ingredients_inventory ii ON ii.id = ia.alternative_ingredient_id
+            WHERE ia.store_id = $1
+              AND COALESCE(ia.is_available, TRUE) = TRUE
+              AND COALESCE(ii.is_available, TRUE) = TRUE
+              AND ii.quantity_available > 0
+            ORDER BY ii.ingredient_name ASC
+          `,
+          [user.store_id],
+        )
+      : [];
+
+    const alternativesByParent = new Map<number, any[]>();
+    for (const alternative of alternatives) {
+      const list = alternativesByParent.get(Number(alternative.parent_ingredient_id)) ?? [];
+      list.push(alternative);
+      alternativesByParent.set(Number(alternative.parent_ingredient_id), list);
+    }
+
+    const ingredientsByProduct = new Map<number, any[]>();
+    for (const ingredient of ingredientRows) {
+      const list = ingredientsByProduct.get(Number(ingredient.product_id)) ?? [];
+      list.push({
+        ...ingredient,
+        alternatives: alternativesByParent.get(Number(ingredient.ingredient_id)) ?? [],
+      });
+      ingredientsByProduct.set(Number(ingredient.product_id), list);
+    }
+
+    return products.map((product) => ({
+      ...product,
+      ingredients: ingredientsByProduct.get(Number(product.id)) ?? [],
+    }));
+  }
+
+  async createPaidPosOrder(input: any) {
+    const user = await this.getUserStoreScope(input.userId);
+
+    if (!user.store_id || !user.store_type) {
+      throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    return this.withTransaction(async (client) => {
+      const orderRows = await this.queryWithClient<{ id: number }>(
+        client,
+        `
+          INSERT INTO orders (
+            store_id, cashier_id, order_number, customer_name, order_type, table_name,
+            subtotal, discount_amount, discount_type, tax_amount, service_charge,
+            total_amount, order_status, payment_status, completed_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'COMPLETED', 'PAID', CURRENT_TIMESTAMP)
+          RETURNING id
+        `,
+        [
+          user.store_id,
+          user.id,
+          input.orderNumber,
+          input.customerName ?? null,
+          input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
+          input.tableName ?? null,
+          input.subtotal ?? 0,
+          input.discount ?? 0,
+          input.discountType ?? null,
+          input.tax ?? 0,
+          input.serviceFee ?? 0,
+          input.total ?? 0,
+        ],
+      );
+      const orderId = orderRows[0].id;
+
+      for (const item of input.items ?? []) {
+        const itemRows = await this.queryWithClient<{ id: number }>(
+          client,
+          `
+            INSERT INTO order_items (
+              order_id, product_id, product_name, category_name, size, color,
+              quantity, unit_price, line_total, item_type, notes
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id
+          `,
+          [
+            orderId,
+            item.productId ?? item.id ?? null,
+            item.name,
+            item.categoryName ?? item.category ?? null,
+            item.size ?? null,
+            item.color ?? null,
+            item.quantity ?? 1,
+            item.price ?? 0,
+            (item.price ?? 0) * (item.quantity ?? 1),
+            item.orderType ?? null,
+            item.notes ?? null,
+          ],
+        );
+        const orderItemId = itemRows[0].id;
+
+        if (user.store_type === 'RETAIL_STORE') {
+          await this.deductRetailProduct(client, user.store_id!, orderId, orderItemId, item.productId ?? item.id, item.quantity ?? 1);
+        } else {
+          await this.deductRestaurantIngredients(client, user.store_id!, orderId, orderItemId, item);
+        }
+      }
+
+      if (input.payment) {
+        await this.queryWithClient(
+          client,
+          `
+            INSERT INTO payments (
+              store_id, order_id, processed_by, payment_number, payment_method,
+              amount_due, amount_paid, change_amount, payment_status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PAID')
+          `,
+          [
+            user.store_id,
+            orderId,
+            user.id,
+            input.payment.paymentNumber ?? `PAY-${Date.now()}`,
+            input.payment.method ?? 'Cash',
+            input.total ?? 0,
+            input.payment.amountPaid ?? input.total ?? 0,
+            input.payment.changeAmount ?? 0,
+          ],
+        );
+      }
+
+      return { id: orderId, order_number: input.orderNumber };
+    });
+  }
+
+  async listPosOrders(userId: number) {
+    const user = await this.getUserStoreScope(userId);
+
+    if (!user.store_id || !user.store_type) {
+      throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    return this.query<any>(
+      `
+        SELECT
+          o.id,
+          o.order_number,
+          o.customer_name,
+          o.order_type,
+          o.table_name,
+          o.subtotal,
+          o.discount_amount,
+          o.discount_type,
+          o.tax_amount,
+          o.service_charge,
+          o.total_amount,
+          o.order_status,
+          o.payment_status,
+          o.created_at,
+          o.completed_at,
+          p.payment_number,
+          p.payment_method,
+          p.amount_paid,
+          p.change_amount,
+          COALESCE(
+            json_agg(
+              json_build_object(
+                'id', oi.id,
+                'product_id', oi.product_id,
+                'product_name', oi.product_name,
+                'category_name', oi.category_name,
+                'size', oi.size,
+                'color', oi.color,
+                'quantity', oi.quantity,
+                'unit_price', oi.unit_price,
+                'line_total', oi.line_total,
+                'item_type', oi.item_type,
+                'notes', oi.notes
+              )
+              ORDER BY oi.id ASC
+            ) FILTER (WHERE oi.id IS NOT NULL),
+            '[]'::json
+          ) AS items
+        FROM orders o
+        LEFT JOIN payments p ON p.order_id = o.id
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.store_id = $1
+          AND (
+            ($2 = 'RETAIL_STORE' AND o.order_type = 'RETAIL')
+            OR ($2 = 'RESTAURANT' AND o.order_type <> 'RETAIL')
+          )
+        GROUP BY o.id, p.payment_number, p.payment_method, p.amount_paid, p.change_amount
+        ORDER BY o.created_at DESC, o.id DESC
+        LIMIT 500
+      `,
+      [user.store_id, user.store_type],
+    );
+  }
+
+  private async replaceProductIngredients(client: PoolClient, storeId: number, productId: number, ingredients: any[]) {
+    await this.queryWithClient(
+      client,
+      `
+        DELETE FROM product_ingredients
+        WHERE store_id = $1
+          AND product_id = $2
+      `,
+      [storeId, productId],
+    );
+
+    for (const ingredient of ingredients) {
+      if (!ingredient.ingredient_id && !ingredient.ingredientId) {
+        continue;
+      }
+
+      const inventoryRows = await this.queryWithClient<any>(
+        client,
+        `
+          SELECT ingredient_name, unit
+          FROM ingredients_inventory
+          WHERE id = $1
+            AND store_id = $2
+          LIMIT 1
+        `,
+        [ingredient.ingredient_id ?? ingredient.ingredientId, storeId],
+      );
+
+      const inventory = inventoryRows[0];
+      if (!inventory) {
+        continue;
+      }
+
+      const quantity = Number(ingredient.quantity_required ?? ingredient.quantityRequired ?? ingredient.default_quantity ?? 0);
+
+      await this.queryWithClient(
+        client,
+        `
+          INSERT INTO product_ingredients (
+            store_id, product_id, ingredient_id, ingredient_name, quantity_required,
+            default_quantity, unit, additional_cost, is_required, is_removable
+          )
+          VALUES ($1, $2, $3, $4, $5, $5, $6, $7, COALESCE($8, TRUE), COALESCE($9, TRUE))
+        `,
+        [
+          storeId,
+          productId,
+          ingredient.ingredient_id ?? ingredient.ingredientId,
+          inventory.ingredient_name,
+          quantity,
+          ingredient.unit ?? inventory.unit,
+          ingredient.additional_cost ?? ingredient.additionalCost ?? 0,
+          ingredient.is_required ?? ingredient.isRequired,
+          ingredient.is_removable ?? ingredient.isRemovable,
+        ],
+      );
+    }
+  }
+
+  private async deductRetailProduct(client: PoolClient, storeId: number, orderId: number, orderItemId: number, productId: number, quantity: number) {
+    const productRows = await this.queryWithClient<{ stock_quantity: number; unit: string | null }>(
+      client,
+      `
+        SELECT stock_quantity, unit
+        FROM products
+        WHERE id = $1
+          AND store_id = $2
+        FOR UPDATE
+      `,
+      [productId, storeId],
+    );
+
+    const product = productRows[0];
+    if (!product) {
+      throw new NotFoundException('Product was not found for this store.');
+    }
+
+    if (Number(product.stock_quantity ?? 0) < quantity) {
+      throw new BadRequestException('Not enough product stock for this order.');
+    }
+
+    await this.queryWithClient(
+      client,
+      `
+        UPDATE products
+        SET stock_quantity = stock_quantity - $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+          AND store_id = $3
+      `,
+      [quantity, productId, storeId],
+    );
+
+    await this.queryWithClient(
+      client,
+      `
+        INSERT INTO inventory_deductions (
+          store_id, order_id, order_item_id, product_id, deduction_type, quantity_deducted, unit
+        )
+        VALUES ($1, $2, $3, $4, 'RETAIL_PRODUCT_SALE', $5, $6)
+      `,
+      [storeId, orderId, orderItemId, productId, quantity, product.unit ?? 'pcs'],
+    );
+  }
+
+  private async deductRestaurantIngredients(client: PoolClient, storeId: number, orderId: number, orderItemId: number, item: any) {
+    const itemQuantity = Number(item.quantity ?? 1);
+    const ingredients = Array.isArray(item.ingredients) ? item.ingredients : [];
+
+    for (const ingredient of ingredients) {
+      const originalId = Number(ingredient.ingredient_id ?? ingredient.ingredientId);
+      const replacementId = ingredient.replacement_ingredient_id ?? ingredient.replacementIngredientId;
+      const ingredientId = Number(replacementId ?? originalId);
+      const removed = ingredient.removed === true || Number(ingredient.quantity ?? 0) <= 0;
+      const quantity = removed ? 0 : Number(ingredient.quantity ?? ingredient.quantity_required ?? 0) * itemQuantity;
+
+      await this.queryWithClient(
+        client,
+        `
+          INSERT INTO order_item_customizations (
+            store_id, order_item_id, product_ingredient_id, original_ingredient_id,
+            replacement_ingredient_id, customization_type, original_ingredient_name,
+            replacement_ingredient_name, original_quantity, new_quantity, unit,
+            additional_cost, notes
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `,
+        [
+          storeId,
+          orderItemId,
+          ingredient.product_ingredient_id ?? ingredient.id ?? null,
+          originalId || null,
+          replacementId ?? null,
+          ingredient.customization_type ?? (removed ? 'REMOVE' : replacementId ? 'REPLACE' : 'CHANGE_QUANTITY'),
+          ingredient.original_name ?? ingredient.name ?? null,
+          ingredient.replacement_name ?? null,
+          ingredient.original_quantity ?? null,
+          Number(ingredient.quantity ?? 0),
+          ingredient.unit ?? null,
+          ingredient.additional_price ?? ingredient.additionalCost ?? 0,
+          ingredient.notes ?? null,
+        ],
+      );
+
+      if (quantity <= 0 || !ingredientId) {
+        continue;
+      }
+
+      const inventoryRows = await this.queryWithClient<{ quantity_available: string | number; unit: string }>(
+        client,
+        `
+          SELECT quantity_available, unit
+          FROM ingredients_inventory
+          WHERE id = $1
+            AND store_id = $2
+          FOR UPDATE
+        `,
+        [ingredientId, storeId],
+      );
+
+      const inventory = inventoryRows[0];
+      if (!inventory) {
+        throw new NotFoundException('Ingredient was not found for this store.');
+      }
+
+      if (Number(inventory.quantity_available ?? 0) < quantity) {
+        throw new BadRequestException('Not enough ingredient inventory for this order.');
+      }
+
+      await this.queryWithClient(
+        client,
+        `
+          UPDATE ingredients_inventory
+          SET quantity_available = quantity_available - $1,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2
+            AND store_id = $3
+        `,
+        [quantity, ingredientId, storeId],
+      );
+
+      await this.queryWithClient(
+        client,
+        `
+          INSERT INTO inventory_deductions (
+            store_id, order_id, order_item_id, ingredient_id, product_id,
+            deduction_type, quantity_deducted, unit
+          )
+          VALUES ($1, $2, $3, $4, $5, 'RESTAURANT_INGREDIENT_SALE', $6, $7)
+        `,
+        [storeId, orderId, orderItemId, ingredientId, item.productId ?? item.id ?? null, quantity, ingredient.unit ?? inventory.unit],
+      );
+    }
   }
 
   private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null, client?: PoolClient) {

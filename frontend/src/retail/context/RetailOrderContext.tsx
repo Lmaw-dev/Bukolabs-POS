@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import { getApiBaseUrl } from '../../auth/services/auth';
+import type { AuthenticatedUser } from '../../auth/types/auth';
 
 export interface OrderItem {
   name: string;
@@ -178,9 +180,35 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | null>(null);
 
-export function RetailOrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const nextId = useRef(initialOrders.length + 1);
+export function RetailOrderProvider({ children, currentUser }: { children: ReactNode; currentUser: AuthenticatedUser | null }) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const nextId = useRef(1);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      if (!currentUser?.id || currentUser.store_type !== 'RETAIL_STORE') {
+        setOrders([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) {
+          setOrders([]);
+          return;
+        }
+
+        const mapped = data.map(mapDatabaseRetailOrder);
+        setOrders(mapped);
+        nextId.current = mapped.length + 1;
+      } catch {
+        setOrders([]);
+      }
+    };
+
+    void loadOrders();
+  }, [currentUser?.id, currentUser?.store_type]);
 
   const addOrder = (order: Omit<Order, 'id'>) => {
     const id = String(nextId.current).padStart(6, '0');
@@ -330,4 +358,44 @@ export function useOrders() {
   const ctx = useContext(OrderContext);
   if (!ctx) throw new Error('useOrders must be used within OrderProvider');
   return ctx;
+}
+
+function mapDatabaseRetailOrder(row: any): Order {
+  const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+  const items = Array.isArray(row.items) ? row.items : [];
+
+  return {
+    id: String(row.id).padStart(6, '0'),
+    transactionNumber: row.order_number ?? String(row.id).padStart(6, '0'),
+    customer: row.customer_name || undefined,
+    amountNumber: Number(row.total_amount ?? 0),
+    subtotal: Number(row.subtotal ?? 0),
+    tax: Number(row.tax_amount ?? 0),
+    discount: Number(row.discount_amount ?? 0),
+    discountType: row.discount_type ?? undefined,
+    paymentStatus:
+      row.payment_status === 'REFUNDED' ? 'Refunded' :
+      row.payment_status === 'PARTIALLY_REFUNDED' ? 'Partially Refunded' :
+      row.payment_status === 'VOIDED' ? 'Void' :
+      row.payment_status === 'PAID' ? 'Paid' :
+      'Not Paid',
+    paymentMethod:
+      row.payment_method === 'Card' ? 'Card' :
+      row.payment_method === 'GCash' ? 'GCash' :
+      row.payment_method === 'PayMaya' ? 'PayMaya' :
+      'Cash',
+    date: createdAt.toISOString().split('T')[0],
+    time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    items: items.map((item: any) => ({
+      name: item.product_name,
+      category: item.category_name ?? 'Uncategorized',
+      size: item.size ?? undefined,
+      color: item.color ?? undefined,
+      quantity: Number(item.quantity ?? 0),
+      price: Number(item.unit_price ?? 0),
+    })),
+    paymentId: row.payment_number ?? undefined,
+    cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,
+    changeGiven: row.change_amount !== null && row.change_amount !== undefined ? Number(row.change_amount) : undefined,
+  };
 }

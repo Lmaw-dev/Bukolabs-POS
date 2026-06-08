@@ -6,8 +6,11 @@ import { Minus, Plus, Search, X, AlertCircle, ShoppingBag, Shirt, Barcode, Recei
 import { useOrders } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
+import { getApiBaseUrl } from '../../auth/services/auth';
+import type { AuthenticatedUser } from '../../auth/types/auth';
 
 interface RetailCreateOrderProps {
+  currentUser: AuthenticatedUser | null;
   onNavigate: (page: Page) => void;
   onOrderCreated: (order: any) => void;
   onLogout: () => void;
@@ -27,6 +30,20 @@ interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  stockQuantity?: number;
+}
+
+interface RetailProduct {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  categoryName?: string;
+  size?: string;
+  color?: string;
+  price: number;
+  image: string;
+  stockQuantity?: number;
 }
 
 const productCategories = [
@@ -237,7 +254,7 @@ const products = [
   },
 ];
 
-export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailCreateOrderProps) {
+export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailCreateOrderProps) {
   const { addOrder, orders, getCustomerHistory, getRecommendedProducts } = useOrders();
   const { settings, discounts } = useStoreSettings();
   const enabledDiscounts = discounts.filter((discount) => discount.is_enabled);
@@ -245,7 +262,9 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   const [currentTransactionNumber, setCurrentTransactionNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
   const [hasHistory, setHasHistory] = useState(false);
-  const [recommendedProducts, setRecommendedProducts] = useState<typeof products>([]);
+  const [posProducts, setPosProducts] = useState<RetailProduct[]>([]);
+  const [dynamicProductCategories, setDynamicProductCategories] = useState([{ id: 'all', name: 'All Items' }]);
+  const [recommendedProducts, setRecommendedProducts] = useState<RetailProduct[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,6 +289,42 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
 
   // Scan feedback
   const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/products?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) return;
+
+        const mappedProducts: RetailProduct[] = data.map((product: any) => ({
+          id: Number(product.id),
+          code: product.sku || product.barcode || `SKU-${product.id}`,
+          name: product.name,
+          category: product.category_name ?? 'Uncategorized',
+          categoryName: product.category_name ?? null,
+          size: product.size ?? undefined,
+          color: product.color ?? undefined,
+          price: Number(product.price ?? 0),
+          image: product.image_url || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200&h=200&fit=crop',
+          stockQuantity: Number(product.available_quantity ?? product.stock_quantity ?? 0),
+        }));
+
+        setPosProducts(mappedProducts);
+        setDynamicProductCategories([
+          { id: 'all', name: 'All Items' },
+          ...Array.from(new Set(mappedProducts.map((product) => product.category))).map((category) => ({ id: category, name: category })),
+        ]);
+      } catch {
+        setPosProducts([]);
+        setDynamicProductCategories([{ id: 'all', name: 'All Items' }]);
+      }
+    };
+
+    void loadProducts();
+  }, [currentUser?.id]);
 
   // Autocomplete logic
   useEffect(() => {
@@ -356,7 +411,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
     if (history) {
       setHasHistory(true);
       const recommendedCategories = getRecommendedProducts(customerName);
-      const recommended = products.filter(p =>
+      const recommended = posProducts.filter(p =>
         recommendedCategories.includes(p.category)
       ).slice(0, 4);
       setRecommendedProducts(recommended);
@@ -364,9 +419,17 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       setHasHistory(false);
       setRecommendedProducts([]);
     }
-  }, [customerName, orders]);
+  }, [customerName, orders, posProducts]);
 
-  const addToCart = (product: typeof products[0]) => {
+  const addToCart = (product: RetailProduct) => {
+    const currentQuantity = cart
+      .filter((item) => item.id === product.id)
+      .reduce((sum, item) => sum + item.quantity, 0);
+    if (product.stockQuantity !== undefined && currentQuantity >= product.stockQuantity) {
+      setScanFeedback({ type: 'error', message: `${product.name} is out of stock.` });
+      return;
+    }
+
     const existingItemIndex = cart.findIndex(item =>
       item.id === product.id &&
       item.size === product.size &&
@@ -390,6 +453,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
         price: product.price,
         quantity: 1,
         image: product.image,
+        stockQuantity: product.stockQuantity,
       };
       setCart([...cart, newItem]);
     }
@@ -400,7 +464,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       e.preventDefault();
 
       // Check if search query is an exact product code
-      const product = products.find(p => p.code.toUpperCase() === searchQuery.toUpperCase());
+      const product = posProducts.find(p => p.code.toUpperCase() === searchQuery.toUpperCase());
 
       if (product) {
         addToCart(product);
@@ -418,6 +482,8 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
   const updateQuantity = (index: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       setCart(cart.filter((_, i) => i !== index));
+    } else if (cart[index]?.stockQuantity !== undefined && newQuantity > cart[index].stockQuantity) {
+      setScanFeedback({ type: 'error', message: `Only ${cart[index].stockQuantity} ${cart[index].name} available.` });
     } else {
       setCart(cart.map((item, i) =>
         i === index ? { ...item, quantity: newQuantity } : item
@@ -429,7 +495,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
     setCart(cart.filter((_, i) => i !== index));
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = posProducts.filter(p => {
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          p.color?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -473,15 +539,16 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
     }, 100);
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
+    let computedChange = 0;
     if (paymentMethod === 'Cash') {
       const cash = parseFloat(cashAmount);
       if (cash < total) {
         alert('Insufficient amount');
         return;
       }
-      const change = cash - total;
-      setChangeAmount(change);
+      computedChange = cash - total;
+      setChangeAmount(computedChange);
     } else {
       setChangeAmount(0);
     }
@@ -508,9 +575,45 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       cashReceived: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
-      changeGiven: paymentMethod === 'Cash' ? changeAmount : 0,
+      changeGiven: paymentMethod === 'Cash' ? computedChange : 0,
       cashier: userName || 'Staff',
     };
+
+    if (currentUser?.id) {
+      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          orderNumber: `RET-${currentTransactionNumber}`,
+          customerName: order.customer ?? null,
+          orderType: 'RETAIL',
+          subtotal,
+          discount,
+          discountType: order.discountType ?? null,
+          serviceFee,
+          tax,
+          total,
+          items: cart.map((item) => ({
+            ...item,
+            productId: item.id,
+            categoryName: item.category,
+          })),
+          payment: {
+            paymentNumber: `PAY-${currentTransactionNumber}`,
+            method: paymentMethod,
+            amountPaid: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
+            changeAmount: paymentMethod === 'Cash' ? computedChange : 0,
+          },
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.message ?? 'Unable to complete payment. Stock may be insufficient.');
+        return;
+      }
+    }
 
     addOrder(order);
     transactionNumberRef.current += 1;
@@ -614,7 +717,7 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
           )}
 
           <div className="bg-white rounded-lg p-1 mb-4 inline-flex gap-1 flex-wrap">
-            {productCategories.map(cat => (
+            {dynamicProductCategories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
@@ -634,7 +737,8 @@ export function RetailCreateOrder({ onNavigate, onOrderCreated, onLogout, storeB
               <button
                 key={`${product.id}-${product.size}-${product.color}`}
                 onClick={() => addToCart(product)}
-                className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left"
+                disabled={product.stockQuantity !== undefined && product.stockQuantity <= 0}
+                className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden relative">
                   <img

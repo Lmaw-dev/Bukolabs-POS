@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import { getApiBaseUrl } from '../../auth/services/auth';
+import type { AuthenticatedUser } from '../../auth/types/auth';
 
 export interface OrderItem {
   name: string;
@@ -227,10 +229,36 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | null>(null);
 
-export function OrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const nextId = useRef(initialOrders.length + 1);
+export function OrderProvider({ children, currentUser }: { children: ReactNode; currentUser: AuthenticatedUser | null }) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const nextId = useRef(1);
   const [paymentCompletedSignal, setPaymentCompletedSignal] = useState(0);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      if (!currentUser?.id || currentUser.store_type !== 'RESTAURANT') {
+        setOrders([]);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) {
+          setOrders([]);
+          return;
+        }
+
+        const mapped = data.map(mapDatabaseRestaurantOrder);
+        setOrders(mapped);
+        nextId.current = mapped.length + 1;
+      } catch {
+        setOrders([]);
+      }
+    };
+
+    void loadOrders();
+  }, [currentUser?.id, currentUser?.store_type]);
 
   // Derive queued orders from orders with isQueued = true
   const queuedOrders: QueuedOrder[] = orders
@@ -309,4 +337,45 @@ export function useOrders() {
   const ctx = useContext(OrderContext);
   if (!ctx) throw new Error('useOrders must be used within OrderProvider');
   return ctx;
+}
+
+function mapDatabaseRestaurantOrder(row: any): Order {
+  const createdAt = row.created_at ? new Date(row.created_at) : new Date();
+  const items = Array.isArray(row.items) ? row.items : [];
+  const type: Order['type'] =
+    row.order_type === 'DINE_IN' ? 'Dine-In' :
+    row.order_type === 'MIXED' ? 'Mixed' :
+    'Takeout';
+
+  return {
+    id: String(row.id).padStart(6, '0'),
+    orderNumber: row.order_number ?? String(row.id).padStart(6, '0'),
+    customer: row.customer_name || 'Walk-in Customer',
+    type,
+    table: row.table_name || '-',
+    amountNumber: Number(row.total_amount ?? 0),
+    subtotal: Number(row.subtotal ?? 0),
+    serviceFee: Number(row.service_charge ?? 0),
+    tax: Number(row.tax_amount ?? 0),
+    discount: Number(row.discount_amount ?? 0),
+    discountType: row.discount_type ?? undefined,
+    paymentStatus: row.payment_status === 'PAID' ? 'Paid' : 'Not Paid',
+    orderStatus:
+      row.order_status === 'PREPARING' ? 'Preparing' :
+      row.order_status === 'READY' ? 'Ready' :
+      row.order_status === 'SERVED' ? 'Served' :
+      row.order_status === 'COMPLETED' ? 'Completed' :
+      'Pending',
+    date: createdAt.toISOString().split('T')[0],
+    time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    items: items.map((item: any) => ({
+      name: item.product_name,
+      quantity: Number(item.quantity ?? 0),
+      price: Number(item.unit_price ?? 0),
+      itemType: item.item_type === 'dine-in' ? 'dine-in' : 'takeout',
+    })),
+    paymentId: row.payment_number ?? undefined,
+    cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,
+    changeGiven: row.change_amount !== null && row.change_amount !== undefined ? Number(row.change_amount) : undefined,
+  };
 }

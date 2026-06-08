@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Pencil, Trash2, Upload } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
@@ -35,6 +35,34 @@ interface Product {
   stock_quantity: number | null;
   low_stock_limit: number | null;
   is_available: boolean;
+  available_quantity?: number | string;
+}
+
+interface Ingredient {
+  id: number;
+  ingredient_name: string;
+  unit: string;
+  quantity_available: number | string;
+}
+
+interface ProductIngredientForm {
+  ingredient_id: string;
+  quantity_required: string;
+  unit: string;
+  is_required: boolean;
+  is_removable: boolean;
+}
+
+interface InventoryDeduction {
+  id: number;
+  order_number: string | null;
+  order_item_name: string | null;
+  product_id: number | null;
+  product_name: string | null;
+  deduction_type: string;
+  quantity_deducted: string | number;
+  unit: string | null;
+  created_at: string;
 }
 
 const emptyProduct = {
@@ -58,6 +86,9 @@ const emptyProduct = {
 export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigate }: ProductManagementProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [productIngredients, setProductIngredients] = useState<ProductIngredientForm[]>([]);
+  const [deductions, setDeductions] = useState<InventoryDeduction[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<Record<string, string | boolean>>(emptyProduct);
   const [message, setMessage] = useState('');
@@ -67,14 +98,51 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  const handleProductImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage('Product image must be 2MB or smaller.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => setField('image_url', String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
   const load = async () => {
     if (!currentUser?.id) return;
-    const [categoryResponse, productResponse] = await Promise.all([
-      fetch(`${getApiBaseUrl()}/admin/categories?admin_user_id=${currentUser.id}`),
-      fetch(`${getApiBaseUrl()}/admin/products?admin_user_id=${currentUser.id}`),
-    ]);
-    setCategories(await categoryResponse.json());
-    setProducts(await productResponse.json());
+    try {
+      const [categoryResponse, productResponse, deductionResponse] = await Promise.all([
+        fetch(`${getApiBaseUrl()}/admin/categories?admin_user_id=${currentUser.id}`),
+        fetch(`${getApiBaseUrl()}/admin/products?admin_user_id=${currentUser.id}`),
+        fetch(`${getApiBaseUrl()}/admin/inventory-deductions?admin_user_id=${currentUser.id}`),
+      ]);
+      const categoryData = await categoryResponse.json();
+      const productData = await productResponse.json();
+      const deductionData = await deductionResponse.json();
+
+      setCategories(Array.isArray(categoryData) ? categoryData : []);
+      setProducts(Array.isArray(productData) ? productData : []);
+      setDeductions(Array.isArray(deductionData) ? deductionData.filter((deduction: InventoryDeduction) => deduction.product_id) : []);
+
+      if (isRestaurant) {
+        const ingredientResponse = await fetch(`${getApiBaseUrl()}/admin/ingredients?admin_user_id=${currentUser.id}`);
+        const ingredientData = await ingredientResponse.json();
+        setIngredients(Array.isArray(ingredientData) ? ingredientData : []);
+      }
+    } catch {
+      setCategories([]);
+      setProducts([]);
+      setDeductions([]);
+      setIngredients([]);
+      setMessage('Unable to load products. Please check if the backend server is running.');
+    }
   };
 
   useEffect(() => {
@@ -84,6 +152,22 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const reset = () => {
     setEditing(null);
     setForm(emptyProduct);
+    setProductIngredients([]);
+  };
+
+  const addIngredientRow = () => {
+    setProductIngredients((current) => [
+      ...current,
+      { ingredient_id: '', quantity_required: '', unit: '', is_required: true, is_removable: true },
+    ]);
+  };
+
+  const updateIngredientRow = (index: number, updates: Partial<ProductIngredientForm>) => {
+    setProductIngredients((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...updates } : row));
+  };
+
+  const removeIngredientRow = (index: number) => {
+    setProductIngredients((current) => current.filter((_, rowIndex) => rowIndex !== index));
   };
 
   const submit = async (event: FormEvent) => {
@@ -107,6 +191,17 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       stock_quantity: Number(form.stock_quantity || 0),
       low_stock_limit: Number(form.low_stock_limit || 5),
       is_available: Boolean(form.is_available),
+      ingredients: isRestaurant
+        ? productIngredients
+            .filter((ingredient) => ingredient.ingredient_id && ingredient.quantity_required)
+            .map((ingredient) => ({
+              ingredient_id: Number(ingredient.ingredient_id),
+              quantity_required: Number(ingredient.quantity_required),
+              unit: ingredient.unit,
+              is_required: ingredient.is_required,
+              is_removable: ingredient.is_removable,
+            }))
+        : undefined,
     };
 
     const response = await fetch(`${getApiBaseUrl()}/admin/products${editing ? `/${editing.id}` : ''}`, {
@@ -126,7 +221,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
     setMessage('Product saved.');
   };
 
-  const edit = (product: Product) => {
+  const edit = async (product: Product) => {
     setEditing(product);
     setForm({
       category_id: product.category_id ? String(product.category_id) : '',
@@ -145,6 +240,18 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
       low_stock_limit: String(product.low_stock_limit ?? 5),
       is_available: product.is_available,
     });
+
+    if (currentUser?.id && isRestaurant) {
+      const response = await fetch(`${getApiBaseUrl()}/admin/products/${product.id}/ingredients?admin_user_id=${currentUser.id}`);
+      const rows = await response.json();
+      setProductIngredients(rows.map((row: any) => ({
+        ingredient_id: String(row.ingredient_id ?? ''),
+        quantity_required: String(row.quantity_required ?? row.default_quantity ?? ''),
+        unit: row.unit ?? '',
+        is_required: row.is_required ?? true,
+        is_removable: row.is_removable ?? true,
+      })));
+    }
   };
 
   const remove = async (product: Product) => {
@@ -174,7 +281,29 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
               </select>
               <input type="number" value={String(form.price)} onChange={(event) => setField('price', event.target.value)} required placeholder="Price" className="rounded-lg border border-border bg-input-background px-4 py-2" />
               <input value={String(form.description)} onChange={(event) => setField('description', event.target.value)} placeholder="Description" className="rounded-lg border border-border bg-input-background px-4 py-2 md:col-span-2" />
-              <input value={String(form.image_url)} onChange={(event) => setField('image_url', event.target.value)} placeholder="Image URL" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+              <div className="md:col-span-1">
+                <div className="flex gap-3">
+                  <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-white">
+                    {form.image_url ? (
+                      <img src={String(form.image_url)} alt={String(form.name || 'Product')} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="px-2 text-center text-xs text-muted-foreground">No image</span>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <label className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 px-3 text-center text-sm text-primary transition-colors hover:bg-muted/40">
+                      <Upload className="h-4 w-4" />
+                      Upload product image
+                      <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleProductImageUpload} className="hidden" />
+                    </label>
+                    {form.image_url && (
+                      <button type="button" onClick={() => setField('image_url', '')} className="rounded-lg border border-border px-3 py-2 text-sm text-primary hover:bg-muted">
+                        Remove image
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {isRestaurant ? (
                 <>
@@ -194,6 +323,54 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
               )}
             </div>
 
+            {isRestaurant && (
+              <div className="mt-5 rounded-lg border border-border p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-medium">Required Ingredients</h2>
+                    <p className="text-xs text-muted-foreground">Product availability is calculated from assigned ingredient stock.</p>
+                  </div>
+                  <button type="button" onClick={addIngredientRow} className="rounded-lg border border-border px-3 py-1.5 text-sm text-primary">Add Ingredient</button>
+                </div>
+
+                <div className="space-y-3">
+                  {productIngredients.map((ingredient, index) => (
+                    <div key={index} className="grid gap-3 md:grid-cols-[1fr_140px_100px_120px_120px_auto]">
+                      <select
+                        value={ingredient.ingredient_id}
+                        onChange={(event) => {
+                          const selected = ingredients.find((item) => item.id === Number(event.target.value));
+                          updateIngredientRow(index, { ingredient_id: event.target.value, unit: selected?.unit ?? ingredient.unit });
+                        }}
+                        className="rounded-lg border border-border bg-input-background px-4 py-2"
+                      >
+                        <option value="">Select ingredient</option>
+                        {ingredients.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.ingredient_name} ({Number(item.quantity_available).toLocaleString()} {item.unit})
+                          </option>
+                        ))}
+                      </select>
+                      <input type="number" value={ingredient.quantity_required} onChange={(event) => updateIngredientRow(index, { quantity_required: event.target.value })} placeholder="Qty/order" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+                      <input value={ingredient.unit} onChange={(event) => updateIngredientRow(index, { unit: event.target.value })} placeholder="Unit" className="rounded-lg border border-border bg-input-background px-4 py-2" />
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={ingredient.is_required} onChange={(event) => updateIngredientRow(index, { is_required: event.target.checked })} className="h-5 w-5 accent-primary" />
+                        Required
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" checked={ingredient.is_removable} onChange={(event) => updateIngredientRow(index, { is_removable: event.target.checked })} className="h-5 w-5 accent-primary" />
+                        Removable
+                      </label>
+                      <button type="button" onClick={() => removeIngredientRow(index)} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  ))}
+                  {productIngredients.length === 0 && (
+                    <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">No ingredients assigned yet.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <label className="mt-4 flex items-center gap-2">
               <input type="checkbox" checked={Boolean(form.is_available)} onChange={(event) => setField('is_available', event.target.checked)} className="h-5 w-5 accent-primary" />
               Available
@@ -212,6 +389,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                   <th className="px-6 py-4 text-left">Name</th>
                   <th className="px-6 py-4 text-left">Category</th>
                   <th className="px-6 py-4 text-left">Price</th>
+                  <th className="px-6 py-4 text-left">{isRestaurant ? 'Can Make' : 'Stock'}</th>
                   <th className="px-6 py-4 text-left">Status</th>
                   <th className="px-6 py-4 text-left">Actions</th>
                 </tr>
@@ -222,6 +400,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                     <td className="px-6 py-4">{product.name}</td>
                     <td className="px-6 py-4">{product.category_name ?? '-'}</td>
                     <td className="px-6 py-4">₱ {Number(product.price).toFixed(2)}</td>
+                    <td className="px-6 py-4">{isRestaurant ? Number(product.available_quantity ?? 0).toLocaleString() : Number(product.stock_quantity ?? 0).toLocaleString()}</td>
                     <td className="px-6 py-4">{product.is_available ? 'Available' : 'Unavailable'}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
@@ -234,6 +413,43 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
               </tbody>
             </table>
           </div>
+
+          {!isRestaurant && (
+            <div className="mt-8">
+              <div className="mb-4">
+                <h2 className="text-primary mb-2">Product Stock Deduction History</h2>
+                <p className="text-muted-foreground">Recent paid orders that deducted retail product stock.</p>
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+                <table className="w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-6 py-4 text-left">Date</th>
+                      <th className="px-6 py-4 text-left">Order</th>
+                      <th className="px-6 py-4 text-left">Product</th>
+                      <th className="px-6 py-4 text-left">Qty Deducted</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deductions.map((deduction) => (
+                      <tr key={deduction.id} className="border-t border-border">
+                        <td className="px-6 py-4">{new Date(deduction.created_at).toLocaleString()}</td>
+                        <td className="px-6 py-4">{deduction.order_number ?? '-'}</td>
+                        <td className="px-6 py-4">{deduction.product_name ?? deduction.order_item_name ?? '-'}</td>
+                        <td className="px-6 py-4">{Number(deduction.quantity_deducted).toLocaleString()} {deduction.unit ?? ''}</td>
+                      </tr>
+                    ))}
+                    {deductions.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-6 text-center text-sm text-muted-foreground">No product stock deductions yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

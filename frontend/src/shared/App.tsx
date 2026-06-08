@@ -150,7 +150,7 @@ export default function App() {
   return (
     <div className="size-full bg-background">
       <StoreSettingsProvider currentUser={currentUser}>
-        <OrderProvider>
+        <OrderProvider currentUser={currentUser}>
           <TableProvider>
           {currentPage === 'login' && (
             <LoginPage onLogin={handleLogin} />
@@ -165,7 +165,7 @@ export default function App() {
             <RetailDashboard currentUser={currentUser} onLogout={handleLogout} onNavigate={navigateTo} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {(currentPage === 'retail-pos-dashboard' || currentPage === 'retail-sales' || currentPage === 'retail-transactions' || currentPage === 'retail-reports') && (
-            <RetailOrderProvider>
+            <RetailOrderProvider currentUser={currentUser}>
               {currentPage === 'retail-pos-dashboard' && (
                 <RetailPOSDashboard
                   onLogout={handleLogout}
@@ -179,6 +179,7 @@ export default function App() {
               )}
               {currentPage === 'retail-sales' && (
                 <RetailCreateOrder
+                  currentUser={currentUser}
                   onNavigate={navigateTo}
                   onOrderCreated={setCurrentOrder}
                   onLogout={handleLogout}
@@ -216,13 +217,13 @@ export default function App() {
             <POSDashboard onLogout={handleLogout} onNavigate={navigateTo} isAdmin={currentUser?.role === 'ADMIN'} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'create-order' && (
-            <CreateOrder onNavigate={navigateTo} onOrderCreated={setCurrentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
+            <CreateOrder currentUser={currentUser} onNavigate={navigateTo} onOrderCreated={setCurrentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'table-management' && (
             <TableManagement onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'payment' && (
-            <Payment onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
+            <Payment currentUser={currentUser} onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'receipt' && (
             <Receipt onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />

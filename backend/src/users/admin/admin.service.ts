@@ -135,4 +135,56 @@ export class AdminService {
   deleteProduct(input: { adminUserId: number; productId: number }) {
     return this.databaseService.deleteProductForAdmin(input);
   }
+
+  listIngredients(adminUserId: number) {
+    return this.databaseService.listIngredientsForAdmin(adminUserId);
+  }
+
+  createIngredient(input: any) {
+    return this.databaseService.createIngredientForAdmin(input);
+  }
+
+  updateIngredient(input: any) {
+    return this.databaseService.updateIngredientForAdmin(input);
+  }
+
+  deleteIngredient(input: { adminUserId: number; ingredientId: number }) {
+    return this.databaseService.deleteIngredientForAdmin(input);
+  }
+
+  listIngredientAlternatives(adminUserId: number) {
+    return this.databaseService.listIngredientAlternativesForAdmin(adminUserId);
+  }
+
+  createIngredientAlternative(input: any) {
+    return this.databaseService.createIngredientAlternativeForAdmin(input);
+  }
+
+  updateIngredientAlternative(input: any) {
+    return this.databaseService.updateIngredientAlternativeForAdmin(input);
+  }
+
+  deleteIngredientAlternative(input: { adminUserId: number; alternativeId: number }) {
+    return this.databaseService.deleteIngredientAlternativeForAdmin(input);
+  }
+
+  listInventoryDeductions(adminUserId: number) {
+    return this.databaseService.listInventoryDeductionsForAdmin(adminUserId);
+  }
+
+  listProductIngredients(input: { adminUserId: number; productId: number }) {
+    return this.databaseService.listProductIngredientsForAdmin(input);
+  }
+
+  listPosProducts(userId: number) {
+    return this.databaseService.listPosProducts(userId);
+  }
+
+  createPaidPosOrder(input: any) {
+    return this.databaseService.createPaidPosOrder(input);
+  }
+
+  listPosOrders(userId: number) {
+    return this.databaseService.listPosOrders(userId);
+  }
 }

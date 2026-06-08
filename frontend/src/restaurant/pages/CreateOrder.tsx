@@ -7,12 +7,15 @@ import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
+import { getApiBaseUrl } from '../../auth/services/auth';
+import type { AuthenticatedUser } from '../../auth/types/auth';
 import wagyuSteakImg from '../../imports/image-4.png';
 import trufflePastaImg from '../../imports/image-5.png';
 import lobsterThermidorImg from '../../imports/image-6.png';
 import freshLemonadeImg from '../../imports/image-7.png';
 
 interface CreateOrderProps {
+  currentUser: AuthenticatedUser | null;
   onNavigate: (page: Page) => void;
   onOrderCreated: (order: any) => void;
   onLogout: () => void;
@@ -23,9 +26,32 @@ interface CreateOrderProps {
 }
 
 interface Ingredient {
+  id?: number;
+  ingredient_id?: number;
+  product_ingredient_id?: number;
+  original_quantity?: number;
   name: string;
   quantity: number;
   unit: string;
+  is_removable?: boolean;
+  replacement_ingredient_id?: number;
+  replacement_name?: string;
+  additional_price?: number;
+  customization_type?: 'REMOVE' | 'ADD' | 'CHANGE_QUANTITY' | 'REPLACE';
+  removed?: boolean;
+  alternatives?: any[];
+}
+
+interface MenuProduct {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  categoryName?: string;
+  image: string;
+  availableQuantity?: number;
+  ingredients: Ingredient[];
 }
 
 interface CartItem {
@@ -258,7 +284,7 @@ function toOrderListFormat(order: any, paid: boolean) {
   };
 }
 
-export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType, staffType }: CreateOrderProps) {
+export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType, staffType }: CreateOrderProps) {
   const { addOrder, orders } = useOrders();
   const { tables } = useTables();
   const { settings, discounts } = useStoreSettings();
@@ -270,7 +296,9 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
   const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
   const [customerName, setCustomerName] = useState('');
   const [hasHistory, setHasHistory] = useState(false);
-  const [recommendedProducts, setRecommendedProducts] = useState<typeof products>([]);
+  const [posProducts, setPosProducts] = useState<MenuProduct[]>([]);
+  const [dynamicMenuCategories, setDynamicMenuCategories] = useState([{ id: 'all', name: 'All' }]);
+  const [recommendedProducts, setRecommendedProducts] = useState<MenuProduct[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [diningOption, setDiningOption] = useState<'' | 'dine-in' | 'takeout'>('');
@@ -303,6 +331,51 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const customerInputRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/products?user_id=${currentUser.id}`);
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) return;
+
+        const mappedProducts: MenuProduct[] = data.map((product: any) => ({
+          id: Number(product.id),
+          name: product.name,
+          description: product.description ?? '',
+          price: Number(product.price ?? 0),
+          category: product.category_name ?? 'Uncategorized',
+          categoryName: product.category_name ?? null,
+          image: product.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&h=200&fit=crop',
+          availableQuantity: Number(product.available_quantity ?? 0),
+          ingredients: (product.ingredients ?? []).map((ingredient: any) => ({
+            id: Number(ingredient.id),
+            product_ingredient_id: Number(ingredient.id),
+            ingredient_id: Number(ingredient.ingredient_id),
+            name: ingredient.name,
+            quantity: Number(ingredient.quantity ?? 0),
+            original_quantity: Number(ingredient.quantity ?? 0),
+            unit: ingredient.unit,
+            is_removable: ingredient.is_removable,
+            alternatives: ingredient.alternatives ?? [],
+          })),
+        }));
+
+        setPosProducts(mappedProducts);
+        setDynamicMenuCategories([
+          { id: 'all', name: 'All' },
+          ...Array.from(new Set(mappedProducts.map((product) => product.category))).map((category) => ({ id: category, name: category })),
+        ]);
+      } catch {
+        setPosProducts([]);
+        setDynamicMenuCategories([{ id: 'all', name: 'All' }]);
+      }
+    };
+
+    void loadProducts();
+  }, [currentUser?.id]);
 
   // Autocomplete: Get unique customer names and filter based on input
   useEffect(() => {
@@ -426,16 +499,16 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       console.log('Top items:', topItems);
 
       // Find matching products
-      const recommended = products.filter(p => topItems.includes(p.name));
+      const recommended = posProducts.filter(p => topItems.includes(p.name));
       console.log('Recommended products:', recommended.length);
       setRecommendedProducts(recommended);
     } else {
       setHasHistory(false);
       setRecommendedProducts([]);
     }
-  }, [customerName, orders, customerRecommendationEnabled]);
+  }, [customerName, orders, customerRecommendationEnabled, posProducts]);
 
-  const addToCart = (product: typeof products[0], orderType?: 'dine-in' | 'takeout') => {
+  const addToCart = (product: MenuProduct, orderType?: 'dine-in' | 'takeout') => {
     const typeToUse = orderType || (diningOption === 'dine-in' || diningOption === 'takeout' ? diningOption : 'dine-in');
 
     // Check if item already exists in cart with same id and orderType
@@ -492,11 +565,50 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
         return {
           ...item,
           ingredients: item.ingredients.map(ing =>
-            ing.name === ingredientName ? { ...ing, quantity: Math.max(0, newQuantity) } : ing
+            ing.name === ingredientName
+              ? {
+                  ...ing,
+                  quantity: Math.max(0, newQuantity),
+                  removed: newQuantity <= 0,
+                  customization_type: newQuantity <= 0 ? 'REMOVE' : 'CHANGE_QUANTITY',
+                }
+              : ing
           )
         };
       }
       return item;
+    }));
+  };
+
+  const replaceIngredient = (index: number, ingredientName: string, alternativeId: string) => {
+    setCart(cart.map((item, i) => {
+      if (i !== index) return item;
+
+      return {
+        ...item,
+        ingredients: item.ingredients.map((ing) => {
+          if (ing.name !== ingredientName) return ing;
+
+          if (!alternativeId) {
+            return {
+              ...ing,
+              replacement_ingredient_id: undefined,
+              replacement_name: undefined,
+              additional_price: 0,
+              customization_type: ing.quantity !== ing.original_quantity ? 'CHANGE_QUANTITY' : undefined,
+            };
+          }
+
+          const alternative = ing.alternatives?.find((item) => String(item.alternative_ingredient_id) === alternativeId);
+          return {
+            ...ing,
+            replacement_ingredient_id: Number(alternativeId),
+            replacement_name: alternative?.ingredient_name ?? 'Alternative',
+            additional_price: Number(alternative?.additional_price ?? 0),
+            customization_type: 'REPLACE',
+          };
+        }),
+      };
     }));
   };
 
@@ -505,7 +617,9 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
       if (i === index) {
         return {
           ...item,
-          ingredients: item.ingredients.filter(ing => ing.name !== ingredientName)
+          ingredients: item.ingredients.map(ing =>
+            ing.name === ingredientName ? { ...ing, quantity: 0, removed: true, customization_type: 'REMOVE' } : ing
+          )
         };
       }
       return item;
@@ -519,13 +633,15 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
     }
   };
 
-  const filteredProducts = products.filter(p => {
+  const filteredProducts = posProducts.filter(p => {
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const itemAdditionalCost = (item: CartItem) => item.ingredients.reduce((sum, ingredient) => sum + Number(ingredient.additional_price ?? 0), 0) * item.quantity;
+  const itemLineTotal = (item: CartItem) => (item.price * item.quantity) + itemAdditionalCost(item);
+  const subtotal = cart.reduce((sum, item) => sum + itemLineTotal(item), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
   const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
   const selectedDiscount = enabledDiscounts.find((item) => String(item.id) === discountType);
@@ -633,13 +749,48 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
     }, 100);
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     const cash = parseFloat(cashAmount);
     if (cash >= total) {
       const change = cash - total;
       setChangeAmount(change);
       if (successOrderDetails) {
         const paidOrder = { ...successOrderDetails, paid: true, cashReceived: cash, changeGiven: change };
+        if (currentUser?.id) {
+          const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: currentUser.id,
+              orderNumber: `REST-${currentOrderNumber}`,
+              customerName: paidOrder.customerName || null,
+              orderType: 'TAKEOUT',
+              subtotal,
+              discount,
+              discountType: selectedDiscountName || null,
+              serviceFee,
+              tax,
+              total,
+              items: cart.map((item) => ({
+                ...item,
+                productId: item.id,
+                categoryName: posProducts.find((product) => product.id === item.id)?.categoryName ?? null,
+              })),
+              payment: {
+                paymentNumber: `PAY-${currentOrderNumber}`,
+                method: 'Cash',
+                amountPaid: cash,
+                changeAmount: change,
+              },
+            }),
+          });
+
+          const data = await response.json();
+          if (!response.ok) {
+            alert(data?.message ?? 'Unable to complete order. Inventory may be insufficient.');
+            return;
+          }
+        }
         addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: cash, changeGiven: change });
         onOrderCreated(paidOrder);
         setSuccessOrderDetails(paidOrder);
@@ -772,7 +923,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
           )}
 
           <div className="bg-white rounded-lg p-1 mb-4 inline-flex gap-1">
-            {menuCategories.map(cat => (
+            {dynamicMenuCategories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
@@ -792,7 +943,8 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left"
+                disabled={product.availableQuantity !== undefined && product.availableQuantity <= 0}
+                className="bg-white rounded-lg p-2.5 hover:shadow-md transition-shadow text-left disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <div className="aspect-square bg-muted rounded-lg mb-2 overflow-hidden">
                   <img
@@ -1352,32 +1504,51 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
                 <label className="block text-xs text-muted-foreground mb-2">Ingredients:</label>
                 <div className="space-y-2">
                   {cart[customizeItemIndex].ingredients.map((ingredient, ingIndex) => (
-                    <div key={`ing-${ingIndex}-${ingredient.name}`} className="flex items-center gap-2 p-2 border border-border rounded-lg">
-                      <div className="flex-1">
-                        <p className="text-xs">{ingredient.name}</p>
-                        <p className="text-xs text-muted-foreground">{ingredient.quantity} {ingredient.unit}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
+                    <div key={`ing-${ingIndex}-${ingredient.name}`} className="p-2 border border-border rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <p className="text-xs">{ingredient.name}</p>
+                          <p className="text-xs text-muted-foreground">{ingredient.quantity} {ingredient.unit}</p>
+                          {ingredient.replacement_name && (
+                            <p className="text-xs text-primary">{ingredient.replacement_name} instead +PHP {Number(ingredient.additional_price ?? 0).toFixed(2)}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity - (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
+                            className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-xs w-10 text-center">{ingredient.quantity}</span>
+                          <button
+                            onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity + (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
+                            className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
                         <button
-                          onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity - (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
-                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                          onClick={() => deleteIngredient(customizeItemIndex, ingredient.name)}
+                          className="text-destructive hover:bg-destructive/10 p-1.5 rounded"
                         >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-xs w-10 text-center">{ingredient.quantity}</span>
-                        <button
-                          onClick={() => updateIngredientQuantity(customizeItemIndex, ingredient.name, ingredient.quantity + (ingredient.unit === 'g' || ingredient.unit === 'ml' ? 5 : 1))}
-                          className="w-6 h-6 rounded bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
-                        >
-                          <Plus className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                      <button
-                        onClick={() => deleteIngredient(customizeItemIndex, ingredient.name)}
-                        className="text-destructive hover:bg-destructive/10 p-1.5 rounded"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {ingredient.alternatives && ingredient.alternatives.length > 0 && (
+                        <select
+                          value={ingredient.replacement_ingredient_id ? String(ingredient.replacement_ingredient_id) : ''}
+                          onChange={(event) => replaceIngredient(customizeItemIndex, ingredient.name, event.target.value)}
+                          className="mt-2 w-full rounded-lg border border-border bg-input-background px-3 py-2 text-xs"
+                        >
+                          <option value="">No replacement</option>
+                          {ingredient.alternatives.map((alternative) => (
+                            <option key={alternative.id} value={alternative.alternative_ingredient_id}>
+                              {alternative.ingredient_name} +PHP {Number(alternative.additional_price ?? 0).toFixed(2)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1422,7 +1593,7 @@ export function CreateOrder({ onNavigate, onOrderCreated, onLogout, storeBrand, 
             <div className="overflow-y-auto flex-1 p-5">
               <div className="mb-4">
                 <div className="bg-white rounded-lg p-1 inline-flex gap-1">
-                  {menuCategories.map(cat => (
+                  {dynamicMenuCategories.map(cat => (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}

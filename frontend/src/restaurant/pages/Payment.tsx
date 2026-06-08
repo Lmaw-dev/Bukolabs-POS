@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
-import type { StaffType, StoreType } from '../../auth/types/auth';
+import type { AuthenticatedUser, StaffType, StoreType } from '../../auth/types/auth';
 import { CreditCard, Wallet, Banknote } from 'lucide-react';
+import { getApiBaseUrl } from '../../auth/services/auth';
 
 interface PaymentProps {
+  currentUser: AuthenticatedUser | null;
   onNavigate: (page: Page) => void;
   currentOrder: any;
   onLogout: () => void;
@@ -14,11 +16,45 @@ interface PaymentProps {
   staffType?: StaffType;
 }
 
-export function Payment({ onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: PaymentProps) {
+export function Payment({ currentUser, onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: PaymentProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'ewallet'>('cash');
   const [paymentTiming, setPaymentTiming] = useState<'now' | 'later'>('now');
 
-  const handleProcessPayment = () => {
+  const handleProcessPayment = async () => {
+    if (paymentTiming === 'now' && currentUser?.id && currentOrder?.items?.length) {
+      const total = currentOrder.total ?? currentOrder.subtotal ?? 0;
+      const orderNumber = currentOrder.orderNumber ?? currentOrder.order_number ?? Date.now();
+      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          orderNumber: `REST-${orderNumber}`,
+          customerName: currentOrder.customerName ?? null,
+          orderType: currentOrder.orderType ?? 'DINE_IN',
+          tableName: currentOrder.tableNumber ? `Table ${currentOrder.tableNumber}` : null,
+          subtotal: currentOrder.subtotal ?? 0,
+          discount: currentOrder.discount ?? 0,
+          discountType: currentOrder.discountType ?? null,
+          serviceFee: currentOrder.serviceFee ?? 0,
+          tax: currentOrder.tax ?? 0,
+          total,
+          items: currentOrder.items.map((item: any) => ({ ...item, productId: item.id })),
+          payment: {
+            paymentNumber: `PAY-${orderNumber}`,
+            method: paymentMethod,
+            amountPaid: total,
+            changeAmount: 0,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.message ?? 'Unable to process payment. Inventory may be insufficient.');
+        return;
+      }
+    }
+
     onNavigate('receipt');
   };
 
