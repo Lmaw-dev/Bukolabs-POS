@@ -303,6 +303,16 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   const [scanFeedback, setScanFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
+    const highestOrderNumber = orders.reduce((highest, order) => {
+      const match = String(order.transactionNumber ?? order.id ?? '').match(/(\d+)$/);
+      const numericOrder = match ? Number(match[1]) : 0;
+      return Number.isFinite(numericOrder) ? Math.max(highest, numericOrder) : highest;
+    }, 100000);
+
+    transactionNumberRef.current = Math.max(transactionNumberRef.current, highestOrderNumber + 1);
+  }, [orders]);
+
+  useEffect(() => {
     const loadProducts = async () => {
       if (!currentUser?.id) return;
 
@@ -604,8 +614,10 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
       setChangeAmount(0);
     }
 
+    const transactionNumber = currentTransactionNumber || String(transactionNumberRef.current).padStart(6, '0');
+
     const order = {
-      transactionNumber: currentTransactionNumber,
+      transactionNumber,
       customer: customerName.trim() || undefined,
       items: cart.map(item => ({
         name: item.name,
@@ -636,7 +648,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: currentUser.id,
-          orderNumber: `RET-${currentTransactionNumber}`,
+          orderNumber: `RET-${transactionNumber}`,
           customerName: order.customer ?? null,
           orderType: 'RETAIL',
           subtotal,
@@ -652,7 +664,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
             categoryName: item.category,
           })),
           payment: {
-            paymentNumber: `PAY-${currentTransactionNumber}`,
+            paymentNumber: `PAY-${transactionNumber}`,
             method: paymentMethod,
             amountPaid: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
             changeAmount: paymentMethod === 'Cash' ? computedChange : 0,
@@ -662,6 +674,13 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
       const data = await response.json();
       if (!response.ok) {
+        if (String(data?.message ?? '').toLowerCase().includes('already exists')) {
+          transactionNumberRef.current += 1;
+          setCurrentTransactionNumber(String(transactionNumberRef.current).padStart(6, '0'));
+          alert('Duplicate transaction number detected. Please click Complete Payment again.');
+          return;
+        }
+
         alert(data?.message ?? 'Unable to complete payment. Stock may be insufficient.');
         return;
       }
