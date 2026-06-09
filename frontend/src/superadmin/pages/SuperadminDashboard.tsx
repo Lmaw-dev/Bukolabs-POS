@@ -24,6 +24,7 @@ import {
   Utensils,
   X,
 } from 'lucide-react';
+import { LogoutConfirmDialog } from '../../shared/components/LogoutConfirmDialog';
 
 interface AdminSummary {
   id: number;
@@ -90,6 +91,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
   const [permanentlyDeletingAdminId, setPermanentlyDeletingAdminId] = useState<number | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -439,7 +441,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         <div className={`border-t border-white/10 py-2 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3' : 'px-5'}`}>
           <button
             type="button"
-            onClick={onLogout}
+            onClick={() => setShowLogoutConfirm(true)}
             className={`flex h-11 w-full items-center rounded-lg border border-transparent text-white transition hover:bg-red-500/10 hover:text-red-400 ${
               isSidebarCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
             }`}
@@ -451,6 +453,15 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           </button>
         </div>
       </aside>
+
+      <LogoutConfirmDialog
+        isOpen={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+      />
 
       <main className={`min-h-screen min-w-0 transition-[margin-left] duration-300 ease-in-out ${isSidebarCollapsed ? 'ml-20' : 'ml-80'}`}>
         {activeSection === 'stores' && (

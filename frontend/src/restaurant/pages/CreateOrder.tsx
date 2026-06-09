@@ -275,6 +275,7 @@ function toOrderListFormat(order: any, paid: boolean) {
       name: item.name,
       quantity: item.quantity,
       price: item.price * item.quantity,
+      image: item.image,
       itemType: item.orderType,
     })),
     isQueued: order.isQueued || false,

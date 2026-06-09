@@ -9,6 +9,7 @@ export interface OrderItem {
   color?: string;
   quantity: number;
   price: number;
+  image?: string;
   refunded?: boolean;
   refundedQuantity?: number;
 }
@@ -396,6 +397,7 @@ function mapDatabaseRetailOrder(row: any): Order {
       color: item.color ?? undefined,
       quantity: Number(item.quantity ?? 0),
       price: Number(item.unit_price ?? 0),
+      image: item.image_url ?? item.image ?? undefined,
     })),
     paymentId: row.payment_number ?? undefined,
     cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,

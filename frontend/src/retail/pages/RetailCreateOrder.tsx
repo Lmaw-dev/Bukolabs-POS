@@ -646,6 +646,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
         color: item.color,
         quantity: item.quantity,
         price: item.price,
+        image: item.image,
       })),
       subtotal,
       serviceFee,

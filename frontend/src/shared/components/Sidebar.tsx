@@ -4,6 +4,7 @@ import { Page, type StoreBrand } from '../App';
 import type { StaffType } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
+import { LogoutConfirmDialog } from './LogoutConfirmDialog';
 
 interface SidebarProps {
   currentPage: Page;
@@ -30,11 +31,6 @@ type MenuItem = {
 export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RESTAURANT', staffType = 'POS_STAFF' }: SidebarProps) {
   const isRetail = storeType === 'RETAIL_STORE';
   const { settings } = useStoreSettings();
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Store: false,
-    Temporary: false,
-  });
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const storeItems = [
     { icon: Info, label: 'Store Information', page: 'store-information' as Page },
@@ -47,6 +43,15 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
     { icon: UtensilsCrossed, label: 'Ingredients', page: 'ingredient-management' as Page },
   ];
   const retailTemporaryItems = temporaryItems.filter((item) => item.page !== 'ingredient-management');
+  const storePages = storeItems.map((item) => item.page);
+  const visibleTemporaryItems = isRetail ? retailTemporaryItems : temporaryItems;
+  const temporaryPages = visibleTemporaryItems.map((item) => item.page);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Store: storePages.includes(currentPage),
+    Temporary: temporaryPages.includes(currentPage),
+  });
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const restaurantAdminMenuItems: MenuItem[] = [
     { icon: Home, label: 'Dashboard', page: 'pos-dashboard' as Page },
@@ -83,7 +88,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
   const managementItems: MenuItem[] = isAdmin
     ? [
         { icon: Store, label: 'Store', children: storeItems },
-        { icon: Archive, label: 'Temporary', children: isRetail ? retailTemporaryItems : temporaryItems },
+        { icon: Archive, label: 'Temporary', children: visibleTemporaryItems },
       ]
     : [];
   const visibleMenuItems = menuItems.filter((item) => item.page !== 'table-management' || settings.enable_table_management);
@@ -97,6 +102,18 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
       Temporary: false,
     });
   };
+  const getMenuButtonClasses = (active: boolean, isOpen: boolean) =>
+    active
+      ? 'border-[#00a7a5]/25 text-white'
+      : isOpen
+        ? 'border-white/15 bg-white/10 text-white'
+        : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100';
+  const getMenuButtonStyle = (active: boolean, isOpen: boolean) =>
+    active
+      ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
+      : isOpen
+        ? { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)' }
+        : undefined;
 
   return (
     <div
@@ -131,6 +148,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
           {visibleMenuItems.map((item) => {
             const childActive = item.children?.some((child) => child.page === currentPage) ?? false;
             const active = currentPage === item.page || childActive;
+            const isOpen = item.children ? openGroups[item.label] : false;
             return (
               <li key={item.page ?? item.label}>
                 <button
@@ -148,16 +166,8 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                   }}
                   className={`flex h-[52px] w-full items-center rounded-lg border transition ${
                     isCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
-                  } ${
-                    active
-                      ? 'border-[#00a7a5]/25 text-white'
-                      : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
-                  }`}
-                  style={
-                    active
-                      ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
-                      : undefined
-                  }
+                  } ${getMenuButtonClasses(active, isOpen)}`}
+                  style={getMenuButtonStyle(active, isOpen)}
                 >
                   <span className="shrink-0">
                     <item.icon className="h-5 w-5" strokeWidth={1.8} />
@@ -204,6 +214,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
               {managementItems.map((item) => {
                 const childActive = item.children?.some((child) => child.page === currentPage) ?? false;
                 const active = currentPage === item.page || childActive;
+                const isOpen = item.children ? openGroups[item.label] : false;
                 return (
                   <li key={item.page ?? item.label}>
                     <button
@@ -221,16 +232,8 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                       }}
                       className={`flex h-[52px] w-full items-center rounded-lg border transition ${
                         isCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
-                      } ${
-                        active
-                          ? 'border-[#00a7a5]/25 text-white'
-                          : 'border-transparent text-white hover:bg-[#007a5e]/15 hover:text-slate-100'
-                      }`}
-                      style={
-                        active
-                          ? { background: 'linear-gradient(135deg, #008967 0%, #007a5e 100%)', boxShadow: '0 0 18px rgba(0,167,165,0.16)' }
-                          : undefined
-                      }
+                      } ${getMenuButtonClasses(active, isOpen)}`}
+                      style={getMenuButtonStyle(active, isOpen)}
                     >
                       <span className="shrink-0">
                         <item.icon className="h-5 w-5" strokeWidth={1.8} />
@@ -276,7 +279,7 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
 
       <div className={`shrink-0 border-t border-white/10 py-2 text-white transition-all duration-300 ease-in-out ${isCollapsed ? 'px-3' : 'px-5'}`}>
         <button
-          onClick={onLogout}
+          onClick={() => setShowLogoutConfirm(true)}
           className={`flex h-[52px] w-full items-center rounded-lg border border-transparent text-white transition hover:bg-red-500/10 hover:text-red-200 ${
             isCollapsed ? 'justify-center gap-0 px-0' : 'gap-4 px-4 text-left'
           }`}
@@ -289,6 +292,15 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
           </span>
         </button>
       </div>
+
+      <LogoutConfirmDialog
+        isOpen={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+      />
     </div>
   );
 }

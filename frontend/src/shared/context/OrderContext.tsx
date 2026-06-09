@@ -6,6 +6,7 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  image?: string;
   itemType?: 'dine-in' | 'takeout';
 }
 
@@ -372,6 +373,7 @@ function mapDatabaseRestaurantOrder(row: any): Order {
       name: item.product_name,
       quantity: Number(item.quantity ?? 0),
       price: Number(item.unit_price ?? 0),
+      image: item.image_url ?? item.image ?? undefined,
       itemType: item.item_type === 'dine-in' ? 'dine-in' : 'takeout',
     })),
     paymentId: row.payment_number ?? undefined,

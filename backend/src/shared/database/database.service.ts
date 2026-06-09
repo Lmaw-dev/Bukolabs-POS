@@ -1998,6 +1998,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
                 'quantity', oi.quantity,
                 'unit_price', oi.unit_price,
                 'line_total', oi.line_total,
+                'image_url', COALESCE(pv.image_url, prod.image_url),
                 'item_type', oi.item_type,
                 'notes', oi.notes
               )
@@ -2008,6 +2009,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         FROM orders o
         LEFT JOIN payments p ON p.order_id = o.id
         LEFT JOIN order_items oi ON oi.order_id = o.id
+        LEFT JOIN products prod ON prod.id = oi.product_id
+        LEFT JOIN product_variants pv ON pv.id = oi.variant_id
         WHERE o.store_id = $1
           AND (
             ($2 = 'RETAIL_STORE' AND o.order_type = 'RETAIL')

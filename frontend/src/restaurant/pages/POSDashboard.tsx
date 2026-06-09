@@ -17,6 +17,24 @@ interface POSDashboardProps {
   staffType?: StaffType;
 }
 
+function TopItemImage({ src, name }: { src?: string | null; name: string }) {
+  return (
+    <div className="relative w-12 h-12 rounded-lg overflow-hidden shadow-sm border border-border bg-muted flex items-center justify-center flex-shrink-0">
+      <span className="text-xs text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
+      {src ? (
+        <img
+          src={src}
+          alt={name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType, staffType }: POSDashboardProps) {
   const { orders, queuedOrders } = useOrders();
   const { tables, getAvailableTablesCount } = useTables();
@@ -190,7 +208,10 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
 
     orders.filter((order) => order.paymentStatus === 'Paid').forEach((order) => {
       order.items.forEach((item) => {
-        const current = itemMap.get(item.name) ?? { id: item.name, name: item.name, sold: 0, revenue: 'PHP 0.00', revenueValue: 0, image: '' };
+        const current = itemMap.get(item.name) ?? { id: item.name, name: item.name, sold: 0, revenue: 'PHP 0.00', revenueValue: 0, image: item.image || storeBrand?.logo || '' };
+        if ((!current.image || current.image === storeBrand?.logo) && item.image) {
+          current.image = item.image;
+        }
         current.sold += item.quantity;
         current.revenueValue += item.price * item.quantity;
         current.revenue = `PHP ${current.revenueValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -199,7 +220,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
     });
 
     return Array.from(itemMap.values()).sort((a, b) => b.sold - a.sold);
-  }, [orders]);
+  }, [orders, storeBrand?.logo]);
 
   const visibleTopSellingItems = databaseTopSellingItems.slice(0, 4);
 
@@ -311,13 +332,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                 {visibleTopSellingItems.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden shadow-sm border border-border flex-shrink-0">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <TopItemImage src={item.image} name={item.name} />
                       <div>
                         <p className="text-xs">{item.name}</p>
                         <p className="text-xs text-muted-foreground">{item.sold} sold</p>
@@ -435,13 +450,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden shadow-sm border border-border flex-shrink-0">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
+                          <TopItemImage src={item.image} name={item.name} />
                           <span className="text-sm">{item.name}</span>
                         </div>
                       </td>

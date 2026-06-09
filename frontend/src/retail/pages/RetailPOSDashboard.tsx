@@ -16,6 +16,24 @@ interface RetailPOSDashboardProps {
   staffType?: StaffType;
 }
 
+function TopItemImage({ src, name }: { src?: string | null; name: string }) {
+  return (
+    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+      <span className="text-xs text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
+      {src ? (
+        <img
+          src={src}
+          alt={name}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailPOSDashboardProps) {
   const { orders } = useOrders();
   const [dateFilter, setDateFilter] = useState('this-month');
@@ -178,7 +196,10 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
 
     orders.filter((order) => order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Refunded').forEach((order) => {
       order.items.forEach((item) => {
-        const current = itemMap.get(item.name) ?? { id: item.name, name: item.name, sold: 0, revenue: 'PHP 0.00', revenueValue: 0, image: '' };
+        const current = itemMap.get(item.name) ?? { id: item.name, name: item.name, sold: 0, revenue: 'PHP 0.00', revenueValue: 0, image: item.image || storeBrand?.logo || '' };
+        if ((!current.image || current.image === storeBrand?.logo) && item.image) {
+          current.image = item.image;
+        }
         current.sold += item.quantity;
         current.revenueValue += item.price * item.quantity;
         current.revenue = `PHP ${current.revenueValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -187,7 +208,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
     });
 
     return Array.from(itemMap.values()).sort((a, b) => b.sold - a.sold);
-  }, [orders]);
+  }, [orders, storeBrand?.logo]);
 
   const visibleTopSellingItems = databaseTopSellingItems.slice(0, 4);
 
@@ -285,13 +306,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
               <div className="space-y-3">
                 {visibleTopSellingItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <TopItemImage src={item.image} name={item.name} />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium truncate">{item.name}</p>
                       <p className="text-xs text-muted-foreground">{item.sold} sold</p>
@@ -365,13 +380,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
               <div className="space-y-3">
                 {databaseTopSellingItems.map((item, index) => (
                   <div key={item.id} className="flex items-center gap-3 p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors">
-                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <TopItemImage src={item.image} name={item.name} />
                     <div className="flex-1">
                       <p className="text-sm font-medium">{item.name}</p>
                       <p className="text-xs text-muted-foreground">{item.sold} sold</p>

@@ -2,6 +2,8 @@ import { ShoppingBag } from 'lucide-react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
+import { useState } from 'react';
+import { LogoutConfirmDialog } from '../../shared/components/LogoutConfirmDialog';
 
 interface RetailDashboardProps {
   title?: string;
@@ -33,6 +35,8 @@ export function RetailDashboard({
   storeType = 'RETAIL_STORE',
   staffType,
 }: RetailDashboardProps) {
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   if (onNavigate) {
     return (
       <div className="flex h-screen">
@@ -81,8 +85,8 @@ export function RetailDashboard({
           </div>
           <button
             type="button"
-            onClick={onLogout}
-            className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+            onClick={() => setShowLogoutConfirm(true)}
+            className="rounded-xl border border-[#00a7a5]/20 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
             Sign Out
           </button>
@@ -100,6 +104,15 @@ export function RetailDashboard({
           </div>
         </div>
       </div>
+
+      <LogoutConfirmDialog
+        isOpen={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={() => {
+          setShowLogoutConfirm(false);
+          onLogout();
+        }}
+      />
     </div>
   );
 }
