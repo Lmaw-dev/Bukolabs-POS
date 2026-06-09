@@ -5,7 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, UtensilsCrossed, X } from 'lucide-react';
+import { Calendar, X } from 'lucide-react';
 
 interface POSDashboardProps {
   onLogout: () => void;
@@ -354,15 +354,8 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
           </div>
 
           <div className="bg-card rounded-xl shadow-sm border border-border">
-            <div className="p-5 border-b border-border flex justify-between items-center">
+            <div className="p-5 border-b border-border">
               <h3 className="text-base text-primary">Recent Orders</h3>
-              <button
-                onClick={() => onNavigate('create-order')}
-                className="bg-secondary text-secondary-foreground px-5 py-2 rounded-lg hover:bg-secondary/90 transition-colors flex items-center gap-2 text-sm"
-              >
-                <UtensilsCrossed className="w-4 h-4" />
-                Get Orders
-              </button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">

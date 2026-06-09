@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
-import { Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users } from 'lucide-react';
+import { Banknote, Building2, Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users, Smartphone, Wallet } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
@@ -307,6 +307,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [showPreview, setShowPreview] = useState(false);
   const [showTakeoutMode, setShowTakeoutMode] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showPaymentChoice, setShowPaymentChoice] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showSuccess, setShowSuccess] = useState(false);
   const [cashAmount, setCashAmount] = useState('');
   const [changeAmount, setChangeAmount] = useState(0);
@@ -325,6 +327,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [isInQueue, setIsInQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
   const queueCounterRef = useRef(1);
+  const enabledPaymentMethods = settings.enabled_payment_methods.length > 0 ? settings.enabled_payment_methods : ['Cash'];
 
   // Autocomplete for customer name
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
@@ -654,6 +657,56 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const discount = subtotal * discountRate;
 
   const total = subtotal + serviceFee + tax - discount;
+  const getOrderTypeForPayload = (items: CartItem[]) => {
+    const hasDineIn = items.some(item => item.orderType === 'dine-in');
+    const hasTakeout = items.some(item => item.orderType === 'takeout');
+    return hasDineIn && hasTakeout ? 'MIXED' : hasDineIn ? 'DINE_IN' : 'TAKEOUT';
+  };
+
+  const persistRestaurantOrder = async (
+    orderDetails: any,
+    paid: boolean,
+    payment?: { amountPaid: number; changeAmount: number; method: string },
+  ) => {
+    if (!currentUser?.id) return null;
+
+    const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser.id,
+        orderNumber: `REST-${orderDetails.orderNumber}`,
+        customerName: orderDetails.customerName || null,
+        orderType: getOrderTypeForPayload(orderDetails.items),
+        tableName: orderDetails.tableNumber ? `Table ${orderDetails.tableNumber}` : null,
+        subtotal: orderDetails.subtotal,
+        discount: orderDetails.discount,
+        discountType: orderDetails.discountType ?? null,
+        serviceFee: orderDetails.serviceFee,
+        tax: orderDetails.tax,
+        total: orderDetails.total,
+        orderStatus: paid ? 'COMPLETED' : 'PENDING',
+        paymentStatus: paid ? 'PAID' : 'NOT_PAID',
+        items: orderDetails.items.map((item: CartItem) => ({
+          ...item,
+          productId: item.id,
+          categoryName: posProducts.find((product) => product.id === item.id)?.categoryName ?? null,
+        })),
+        payment: paid && payment ? {
+          paymentNumber: `PAY-${orderDetails.orderNumber}`,
+          method: payment.method,
+          amountPaid: payment.amountPaid,
+          changeAmount: payment.changeAmount,
+        } : undefined,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message ?? 'Unable to save order. Inventory may be insufficient.');
+    }
+    return data;
+  };
 
   const validateOrder = (): boolean => {
     if (!diningOption) {
@@ -727,75 +780,57 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
 
     // Small delay to ensure state updates properly
     setTimeout(() => {
-      if (hasTakeout && !hasDineIn) {
-        // Pure takeout - pay now
-        console.log('Opening payment modal for takeout');
+      const shouldPayDirectly = !tableManagementEnabled || !hasDineIn;
+
+      if (shouldPayDirectly) {
         setSuccessOrderDetails(order);
+        setPaymentMethod(enabledPaymentMethods[0] ?? 'Cash');
         setShowPayment(true);
       } else if (hasDineIn) {
-        // Has dine-in - pay later
-        console.log('Creating dine-in order');
-        const orderForList = toOrderListFormat(order, false);
-        // Add queue info to order
-        if (isInQueue && queuePosition) {
-          addOrder({ ...orderForList, isQueued: true, queuePosition });
-        } else {
-          addOrder(orderForList);
-        }
-        onOrderCreated(order);
         setSuccessOrderDetails(order);
-        setShowSuccess(true);
+        setShowPaymentChoice(true);
       }
     }, 100);
   };
 
+  const handlePayLater = async () => {
+    if (!successOrderDetails) return;
+
+    try {
+      await persistRestaurantOrder(successOrderDetails, false);
+      const orderForList = toOrderListFormat(successOrderDetails, false);
+      if (successOrderDetails.isQueued && successOrderDetails.queuePosition) {
+        addOrder({ ...orderForList, isQueued: true, queuePosition: successOrderDetails.queuePosition });
+      } else {
+        addOrder(orderForList);
+      }
+      onOrderCreated(successOrderDetails);
+      setShowPaymentChoice(false);
+      setShowSuccess(true);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to save order.');
+    }
+  };
+
   const handlePaymentSubmit = async () => {
-    const cash = parseFloat(cashAmount);
-    if (cash >= total) {
-      const change = cash - total;
+    const amountPaid = paymentMethod === 'Cash' ? parseFloat(cashAmount) : total;
+    if (amountPaid >= total) {
+      const change = paymentMethod === 'Cash' ? amountPaid - total : 0;
       setChangeAmount(change);
       if (successOrderDetails) {
-        const paidOrder = { ...successOrderDetails, paid: true, cashReceived: cash, changeGiven: change };
-        if (currentUser?.id) {
-          const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: currentUser.id,
-              orderNumber: `REST-${currentOrderNumber}`,
-              customerName: paidOrder.customerName || null,
-              orderType: 'TAKEOUT',
-              subtotal,
-              discount,
-              discountType: selectedDiscountName || null,
-              serviceFee,
-              tax,
-              total,
-              items: cart.map((item) => ({
-                ...item,
-                productId: item.id,
-                categoryName: posProducts.find((product) => product.id === item.id)?.categoryName ?? null,
-              })),
-              payment: {
-                paymentNumber: `PAY-${currentOrderNumber}`,
-                method: 'Cash',
-                amountPaid: cash,
-                changeAmount: change,
-              },
-            }),
-          });
-
-          const data = await response.json();
-          if (!response.ok) {
-            alert(data?.message ?? 'Unable to complete order. Inventory may be insufficient.');
-            return;
-          }
+        const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
+        try {
+          await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Unable to complete order.');
+          return;
         }
-        addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: cash, changeGiven: change });
+        addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: amountPaid, changeGiven: change });
         onOrderCreated(paidOrder);
         setSuccessOrderDetails(paidOrder);
       }
       setCashAmount('');
+      setShowPaymentChoice(false);
       setShowPayment(false);
       // Show receipt preview first for takeout orders
       setShowReceiptPreview(true);
@@ -819,6 +854,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     setCurrentOrderNumber('');
     setIsInQueue(false);
     setQueuePosition(null);
+    setShowPaymentChoice(false);
+    setPaymentMethod(enabledPaymentMethods[0] ?? 'Cash');
     setShowReceiptPreview(false);
     onNavigate('create-order');
   };
@@ -1644,6 +1681,52 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         </div>
       )}
 
+      {/* Payment Choice Modal */}
+      {showPaymentChoice && successOrderDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className="flex justify-between items-center p-5 border-b border-border">
+              <h2 className="text-lg text-primary">Dine-In Payment</h2>
+              <button
+                onClick={() => setShowPaymentChoice(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <div className="rounded-lg bg-muted p-4 mb-4">
+                <p className="text-xs text-muted-foreground">Total Amount</p>
+                <p className="mt-1 text-3xl text-primary font-medium">PHP {total.toFixed(2)}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Choose Pay Later if the table should stay occupied until the customer pays.
+                </p>
+              </div>
+              <div className="grid gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentMethod(enabledPaymentMethods[0] ?? 'Cash');
+                    setShowPaymentChoice(false);
+                    setShowPayment(true);
+                  }}
+                  className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Pay Now
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePayLater}
+                  className="w-full rounded-lg border border-border py-3 text-sm font-medium hover:bg-muted"
+                >
+                  Pay Later
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Payment Modal */}
       {showPayment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -1706,18 +1789,45 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium mb-2">Amount Received</label>
-                <input
-                  type="number"
-                  value={cashAmount}
-                  onChange={(e) => setCashAmount(e.target.value)}
-                  placeholder="Enter amount"
-                  className="w-full px-4 py-3 border border-border rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                  autoFocus
-                />
+                <label className="block text-sm font-medium mb-2">Payment Method</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {enabledPaymentMethods.map((method) => {
+                    const Icon = method === 'Cash' ? Banknote : method === 'Bank Transfer' ? Building2 : method === 'GCash' ? Smartphone : Wallet;
+                    return (
+                      <button
+                        key={method}
+                        type="button"
+                        onClick={() => {
+                          setPaymentMethod(method);
+                          if (method !== 'Cash') setCashAmount('');
+                        }}
+                        className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                          paymentMethod === method ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {method}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {cashAmount && parseFloat(cashAmount) >= total && (
+              {paymentMethod === 'Cash' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Amount Received</label>
+                  <input
+                    type="number"
+                    value={cashAmount}
+                    onChange={(e) => setCashAmount(e.target.value)}
+                    placeholder="Enter amount"
+                    className="w-full px-4 py-3 border border-border rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {paymentMethod === 'Cash' && cashAmount && parseFloat(cashAmount) >= total && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
                   <p className="text-sm text-muted-foreground mb-1">Change</p>
                   <p className="text-2xl text-green-600 font-medium">₱ {(parseFloat(cashAmount) - total).toFixed(2)}</p>
@@ -1733,7 +1843,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                 </button>
                 <button
                   onClick={handlePaymentSubmit}
-                  disabled={!cashAmount || parseFloat(cashAmount) < total}
+                  disabled={paymentMethod === 'Cash' && (!cashAmount || parseFloat(cashAmount) < total)}
                   className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm Payment

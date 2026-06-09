@@ -14,6 +14,7 @@ export interface StoreSettingValues {
   enable_tax: boolean;
   tax_rate: number;
   enable_discount: boolean;
+  enabled_payment_methods: string[];
 }
 
 export interface DiscountSetting {
@@ -43,6 +44,7 @@ export const defaultStoreSettings: StoreSettingValues = {
   enable_tax: true,
   tax_rate: 0,
   enable_discount: true,
+  enabled_payment_methods: ['Cash', 'GCash', 'Maya', 'Bank Transfer'],
 };
 
 const StoreSettingsContext = createContext<StoreSettingsContextValue>({
@@ -110,5 +112,31 @@ export function normalizeStoreSettings(data: any): StoreSettingValues {
     enable_tax: data?.enable_tax ?? true,
     tax_rate: Number(data?.tax_rate ?? 0),
     enable_discount: data?.enable_discount ?? true,
+    enabled_payment_methods: normalizePaymentMethods(data?.enabled_payment_methods),
   };
+}
+
+function normalizePaymentMethods(value: unknown): string[] {
+  const defaults = ['Cash', 'GCash', 'Maya', 'Bank Transfer'];
+  if (Array.isArray(value)) {
+    const methods = value.filter((method): method is string => typeof method === 'string' && method.trim().length > 0);
+    return methods.length > 0 ? methods : defaults;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        const methods = parsed.filter((method): method is string => typeof method === 'string' && method.trim().length > 0);
+        return methods.length > 0 ? methods : defaults;
+      }
+    } catch {
+      const methods = value
+        .replace(/[{}"]/g, '')
+        .split(',')
+        .map((method) => method.trim())
+        .filter(Boolean);
+      return methods.length > 0 ? methods : defaults;
+    }
+  }
+  return defaults;
 }

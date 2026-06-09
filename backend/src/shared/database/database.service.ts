@@ -905,6 +905,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     enableTakeout?: boolean;
     enableIngredientCustomization?: boolean;
     enableReceiptPrinting?: boolean;
+    enabledPaymentMethods?: string[];
   }) {
     const admin = await this.getUserStoreScope(input.adminUserId);
 
@@ -932,10 +933,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           enable_takeout = COALESCE($11, enable_takeout),
           enable_ingredient_customization = COALESCE($12, enable_ingredient_customization),
           enable_receipt_printing = COALESCE($13, enable_receipt_printing),
-          store_type = COALESCE(store_type, $14),
+          enabled_payment_methods = COALESCE($14, enabled_payment_methods),
+          store_type = COALESCE(store_type, $15),
           updated_at = CURRENT_TIMESTAMP
-        WHERE store_id = $15
-          AND (store_type = $14 OR store_type IS NULL)
+        WHERE store_id = $16
+          AND (store_type = $15 OR store_type IS NULL)
         RETURNING *
       `,
       [
@@ -952,6 +954,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         input.enableTakeout,
         input.enableIngredientCustomization,
         input.enableReceiptPrinting,
+        input.enabledPaymentMethods ?? null,
         admin.store_type,
         admin.store_id,
       ],
@@ -1833,6 +1836,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
 
     return this.withTransaction(async (client) => {
+      const isPaid = Boolean(input.payment);
+      const orderStatus = input.orderStatus ?? (isPaid ? 'COMPLETED' : 'PENDING');
+      const paymentStatus = input.paymentStatus ?? (isPaid ? 'PAID' : 'NOT_PAID');
       const orderRows = await this.queryWithClient<{ id: number }>(
         client,
         `
@@ -1841,7 +1847,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             subtotal, discount_amount, discount_type, tax_amount, service_charge,
             total_amount, order_status, payment_status, completed_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'COMPLETED', 'PAID', CURRENT_TIMESTAMP)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           RETURNING id
         `,
         [
@@ -1857,6 +1863,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           input.tax ?? 0,
           input.serviceFee ?? 0,
           input.total ?? 0,
+          orderStatus,
+          paymentStatus,
+          isPaid ? new Date() : null,
         ],
       );
       const orderId = orderRows[0].id;
@@ -2310,13 +2319,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           enable_dine_in,
           enable_takeout,
           enable_ingredient_customization,
-          enable_receipt_printing
+          enable_receipt_printing,
+          enabled_payment_methods
         )
-        VALUES ($1, $2, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, 0, TRUE, 0, TRUE, TRUE, TRUE, TRUE)
+        VALUES ($1, $2, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, 0, 0, TRUE, 0, TRUE, TRUE, TRUE, TRUE, ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer']::TEXT[])
         ON CONFLICT (store_id) DO UPDATE
         SET store_type = COALESCE(store_settings.store_type, EXCLUDED.store_type),
             service_charge_rate = COALESCE(store_settings.service_charge_rate, store_settings.service_charge_percentage, 0),
             service_charge_percentage = COALESCE(store_settings.service_charge_percentage, store_settings.service_charge_rate, 0),
+            enabled_payment_methods = COALESCE(store_settings.enabled_payment_methods, EXCLUDED.enabled_payment_methods),
             updated_at = CURRENT_TIMESTAMP
       `,
       [storeId, storeType],

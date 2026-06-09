@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { Banknote, Building2, Pencil, Plus, Save, Smartphone, Trash2, Wallet } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
@@ -42,6 +42,13 @@ const blankDiscountForm: DiscountForm = {
   discount_name: '',
   discount_rate: 0,
 };
+
+const paymentMethods = [
+  { id: 'Cash', label: 'Cash', description: 'Physical cash payments.', icon: Banknote },
+  { id: 'GCash', label: 'GCash', description: 'GCash wallet payments.', icon: Smartphone },
+  { id: 'Maya', label: 'Maya', description: 'Maya wallet payments.', icon: Wallet },
+  { id: 'Bank Transfer', label: 'Bank Transfer', description: 'Direct bank transfer payments.', icon: Building2 },
+];
 
 function SettingToggle({
   checked,
@@ -126,6 +133,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
           enable_tax: settings.enable_tax,
           tax_rate: settings.tax_rate,
           enable_discount: settings.enable_discount,
+          enabled_payment_methods: settings.enabled_payment_methods.length > 0 ? settings.enabled_payment_methods : ['Cash'],
         }),
       });
       const data = await response.json();
@@ -139,6 +147,20 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
     } finally {
       setSaving(false);
     }
+  };
+
+  const togglePaymentMethod = (methodId: string) => {
+    setSettings((current) => {
+      const exists = current.enabled_payment_methods.includes(methodId);
+      const nextMethods = exists
+        ? current.enabled_payment_methods.filter((method) => method !== methodId)
+        : [...current.enabled_payment_methods, methodId];
+
+      return {
+        ...current,
+        enabled_payment_methods: nextMethods.length > 0 ? nextMethods : ['Cash'],
+      };
+    });
   };
 
   const saveDiscount = async () => {
@@ -196,8 +218,8 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
     <div className="flex h-screen">
       <Sidebar currentPage="store-settings" onNavigate={onNavigate} onLogout={onLogout} isAdmin storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} />
       <div className="flex-1 overflow-auto bg-background">
-        <main className="p-8">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <main className="min-h-full p-6 lg:p-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-primary mb-2">Store Settings</h1>
               <p className="text-muted-foreground">Control POS features for {currentUser?.store_name ?? 'this store'}.</p>
@@ -210,7 +232,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
 
           {message && <div className="mb-4 rounded-lg border border-border bg-card p-4 text-sm">{message}</div>}
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,430px)]">
             <section className="rounded-lg border border-border bg-card p-6 shadow-sm">
               <h2 className="mb-1 text-xl font-semibold">{isRestaurant ? 'Restaurant POS Settings' : 'Retail Store Settings'}</h2>
               <p className="mb-5 text-sm text-muted-foreground">These settings are saved per store and applied to staff POS pages.</p>
@@ -218,7 +240,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
               {loading ? (
                 <p className="text-muted-foreground">Loading settings...</p>
               ) : (
-                <div className="space-y-4">
+                <div className="grid gap-4 lg:grid-cols-2">
                   {visibleSettings.map(([key, label, description]) => (
                     <div key={key} className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
                       <span>
@@ -233,7 +255,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                   ))}
 
                   {(settings.enable_service_charge || settings.enable_tax) && (
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2 lg:col-span-2">
                       {settings.enable_service_charge && (
                         <label className="block rounded-lg border border-border p-4">
                           <span className="mb-2 block font-medium">Service Charge Rate (%)</span>
@@ -262,6 +284,35 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                       )}
                     </div>
                   )}
+
+                  <div className="rounded-lg border border-border p-4 lg:col-span-2">
+                    <div className="mb-4">
+                      <h3 className="font-medium">Payment Methods</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">Choose which options appear in restaurant and retail POS payment screens.</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      {paymentMethods.map((method) => {
+                        const Icon = method.icon;
+                        const selected = settings.enabled_payment_methods.includes(method.id);
+                        return (
+                          <button
+                            key={method.id}
+                            type="button"
+                            onClick={() => togglePaymentMethod(method.id)}
+                            className={`flex min-h-[92px] items-start gap-3 rounded-lg border p-3 text-left transition ${
+                              selected ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:bg-muted'
+                            }`}
+                          >
+                            <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+                            <span>
+                              <span className="block text-sm font-medium">{method.label}</span>
+                              <span className="mt-1 block text-xs text-muted-foreground">{method.description}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </section>

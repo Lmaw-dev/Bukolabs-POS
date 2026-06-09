@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   enable_takeout BOOLEAN DEFAULT TRUE,
   enable_ingredient_customization BOOLEAN DEFAULT TRUE,
   enable_receipt_printing BOOLEAN DEFAULT TRUE,
+  enabled_payment_methods TEXT[] DEFAULT ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer'],
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -37,6 +38,7 @@ ALTER TABLE store_settings
   ADD COLUMN IF NOT EXISTS enable_ingredient_customization BOOLEAN DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   ADD COLUMN IF NOT EXISTS enable_receipt_printing BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS enabled_payment_methods TEXT[] DEFAULT ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer'],
   ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 UPDATE store_settings
@@ -44,6 +46,11 @@ SET service_charge_rate = COALESCE(service_charge_rate, service_charge_percentag
     service_charge_percentage = COALESCE(service_charge_percentage, service_charge_rate, 0)
 WHERE service_charge_rate IS NULL
    OR service_charge_percentage IS NULL;
+
+UPDATE store_settings
+SET enabled_payment_methods = ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer']
+WHERE enabled_payment_methods IS NULL
+   OR array_length(enabled_payment_methods, 1) IS NULL;
 
 CREATE TABLE IF NOT EXISTS discount_types (
   id BIGSERIAL PRIMARY KEY,

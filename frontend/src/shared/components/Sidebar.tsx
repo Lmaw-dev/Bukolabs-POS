@@ -103,11 +103,13 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
       className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden text-white transition-[width] duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-80'}`}
       style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
     >
-      <div className={`relative shrink-0 border-b border-white/10 transition-all duration-300 ease-in-out ${isCollapsed ? 'px-3 pb-3 pt-4' : 'px-6 pb-4 pt-5'}`}>
+      <div className={`relative shrink-0 border-b border-white/10 transition-all duration-300 ease-in-out ${isCollapsed ? 'px-3 pb-14 pt-4' : 'px-6 pb-4 pt-5'}`}>
         <button
           type="button"
           onClick={() => setIsCollapsed((value) => !value)}
-          className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+          className={`absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15 ${
+            isCollapsed ? 'bottom-3 left-1/2 -translate-x-1/2' : 'right-3 top-3'
+          }`}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
@@ -175,7 +177,6 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                         <li key={child.page}>
                           <button
                             onClick={() => {
-                              closeManagementGroups();
                               onNavigate(child.page);
                             }}
                             className={`flex h-10 w-full items-center rounded-md transition ${
@@ -249,7 +250,6 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
                             <li key={child.page}>
                               <button
                                     onClick={() => {
-                                      closeManagementGroups();
                                       onNavigate(child.page);
                                     }}
                                 className={`flex h-10 w-full items-center rounded-md transition ${

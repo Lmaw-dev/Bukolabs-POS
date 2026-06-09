@@ -84,6 +84,7 @@ export class AdminService {
     enableTakeout?: boolean;
     enableIngredientCustomization?: boolean;
     enableReceiptPrinting?: boolean;
+    enabledPaymentMethods?: string[];
   }) {
     return this.databaseService.updateStoreSettingsForAdmin(input);
   }
