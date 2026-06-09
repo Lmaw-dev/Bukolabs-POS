@@ -1835,40 +1835,41 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       throw new InternalServerErrorException('User account is not linked to a store.');
     }
 
-    return this.withTransaction(async (client) => {
-      const isPaid = Boolean(input.payment);
-      const orderStatus = input.orderStatus ?? (isPaid ? 'COMPLETED' : 'PENDING');
-      const paymentStatus = input.paymentStatus ?? (isPaid ? 'PAID' : 'NOT_PAID');
-      const orderRows = await this.queryWithClient<{ id: number }>(
-        client,
-        `
-          INSERT INTO orders (
-            store_id, cashier_id, order_number, customer_name, order_type, table_name,
-            subtotal, discount_amount, discount_type, tax_amount, service_charge,
-            total_amount, order_status, payment_status, completed_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-          RETURNING id
-        `,
-        [
-          user.store_id,
-          user.id,
-          input.orderNumber,
-          input.customerName ?? null,
-          input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
-          input.tableName ?? null,
-          input.subtotal ?? 0,
-          input.discount ?? 0,
-          input.discountType ?? null,
-          input.tax ?? 0,
-          input.serviceFee ?? 0,
-          input.total ?? 0,
-          orderStatus,
-          paymentStatus,
-          isPaid ? new Date() : null,
-        ],
-      );
-      const orderId = orderRows[0].id;
+    try {
+      return await this.withTransaction(async (client) => {
+        const isPaid = Boolean(input.payment);
+        const orderStatus = input.orderStatus ?? (isPaid ? 'COMPLETED' : 'PENDING');
+        const paymentStatus = input.paymentStatus ?? (isPaid ? 'PAID' : 'NOT_PAID');
+        const orderRows = await this.queryWithClient<{ id: number }>(
+          client,
+          `
+            INSERT INTO orders (
+              store_id, cashier_id, order_number, customer_name, order_type, table_name,
+              subtotal, discount_amount, discount_type, tax_amount, service_charge,
+              total_amount, order_status, payment_status, completed_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            RETURNING id
+          `,
+          [
+            user.store_id,
+            user.id,
+            input.orderNumber,
+            input.customerName ?? null,
+            input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
+            input.tableName ?? null,
+            input.subtotal ?? 0,
+            input.discount ?? 0,
+            input.discountType ?? null,
+            input.tax ?? 0,
+            input.serviceFee ?? 0,
+            input.total ?? 0,
+            orderStatus,
+            paymentStatus,
+            isPaid ? new Date() : null,
+          ],
+        );
+        const orderId = orderRows[0].id;
 
       for (const item of input.items ?? []) {
         const itemRows = await this.queryWithClient<{ id: number }>(
@@ -1906,6 +1907,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (input.payment) {
+        const paymentNumber = await this.createUniquePaymentNumber(client, input.payment.paymentNumber ?? `PAY-${orderId}`);
+
         await this.queryWithClient(
           client,
           `
@@ -1919,7 +1922,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             user.store_id,
             orderId,
             user.id,
-            input.payment.paymentNumber ?? `PAY-${Date.now()}`,
+            paymentNumber,
             input.payment.method ?? 'Cash',
             input.total ?? 0,
             input.payment.amountPaid ?? input.total ?? 0,
@@ -1928,8 +1931,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-      return { id: orderId, order_number: input.orderNumber };
-    });
+        return { id: orderId, order_number: input.orderNumber };
+      });
+    } catch (error) {
+      this.handleDatabaseWriteError(error, 'Unable to save order.');
+    }
   }
 
   async listPosOrders(userId: number) {
@@ -2163,41 +2169,63 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private async deductRestaurantIngredients(client: PoolClient, storeId: number, orderId: number, orderItemId: number, item: any) {
     const itemQuantity = Number(item.quantity ?? 1);
     const ingredients = Array.isArray(item.ingredients) ? item.ingredients : [];
+    const finiteNumberOrNull = (value: unknown) => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    };
 
     for (const ingredient of ingredients) {
-      const originalId = Number(ingredient.ingredient_id ?? ingredient.ingredientId);
-      const replacementId = ingredient.replacement_ingredient_id ?? ingredient.replacementIngredientId;
-      const ingredientId = Number(replacementId ?? originalId);
+      const originalId = finiteNumberOrNull(ingredient.ingredient_id ?? ingredient.ingredientId);
+      const replacementId = finiteNumberOrNull(ingredient.replacement_ingredient_id ?? ingredient.replacementIngredientId);
+      const productIngredientId = finiteNumberOrNull(ingredient.product_ingredient_id ?? ingredient.productIngredientId ?? (originalId ? ingredient.id : null));
+      const ingredientId = replacementId ?? originalId;
       const removed = ingredient.removed === true || Number(ingredient.quantity ?? 0) <= 0;
       const quantity = removed ? 0 : Number(ingredient.quantity ?? ingredient.quantity_required ?? 0) * itemQuantity;
-
-      await this.queryWithClient(
-        client,
-        `
-          INSERT INTO order_item_customizations (
-            store_id, order_item_id, product_ingredient_id, original_ingredient_id,
-            replacement_ingredient_id, customization_type, original_ingredient_name,
-            replacement_ingredient_name, original_quantity, new_quantity, unit,
-            additional_cost, notes
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        `,
-        [
-          storeId,
-          orderItemId,
-          ingredient.product_ingredient_id ?? ingredient.id ?? null,
-          originalId || null,
-          replacementId ?? null,
-          ingredient.customization_type ?? (removed ? 'REMOVE' : replacementId ? 'REPLACE' : 'CHANGE_QUANTITY'),
-          ingredient.original_name ?? ingredient.name ?? null,
-          ingredient.replacement_name ?? null,
-          ingredient.original_quantity ?? null,
-          Number(ingredient.quantity ?? 0),
-          ingredient.unit ?? null,
-          ingredient.additional_price ?? ingredient.additionalCost ?? 0,
-          ingredient.notes ?? null,
-        ],
+      const originalQuantity = Number(ingredient.original_quantity ?? ingredient.originalQuantity ?? ingredient.quantity ?? 0);
+      const ingredientQuantity = Number(ingredient.quantity ?? 0);
+      const additionalCost = Number(ingredient.additional_price ?? ingredient.additionalCost ?? 0);
+      const customizationType = ingredient.customization_type ?? ingredient.customizationType ?? null;
+      const hasCustomization = Boolean(
+        customizationType ||
+          removed ||
+          replacementId ||
+          additionalCost !== 0 ||
+          (Number.isFinite(originalQuantity) && Number.isFinite(ingredientQuantity) && ingredientQuantity !== originalQuantity),
       );
+
+      if (!ingredientId && !productIngredientId) {
+        continue;
+      }
+
+      if (hasCustomization) {
+        await this.queryWithClient(
+          client,
+          `
+            INSERT INTO order_item_customizations (
+              store_id, order_item_id, product_ingredient_id, original_ingredient_id,
+              replacement_ingredient_id, customization_type, original_ingredient_name,
+              replacement_ingredient_name, original_quantity, new_quantity, unit,
+              additional_cost, notes
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          `,
+          [
+            storeId,
+            orderItemId,
+            productIngredientId,
+            originalId,
+            replacementId,
+            customizationType ?? (removed ? 'REMOVE' : replacementId ? 'REPLACE' : 'CHANGE_QUANTITY'),
+            ingredient.original_name ?? ingredient.name ?? null,
+            ingredient.replacement_name ?? null,
+            Number.isFinite(originalQuantity) ? originalQuantity : null,
+            Number.isFinite(ingredientQuantity) ? ingredientQuantity : 0,
+            ingredient.unit ?? null,
+            additionalCost,
+            ingredient.notes ?? null,
+          ],
+        );
+      }
 
       if (quantity <= 0 || !ingredientId) {
         continue;
@@ -2248,6 +2276,30 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         [storeId, orderId, orderItemId, ingredientId, item.productId ?? item.id ?? null, quantity, ingredient.unit ?? inventory.unit],
       );
     }
+  }
+
+  private async createUniquePaymentNumber(client: PoolClient, requestedPaymentNumber: unknown) {
+    const basePaymentNumber = String(requestedPaymentNumber ?? '').trim() || `PAY-${Date.now()}`;
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const candidate = attempt === 0 ? basePaymentNumber : `${basePaymentNumber}-${attempt + 1}`;
+      const existing = await this.queryWithClient<{ id: number }>(
+        client,
+        `
+          SELECT id
+          FROM payments
+          WHERE payment_number = $1
+          LIMIT 1
+        `,
+        [candidate],
+      );
+
+      if (existing.length === 0) {
+        return candidate;
+      }
+    }
+
+    return `${basePaymentNumber}-${Date.now()}`;
   }
 
   private async ensureStoreInformationRow(storeId: number, fallbackStoreName: string | null, client?: PoolClient) {

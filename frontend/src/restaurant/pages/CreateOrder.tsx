@@ -329,6 +329,16 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const queueCounterRef = useRef(1);
   const enabledPaymentMethods = settings.enabled_payment_methods.length > 0 ? settings.enabled_payment_methods : ['Cash'];
 
+  useEffect(() => {
+    const highestOrderNumber = orders.reduce((highest, order) => {
+      const match = String(order.orderNumber ?? order.id ?? '').match(/(\d+)$/);
+      const numericOrder = match ? Number(match[1]) : 0;
+      return Number.isFinite(numericOrder) ? Math.max(highest, numericOrder) : highest;
+    }, 100000);
+
+    orderNumberRef.current = Math.max(orderNumberRef.current, highestOrderNumber + 1);
+  }, [orders]);
+
   // Autocomplete for customer name
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
@@ -662,6 +672,31 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     const hasTakeout = items.some(item => item.orderType === 'takeout');
     return hasDineIn && hasTakeout ? 'MIXED' : hasDineIn ? 'DINE_IN' : 'TAKEOUT';
   };
+  const serializeIngredientForOrder = (ingredient: Ingredient) => ({
+    id: ingredient.id,
+    ingredient_id: ingredient.ingredient_id,
+    product_ingredient_id: ingredient.product_ingredient_id,
+    original_quantity: ingredient.original_quantity,
+    name: ingredient.name,
+    quantity: ingredient.quantity,
+    unit: ingredient.unit,
+    replacement_ingredient_id: ingredient.replacement_ingredient_id,
+    replacement_name: ingredient.replacement_name,
+    additional_price: ingredient.additional_price,
+    customization_type: ingredient.customization_type,
+    removed: ingredient.removed,
+  });
+  const serializeItemForOrder = (item: CartItem) => ({
+    id: item.id,
+    productId: item.id,
+    name: item.name,
+    categoryName: posProducts.find((product) => product.id === item.id)?.categoryName ?? null,
+    price: item.price,
+    quantity: item.quantity,
+    orderType: item.orderType,
+    notes: item.notes,
+    ingredients: item.ingredients.map(serializeIngredientForOrder),
+  });
 
   const persistRestaurantOrder = async (
     orderDetails: any,
@@ -687,11 +722,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         total: orderDetails.total,
         orderStatus: paid ? 'COMPLETED' : 'PENDING',
         paymentStatus: paid ? 'PAID' : 'NOT_PAID',
-        items: orderDetails.items.map((item: CartItem) => ({
-          ...item,
-          productId: item.id,
-          categoryName: posProducts.find((product) => product.id === item.id)?.categoryName ?? null,
-        })),
+        items: orderDetails.items.map(serializeItemForOrder),
         payment: paid && payment ? {
           paymentNumber: `PAY-${orderDetails.orderNumber}`,
           method: payment.method,
@@ -813,28 +844,30 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   };
 
   const handlePaymentSubmit = async () => {
-    const amountPaid = paymentMethod === 'Cash' ? parseFloat(cashAmount) : total;
-    if (amountPaid >= total) {
-      const change = paymentMethod === 'Cash' ? amountPaid - total : 0;
-      setChangeAmount(change);
-      if (successOrderDetails) {
-        const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
-        try {
-          await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
-        } catch (error) {
-          alert(error instanceof Error ? error.message : 'Unable to complete order.');
-          return;
-        }
-        addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: amountPaid, changeGiven: change });
-        onOrderCreated(paidOrder);
-        setSuccessOrderDetails(paidOrder);
-      }
-      setCashAmount('');
-      setShowPaymentChoice(false);
-      setShowPayment(false);
-      // Show receipt preview first for takeout orders
-      setShowReceiptPreview(true);
+    const amountPaid = paymentMethod === 'Cash' ? Number(cashAmount) : total;
+    if (paymentMethod === 'Cash' && (!Number.isFinite(amountPaid) || amountPaid < total)) {
+      return;
     }
+
+    const change = paymentMethod === 'Cash' ? amountPaid - total : 0;
+    setChangeAmount(change);
+    if (successOrderDetails) {
+      const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
+      try {
+        await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Unable to complete order.');
+        return;
+      }
+      addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: amountPaid, changeGiven: change });
+      onOrderCreated(paidOrder);
+      setSuccessOrderDetails(paidOrder);
+    }
+    setCashAmount('');
+    setShowPaymentChoice(false);
+    setShowPayment(false);
+    // Show receipt preview first for takeout orders
+    setShowReceiptPreview(true);
   };
 
   const handleSuccessClose = () => {
