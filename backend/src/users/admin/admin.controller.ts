@@ -641,6 +641,11 @@ export class AdminController {
     return this.adminService.listPosOrders(Number(userId));
   }
 
+  @Get('pos/next-order-number')
+  getNextPosOrderNumber(@Query('user_id') userId: string) {
+    return this.adminService.getNextPosOrderNumber(Number(userId));
+  }
+
   @Post('pos/orders')
   createPaidPosOrder(@Body() body: any) {
     return this.adminService.createPaidPosOrder({

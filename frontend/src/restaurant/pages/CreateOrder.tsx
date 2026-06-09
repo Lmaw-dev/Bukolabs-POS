@@ -339,6 +339,26 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     orderNumberRef.current = Math.max(orderNumberRef.current, highestOrderNumber + 1);
   }, [orders]);
 
+  useEffect(() => {
+    const loadNextOrderNumber = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/next-order-number?user_id=${currentUser.id}`);
+        const data = await response.json();
+        const nextOrderNumber = Number(data?.order_number);
+
+        if (response.ok && Number.isFinite(nextOrderNumber)) {
+          orderNumberRef.current = Math.max(orderNumberRef.current, nextOrderNumber);
+        }
+      } catch {
+        // Existing order history still seeds a reasonable local preview number.
+      }
+    };
+
+    void loadNextOrderNumber();
+  }, [currentUser?.id]);
+
   // Autocomplete for customer name
   const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
@@ -710,7 +730,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         user_id: currentUser.id,
-        orderNumber: `REST-${orderDetails.orderNumber}`,
+        orderNumber: orderDetails.orderNumber,
         customerName: orderDetails.customerName || null,
         orderType: getOrderTypeForPayload(orderDetails.items),
         tableName: orderDetails.tableNumber ? `Table ${orderDetails.tableNumber}` : null,
@@ -828,14 +848,20 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     if (!successOrderDetails) return;
 
     try {
-      await persistRestaurantOrder(successOrderDetails, false);
-      const orderForList = toOrderListFormat(successOrderDetails, false);
-      if (successOrderDetails.isQueued && successOrderDetails.queuePosition) {
-        addOrder({ ...orderForList, isQueued: true, queuePosition: successOrderDetails.queuePosition });
+      const savedOrder = await persistRestaurantOrder(successOrderDetails, false);
+      const savedOrderDetails = { ...successOrderDetails, orderNumber: savedOrder?.order_number ?? successOrderDetails.orderNumber };
+      const savedOrderNumber = Number(savedOrderDetails.orderNumber);
+      if (Number.isFinite(savedOrderNumber)) {
+        orderNumberRef.current = Math.max(orderNumberRef.current, savedOrderNumber + 1);
+      }
+      const orderForList = toOrderListFormat(savedOrderDetails, false);
+      if (savedOrderDetails.isQueued && savedOrderDetails.queuePosition) {
+        addOrder({ ...orderForList, isQueued: true, queuePosition: savedOrderDetails.queuePosition });
       } else {
         addOrder(orderForList);
       }
-      onOrderCreated(successOrderDetails);
+      onOrderCreated(savedOrderDetails);
+      setSuccessOrderDetails(savedOrderDetails);
       setShowPaymentChoice(false);
       setShowSuccess(true);
     } catch (error) {
@@ -854,7 +880,13 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     if (successOrderDetails) {
       const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
       try {
-        await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
+        const savedOrder = await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
+        paidOrder.orderNumber = savedOrder?.order_number ?? paidOrder.orderNumber;
+        const savedOrderNumber = Number(paidOrder.orderNumber);
+        if (Number.isFinite(savedOrderNumber)) {
+          orderNumberRef.current = Math.max(orderNumberRef.current, savedOrderNumber + 1);
+        }
+        setCurrentOrderNumber(paidOrder.orderNumber);
       } catch (error) {
         alert(error instanceof Error ? error.message : 'Unable to complete order.');
         return;

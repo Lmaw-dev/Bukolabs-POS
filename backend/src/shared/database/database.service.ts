@@ -1840,6 +1840,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         const isPaid = Boolean(input.payment);
         const orderStatus = input.orderStatus ?? (isPaid ? 'COMPLETED' : 'PENDING');
         const paymentStatus = input.paymentStatus ?? (isPaid ? 'PAID' : 'NOT_PAID');
+        const orderNumber = await this.createUniqueOrderNumber(client, input.orderNumber);
         const orderRows = await this.queryWithClient<{ id: number }>(
           client,
           `
@@ -1854,7 +1855,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           [
             user.store_id,
             user.id,
-            input.orderNumber,
+            orderNumber,
             input.customerName ?? null,
             input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
             input.tableName ?? null,
@@ -1907,7 +1908,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       }
 
       if (input.payment) {
-        const paymentNumber = await this.createUniquePaymentNumber(client, input.payment.paymentNumber ?? `PAY-${orderId}`);
+        const paymentNumber = await this.createUniquePaymentNumber(client, `PAY-${orderNumber}`);
 
         await this.queryWithClient(
           client,
@@ -1931,11 +1932,28 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-        return { id: orderId, order_number: input.orderNumber };
+        return { id: orderId, order_number: orderNumber };
       });
     } catch (error) {
       this.handleDatabaseWriteError(error, 'Unable to save order.');
     }
+  }
+
+  async getNextPosOrderNumber(userId: number) {
+    const user = await this.getUserStoreScope(userId);
+
+    if (!user.store_id || !user.store_type) {
+      throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    const rows = await this.query<{ next_order_number: string | number }>(
+      `
+        SELECT COALESCE(MAX(NULLIF(regexp_replace(order_number, '\\D', '', 'g'), '')::BIGINT), 100000) + 1 AS next_order_number
+        FROM orders
+      `,
+    );
+
+    return { order_number: String(rows[0]?.next_order_number ?? 100001).padStart(6, '0') };
   }
 
   async listPosOrders(userId: number) {
@@ -2278,6 +2296,47 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async createUniqueOrderNumber(client: PoolClient, requestedOrderNumber: unknown) {
+    await client.query('LOCK TABLE orders IN SHARE ROW EXCLUSIVE MODE');
+
+    const requestedDigits = String(requestedOrderNumber ?? '').replace(/\D/g, '');
+    const requestedNumeric = requestedDigits ? Number(requestedDigits) : null;
+    const maxRows = await this.queryWithClient<{ max_order_number: string | number | null }>(
+      client,
+      `
+        SELECT COALESCE(MAX(NULLIF(regexp_replace(order_number, '\\D', '', 'g'), '')::BIGINT), 100000) AS max_order_number
+        FROM orders
+      `,
+    );
+    const maxOrderNumber = Number(maxRows[0]?.max_order_number ?? 100000);
+    let candidate = Math.max(
+      Number.isFinite(requestedNumeric) && requestedNumeric ? requestedNumeric : 100001,
+      Number.isFinite(maxOrderNumber) ? maxOrderNumber + 1 : 100001,
+    );
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const candidateText = String(candidate).padStart(6, '0');
+      const existing = await this.queryWithClient<{ id: number }>(
+        client,
+        `
+          SELECT id
+          FROM orders
+          WHERE regexp_replace(order_number, '\\D', '', 'g') = $1
+          LIMIT 1
+        `,
+        [candidateText],
+      );
+
+      if (existing.length === 0) {
+        return candidateText;
+      }
+
+      candidate += 1;
+    }
+
+    return String(Date.now());
+  }
+
   private async createUniquePaymentNumber(client: PoolClient, requestedPaymentNumber: unknown) {
     const basePaymentNumber = String(requestedPaymentNumber ?? '').trim() || `PAY-${Date.now()}`;
 
@@ -2353,6 +2412,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async ensureStoreSettingsRow(storeId: number, storeType: string | null) {
+    await this.ensureStoreSettingsSchema();
+
     await this.query(
       `
         INSERT INTO store_settings (
@@ -2383,6 +2444,32 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             updated_at = CURRENT_TIMESTAMP
       `,
       [storeId, storeType],
+    );
+  }
+
+  private async ensureStoreSettingsSchema() {
+    await this.query(
+      `
+        ALTER TABLE store_settings
+          ADD COLUMN IF NOT EXISTS store_type VARCHAR(50),
+          ADD COLUMN IF NOT EXISTS enable_customer_recommendation BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_table_management BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_refund BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_void BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_discount BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_service_charge BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS service_charge_rate DECIMAL(5,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS service_charge_percentage DECIMAL(5,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS enable_tax BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS tax_rate DECIMAL(5,2) DEFAULT 0,
+          ADD COLUMN IF NOT EXISTS enable_dine_in BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_takeout BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_ingredient_customization BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enable_receipt_printing BOOLEAN DEFAULT TRUE,
+          ADD COLUMN IF NOT EXISTS enabled_payment_methods TEXT[] DEFAULT ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer'],
+          ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
     );
   }
 
