@@ -22,7 +22,7 @@ import { ProductManagement } from './components/ProductManagement';
 import { IngredientManagement } from './components/IngredientManagement';
 import { OrderProvider } from './context/OrderContext';
 import { TableProvider } from './context/TableContext';
-import { StoreSettingsProvider } from './context/StoreSettingsContext';
+import { StoreSettingsProvider, useStoreSettings } from './context/StoreSettingsContext';
 import { getApiBaseUrl } from '../auth/services/auth';
 import type { AuthenticatedUser } from '../auth/types/auth';
 import { getDefaultStoreLogo } from './utils/defaultStoreLogo';
@@ -220,7 +220,13 @@ export default function App() {
             <CreateOrder currentUser={currentUser} onNavigate={navigateTo} onOrderCreated={setCurrentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
           )}
           {currentPage === 'table-management' && (
-            <TableManagement onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
+            <TableManagementRoute
+              currentUser={currentUser}
+              currentOrder={currentOrder}
+              onNavigate={navigateTo}
+              onLogout={handleLogout}
+              storeBrand={storeBrand}
+            />
           )}
           {currentPage === 'payment' && (
             <Payment currentUser={currentUser} onNavigate={navigateTo} currentOrder={currentOrder} onLogout={handleLogout} storeBrand={storeBrand} userName={currentUser?.full_name} storeType={currentUser?.store_type} staffType={currentUser?.staff_type} />
@@ -260,5 +266,53 @@ export default function App() {
         </OrderProvider>
       </StoreSettingsProvider>
     </div>
+  );
+}
+
+function TableManagementRoute({
+  currentUser,
+  currentOrder,
+  onNavigate,
+  onLogout,
+  storeBrand,
+}: {
+  currentUser: AuthenticatedUser | null;
+  currentOrder: any;
+  onNavigate: (page: Page) => void;
+  onLogout: () => void;
+  storeBrand: StoreBrand;
+}) {
+  const { settings } = useStoreSettings();
+
+  useEffect(() => {
+    if (!settings.enable_table_management) {
+      onNavigate('pos-dashboard');
+    }
+  }, [settings.enable_table_management, onNavigate]);
+
+  if (!settings.enable_table_management) {
+    return (
+      <POSDashboard
+        onLogout={onLogout}
+        onNavigate={onNavigate}
+        isAdmin={currentUser?.role === 'ADMIN'}
+        storeBrand={storeBrand}
+        userName={currentUser?.full_name}
+        storeType={currentUser?.store_type}
+        staffType={currentUser?.staff_type}
+      />
+    );
+  }
+
+  return (
+    <TableManagement
+      onNavigate={onNavigate}
+      currentOrder={currentOrder}
+      onLogout={onLogout}
+      storeBrand={storeBrand}
+      userName={currentUser?.full_name}
+      storeType={currentUser?.store_type}
+      staffType={currentUser?.staff_type}
+    />
   );
 }

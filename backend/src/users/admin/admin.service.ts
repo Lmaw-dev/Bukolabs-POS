@@ -185,6 +185,10 @@ export class AdminService {
     return this.databaseService.createPaidPosOrder(input);
   }
 
+  getNextPosOrderNumber(userId: number) {
+    return this.databaseService.getNextPosOrderNumber(userId);
+  }
+
   listPosOrders(userId: number) {
     return this.databaseService.listPosOrders(userId);
   }

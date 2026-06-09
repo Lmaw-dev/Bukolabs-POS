@@ -313,6 +313,26 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   }, [orders]);
 
   useEffect(() => {
+    const loadNextOrderNumber = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/next-order-number?user_id=${currentUser.id}`);
+        const data = await response.json();
+        const nextOrderNumber = Number(data?.order_number);
+
+        if (response.ok && Number.isFinite(nextOrderNumber)) {
+          transactionNumberRef.current = Math.max(transactionNumberRef.current, nextOrderNumber);
+        }
+      } catch {
+        // Existing order history still seeds a reasonable local preview number.
+      }
+    };
+
+    void loadNextOrderNumber();
+  }, [currentUser?.id]);
+
+  useEffect(() => {
     const loadProducts = async () => {
       if (!currentUser?.id) return;
 
@@ -648,7 +668,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: currentUser.id,
-          orderNumber: `RET-${transactionNumber}`,
+          orderNumber: transactionNumber,
           customerName: order.customer ?? null,
           orderType: 'RETAIL',
           subtotal,
@@ -674,20 +694,21 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
       const data = await response.json();
       if (!response.ok) {
-        if (String(data?.message ?? '').toLowerCase().includes('already exists')) {
-          transactionNumberRef.current += 1;
-          setCurrentTransactionNumber(String(transactionNumberRef.current).padStart(6, '0'));
-          alert('Duplicate transaction number detected. Please click Complete Payment again.');
-          return;
-        }
-
         alert(data?.message ?? 'Unable to complete payment. Stock may be insufficient.');
         return;
       }
+
+      order.transactionNumber = data?.order_number ?? order.transactionNumber;
+      const savedOrderNumber = Number(order.transactionNumber);
+      if (Number.isFinite(savedOrderNumber)) {
+        transactionNumberRef.current = Math.max(transactionNumberRef.current, savedOrderNumber + 1);
+      }
+      setCurrentTransactionNumber(order.transactionNumber);
     }
 
     addOrder(order);
-    transactionNumberRef.current += 1;
+    const completedOrderNumber = Number(order.transactionNumber);
+    transactionNumberRef.current = Number.isFinite(completedOrderNumber) ? Math.max(transactionNumberRef.current, completedOrderNumber + 1) : transactionNumberRef.current + 1;
     setCompletedOrder(order);
     setShowPayment(false);
 
