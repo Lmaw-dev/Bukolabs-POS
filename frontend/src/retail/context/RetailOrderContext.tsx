@@ -201,7 +201,10 @@ export function RetailOrderProvider({ children, currentUser }: { children: React
 
         const mapped = data.map(mapDatabaseRetailOrder);
         setOrders(mapped);
-        nextId.current = mapped.length + 1;
+        nextId.current = mapped.reduce((highest, order) => {
+          const numericId = Number(order.id);
+          return Number.isFinite(numericId) ? Math.max(highest, numericId) : highest;
+        }, 0) + 1;
       } catch {
         setOrders([]);
       }
@@ -211,7 +214,7 @@ export function RetailOrderProvider({ children, currentUser }: { children: React
   }, [currentUser?.id, currentUser?.store_type]);
 
   const addOrder = (order: Omit<Order, 'id'>) => {
-    const id = String(nextId.current).padStart(6, '0');
+    const id = order.transactionNumber || String(nextId.current).padStart(6, '0');
     nextId.current += 1;
     setOrders(prev => [{ ...order, id }, ...prev]);
   };

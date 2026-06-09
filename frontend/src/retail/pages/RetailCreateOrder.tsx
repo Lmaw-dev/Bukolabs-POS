@@ -617,7 +617,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
     const transactionNumber = currentTransactionNumber || String(transactionNumberRef.current).padStart(6, '0');
 
     const order = {
-      transactionNumber,
+      transactionNumber: `RET-${transactionNumber}`,
       customer: customerName.trim() || undefined,
       items: cart.map(item => ({
         name: item.name,
@@ -1082,7 +1082,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
             </div>
             <div className="overflow-y-auto flex-1 p-5">
               <div className="mb-4 space-y-1">
-                <p className="text-sm"><strong>Transaction #:</strong> {currentTransactionNumber}</p>
+                <p className="text-sm"><strong>Transaction #:</strong> RET-{currentTransactionNumber}</p>
                 <p className="text-sm"><strong>Customer:</strong> {customerName.trim() || 'Walk-in Customer'}</p>
               </div>
 

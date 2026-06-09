@@ -34,10 +34,19 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   const [orderToVoid, setOrderToVoid] = useState<Order | null>(null);
   const [voidReason, setVoidReason] = useState('');
 
+  const getTransactionNumber = (order: Order) => {
+    if (order.transactionNumber) {
+      return order.transactionNumber.startsWith('RET-') ? order.transactionNumber : `RET-${order.transactionNumber}`;
+    }
+
+    return `RET-${order.id}`;
+  };
+
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
+    const transactionNumber = getTransactionNumber(order).toLowerCase();
     const matchesSearch = !term ||
-      order.id.toLowerCase().includes(term) ||
+      transactionNumber.includes(term) ||
       (order.customer && order.customer.toLowerCase().includes(term));
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
     const matchesDate = !dateFilter || order.date === dateFilter;
@@ -193,8 +202,8 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
               <tbody className="divide-y divide-border">
                 {filteredOrders.length > 0 ? (
                   filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 text-sm font-mono">{order.id}</td>
+                    <tr key={`${order.id}-${getTransactionNumber(order)}`} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 text-sm font-mono">{getTransactionNumber(order)}</td>
                       <td className="px-4 py-3 text-sm">{order.customer || 'Walk-in Customer'}</td>
                       <td className="px-4 py-3 text-sm">{order.date}</td>
                       <td className="px-4 py-3 text-sm">{order.time}</td>
@@ -284,7 +293,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Transaction #</p>
-                  <p className="text-sm font-mono">{selectedOrder.id}</p>
+                  <p className="text-sm font-mono">{getTransactionNumber(selectedOrder)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Customer</p>
@@ -472,7 +481,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
 
             <div className="overflow-y-auto p-5">
               <div className="bg-muted rounded-lg p-3 mb-4">
-                <p className="text-sm"><strong>Transaction #:</strong> {orderToRefund.id}</p>
+                <p className="text-sm"><strong>Transaction #:</strong> {getTransactionNumber(orderToRefund)}</p>
                 <p className="text-sm"><strong>Customer:</strong> {orderToRefund.customer || 'Walk-in Customer'}</p>
                 <p className="text-sm"><strong>Date:</strong> {orderToRefund.date}</p>
               </div>
@@ -591,7 +600,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
           <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="overflow-y-auto flex-1">
               <ThermalReceipt
-                orderNumber={selectedOrder.transactionNumber || selectedOrder.id || 'N/A'}
+                orderNumber={getTransactionNumber(selectedOrder)}
                 customerName={selectedOrder.customer || 'Walk-in Customer'}
                 items={selectedOrder.items || []}
                 subtotal={selectedOrder.subtotal || 0}
@@ -656,7 +665,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
 
             <div className="p-5">
               <div className="bg-muted rounded-lg p-3 mb-4">
-                <p className="text-sm"><strong>Transaction #:</strong> {orderToVoid.id}</p>
+                <p className="text-sm"><strong>Transaction #:</strong> {getTransactionNumber(orderToVoid)}</p>
                 <p className="text-sm"><strong>Customer:</strong> {orderToVoid.customer || 'Walk-in Customer'}</p>
                 <p className="text-sm"><strong>Amount:</strong> ₱{orderToVoid.amountNumber.toFixed(2)}</p>
                 <p className="text-sm"><strong>Date:</strong> {orderToVoid.date}</p>
