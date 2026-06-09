@@ -19,43 +19,51 @@ interface PaymentProps {
 export function Payment({ currentUser, onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: PaymentProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'ewallet'>('cash');
   const [paymentTiming, setPaymentTiming] = useState<'now' | 'later'>('now');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleProcessPayment = async () => {
-    if (paymentTiming === 'now' && currentUser?.id && currentOrder?.items?.length) {
-      const total = currentOrder.total ?? currentOrder.subtotal ?? 0;
-      const orderNumber = currentOrder.orderNumber ?? currentOrder.order_number ?? Date.now();
-      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser.id,
-          orderNumber: `REST-${orderNumber}`,
-          customerName: currentOrder.customerName ?? null,
-          orderType: currentOrder.orderType ?? 'DINE_IN',
-          tableName: currentOrder.tableNumber ? `Table ${currentOrder.tableNumber}` : null,
-          subtotal: currentOrder.subtotal ?? 0,
-          discount: currentOrder.discount ?? 0,
-          discountType: currentOrder.discountType ?? null,
-          serviceFee: currentOrder.serviceFee ?? 0,
-          tax: currentOrder.tax ?? 0,
-          total,
-          items: currentOrder.items.map((item: any) => ({ ...item, productId: item.id })),
-          payment: {
-            paymentNumber: `PAY-${orderNumber}`,
-            method: paymentMethod,
-            amountPaid: total,
-            changeAmount: 0,
-          },
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data?.message ?? 'Unable to process payment. Inventory may be insufficient.');
-        return;
-      }
-    }
+    if (isProcessing) return;
 
-    onNavigate('receipt');
+    setIsProcessing(true);
+    try {
+      if (paymentTiming === 'now' && currentUser?.id && currentOrder?.items?.length) {
+        const total = currentOrder.total ?? currentOrder.subtotal ?? 0;
+        const orderNumber = currentOrder.orderNumber ?? currentOrder.order_number ?? Date.now();
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            orderNumber: `REST-${orderNumber}`,
+            customerName: currentOrder.customerName ?? null,
+            orderType: currentOrder.orderType ?? 'DINE_IN',
+            tableName: currentOrder.tableNumber ? `Table ${currentOrder.tableNumber}` : null,
+            subtotal: currentOrder.subtotal ?? 0,
+            discount: currentOrder.discount ?? 0,
+            discountType: currentOrder.discountType ?? null,
+            serviceFee: currentOrder.serviceFee ?? 0,
+            tax: currentOrder.tax ?? 0,
+            total,
+            items: currentOrder.items.map((item: any) => ({ ...item, productId: item.id })),
+            payment: {
+              paymentNumber: `PAY-${orderNumber}`,
+              method: paymentMethod,
+              amountPaid: total,
+              changeAmount: 0,
+            },
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          alert(data?.message ?? 'Unable to process payment. Inventory may be insufficient.');
+          return;
+        }
+      }
+
+      onNavigate('receipt');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -102,6 +110,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                 <div className="flex gap-4 mb-6">
                   <button
                     onClick={() => setPaymentTiming('now')}
+                    disabled={isProcessing}
                     className={`flex-1 py-3 rounded-lg transition-colors ${
                       paymentTiming === 'now'
                         ? 'bg-primary text-primary-foreground'
@@ -112,6 +121,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                   </button>
                   <button
                     onClick={() => setPaymentTiming('later')}
+                    disabled={isProcessing}
                     className={`flex-1 py-3 rounded-lg transition-colors ${
                       paymentTiming === 'later'
                         ? 'bg-primary text-primary-foreground'
@@ -128,6 +138,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                     <div className="space-y-3 mb-6">
                       <button
                         onClick={() => setPaymentMethod('cash')}
+                        disabled={isProcessing}
                         className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                           paymentMethod === 'cash'
                             ? 'border-primary bg-primary/5'
@@ -139,6 +150,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                       </button>
                       <button
                         onClick={() => setPaymentMethod('card')}
+                        disabled={isProcessing}
                         className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                           paymentMethod === 'card'
                             ? 'border-primary bg-primary/5'
@@ -150,6 +162,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                       </button>
                       <button
                         onClick={() => setPaymentMethod('ewallet')}
+                        disabled={isProcessing}
                         className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-colors ${
                           paymentMethod === 'ewallet'
                             ? 'border-primary bg-primary/5'
@@ -166,15 +179,17 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
                 <div className="flex gap-4">
                   <button
                     onClick={() => onNavigate('create-order')}
-                    className="flex-1 px-6 py-3 border border-border rounded-lg hover:bg-muted transition-colors"
+                    disabled={isProcessing}
+                    className="flex-1 px-6 py-3 border border-border rounded-lg hover:bg-muted transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleProcessPayment}
-                    className="flex-1 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                    disabled={isProcessing}
+                    className="flex-1 px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {paymentTiming === 'now' ? 'Process Payment' : 'Confirm Order'}
+                    {isProcessing ? 'Processing...' : paymentTiming === 'now' ? 'Process Payment' : 'Confirm Order'}
                   </button>
                 </div>
               </div>

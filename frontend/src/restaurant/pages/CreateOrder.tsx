@@ -312,6 +312,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showSuccess, setShowSuccess] = useState(false);
   const [cashAmount, setCashAmount] = useState('');
+  const [isPaymentSubmitting, setIsPaymentSubmitting] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [successOrderDetails, setSuccessOrderDetails] = useState<any>(null);
   const [showTableSelection, setShowTableSelection] = useState(false);
@@ -846,8 +847,10 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   };
 
   const handlePayLater = async () => {
+    if (isPaymentSubmitting) return;
     if (!successOrderDetails) return;
 
+    setIsPaymentSubmitting(true);
     try {
       const savedOrder = await persistRestaurantOrder(successOrderDetails, false);
       const savedOrderDetails = { ...successOrderDetails, orderNumber: savedOrder?.order_number ?? successOrderDetails.orderNumber };
@@ -867,40 +870,49 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       setShowSuccess(true);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Unable to save order.');
+    } finally {
+      setIsPaymentSubmitting(false);
     }
   };
 
   const handlePaymentSubmit = async () => {
+    if (isPaymentSubmitting) return;
+
     const amountPaid = paymentMethod === 'Cash' ? Number(cashAmount) : total;
     if (paymentMethod === 'Cash' && (!Number.isFinite(amountPaid) || amountPaid < total)) {
       return;
     }
 
+    setIsPaymentSubmitting(true);
     const change = paymentMethod === 'Cash' ? amountPaid - total : 0;
     setChangeAmount(change);
-    if (successOrderDetails) {
-      const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
-      try {
-        const savedOrder = await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
-        paidOrder.orderNumber = savedOrder?.order_number ?? paidOrder.orderNumber;
-        const savedOrderNumber = Number(paidOrder.orderNumber);
-        if (Number.isFinite(savedOrderNumber)) {
-          orderNumberRef.current = Math.max(orderNumberRef.current, savedOrderNumber + 1);
+    try {
+      if (successOrderDetails) {
+        const paidOrder = { ...successOrderDetails, paid: true, cashReceived: amountPaid, changeGiven: change };
+        try {
+          const savedOrder = await persistRestaurantOrder(paidOrder, true, { amountPaid, changeAmount: change, method: paymentMethod });
+          paidOrder.orderNumber = savedOrder?.order_number ?? paidOrder.orderNumber;
+          const savedOrderNumber = Number(paidOrder.orderNumber);
+          if (Number.isFinite(savedOrderNumber)) {
+            orderNumberRef.current = Math.max(orderNumberRef.current, savedOrderNumber + 1);
+          }
+          setCurrentOrderNumber(paidOrder.orderNumber);
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Unable to complete order.');
+          return;
         }
-        setCurrentOrderNumber(paidOrder.orderNumber);
-      } catch (error) {
-        alert(error instanceof Error ? error.message : 'Unable to complete order.');
-        return;
+        addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: amountPaid, changeGiven: change });
+        onOrderCreated(paidOrder);
+        setSuccessOrderDetails(paidOrder);
       }
-      addOrder({ ...toOrderListFormat(paidOrder, true), cashReceived: amountPaid, changeGiven: change });
-      onOrderCreated(paidOrder);
-      setSuccessOrderDetails(paidOrder);
+      setCashAmount('');
+      setShowPaymentChoice(false);
+      setShowPayment(false);
+      // Show receipt preview first for takeout orders
+      setShowReceiptPreview(true);
+    } finally {
+      setIsPaymentSubmitting(false);
     }
-    setCashAmount('');
-    setShowPaymentChoice(false);
-    setShowPayment(false);
-    // Show receipt preview first for takeout orders
-    setShowReceiptPreview(true);
   };
 
   const handleSuccessClose = () => {
@@ -1755,7 +1767,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
               <h2 className="text-lg text-primary">Dine-In Payment</h2>
               <button
                 onClick={() => setShowPaymentChoice(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                disabled={isPaymentSubmitting}
+                className="text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1776,16 +1789,18 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                     setShowPaymentChoice(false);
                     setShowPayment(true);
                   }}
-                  className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  disabled={isPaymentSubmitting}
+                  className="w-full rounded-lg bg-primary py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Pay Now
                 </button>
                 <button
                   type="button"
                   onClick={handlePayLater}
-                  className="w-full rounded-lg border border-border py-3 text-sm font-medium hover:bg-muted"
+                  disabled={isPaymentSubmitting}
+                  className="w-full rounded-lg border border-border py-3 text-sm font-medium hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Pay Later
+                  {isPaymentSubmitting ? 'Processing...' : 'Pay Later'}
                 </button>
               </div>
             </div>
@@ -1903,16 +1918,17 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowPayment(false)}
-                  className="flex-1 border border-border py-3 rounded-lg hover:bg-muted transition-colors text-sm"
+                  disabled={isPaymentSubmitting}
+                  className="flex-1 border border-border py-3 rounded-lg hover:bg-muted transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handlePaymentSubmit}
-                  disabled={paymentMethod === 'Cash' && (!cashAmount || parseFloat(cashAmount) < total)}
+                  disabled={isPaymentSubmitting || (paymentMethod === 'Cash' && (!cashAmount || parseFloat(cashAmount) < total))}
                   className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Confirm Payment
+                  {isPaymentSubmitting ? 'Processing...' : 'Confirm Payment'}
                 </button>
               </div>
             </div>

@@ -287,6 +287,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   const [completedOrder, setCompletedOrder] = useState<any>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Card' | 'GCash' | 'PayMaya'>('Cash');
   const [cashAmount, setCashAmount] = useState('');
+  const [isPaymentSubmitting, setIsPaymentSubmitting] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
   const [discountType, setDiscountType] = useState<string>('none');
   const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
@@ -621,6 +622,8 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   };
 
   const handlePaymentSubmit = async () => {
+    if (isPaymentSubmitting) return;
+
     let computedChange = 0;
     if (paymentMethod === 'Cash') {
       const cash = parseFloat(cashAmount);
@@ -634,7 +637,10 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
       setChangeAmount(0);
     }
 
-    const transactionNumber = currentTransactionNumber || String(transactionNumberRef.current).padStart(6, '0');
+    setIsPaymentSubmitting(true);
+
+    const rawTransactionNumber = currentTransactionNumber || String(transactionNumberRef.current).padStart(6, '0');
+    const transactionNumber = String(rawTransactionNumber).match(/(\d+)$/)?.[1] ?? String(transactionNumberRef.current).padStart(6, '0');
 
     const order = {
       transactionNumber: `RET-${transactionNumber}`,
@@ -663,58 +669,62 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
       cashier: userName || 'Staff',
     };
 
-    if (currentUser?.id) {
-      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: currentUser.id,
-          orderNumber: transactionNumber,
-          customerName: order.customer ?? null,
-          orderType: 'RETAIL',
-          subtotal,
-          discount,
-          discountType: order.discountType ?? null,
-          serviceFee,
-          tax,
-          total,
-          items: cart.map((item) => ({
-            ...item,
-            productId: item.id,
-            variantId: item.variantId,
-            categoryName: item.category,
-          })),
-          payment: {
-            paymentNumber: `PAY-${transactionNumber}`,
-            method: paymentMethod,
-            amountPaid: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
-            changeAmount: paymentMethod === 'Cash' ? computedChange : 0,
-          },
-        }),
-      });
+    try {
+      if (currentUser?.id) {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            orderNumber: `RET-${transactionNumber}`,
+            customerName: order.customer ?? null,
+            orderType: 'RETAIL',
+            subtotal,
+            discount,
+            discountType: order.discountType ?? null,
+            serviceFee,
+            tax,
+            total,
+            items: cart.map((item) => ({
+              ...item,
+              productId: item.id,
+              variantId: item.variantId,
+              categoryName: item.category,
+            })),
+            payment: {
+              paymentNumber: `PAY-${transactionNumber}`,
+              method: paymentMethod,
+              amountPaid: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
+              changeAmount: paymentMethod === 'Cash' ? computedChange : 0,
+            },
+          }),
+        });
 
-      const data = await response.json();
-      if (!response.ok) {
-        alert(data?.message ?? 'Unable to complete payment. Stock may be insufficient.');
-        return;
+        const data = await response.json();
+        if (!response.ok) {
+          alert(data?.message ?? 'Unable to complete payment. Stock may be insufficient.');
+          return;
+        }
+
+        order.transactionNumber = data?.order_number ?? order.transactionNumber;
+        const savedOrderNumber = Number(String(order.transactionNumber).match(/(\d+)$/)?.[1]);
+        if (Number.isFinite(savedOrderNumber)) {
+          transactionNumberRef.current = Math.max(transactionNumberRef.current, savedOrderNumber + 1);
+        }
+        setCurrentTransactionNumber(order.transactionNumber);
       }
 
-      order.transactionNumber = data?.order_number ?? order.transactionNumber;
-      const savedOrderNumber = Number(order.transactionNumber);
-      if (Number.isFinite(savedOrderNumber)) {
-        transactionNumberRef.current = Math.max(transactionNumberRef.current, savedOrderNumber + 1);
-      }
-      setCurrentTransactionNumber(order.transactionNumber);
+      addOrder(order);
+      const completedOrderNumber = Number(String(order.transactionNumber).match(/(\d+)$/)?.[1]);
+      transactionNumberRef.current = Number.isFinite(completedOrderNumber) ? Math.max(transactionNumberRef.current, completedOrderNumber + 1) : transactionNumberRef.current + 1;
+      setCompletedOrder(order);
+      setShowPayment(false);
+
+      // Show receipt modal
+      setShowReceipt(true);
+    } finally {
+      setIsPaymentSubmitting(false);
     }
-
-    addOrder(order);
-    const completedOrderNumber = Number(order.transactionNumber);
-    transactionNumberRef.current = Number.isFinite(completedOrderNumber) ? Math.max(transactionNumberRef.current, completedOrderNumber + 1) : transactionNumberRef.current + 1;
-    setCompletedOrder(order);
-    setShowPayment(false);
-
-    // Show receipt modal
-    setShowReceipt(true);
   };
 
   const handleContinueFromReceipt = () => {
@@ -1216,15 +1226,19 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
               )}
 
               <div className="flex gap-2">
-                <button onClick={() => setShowPayment(false)} className="flex-1 border border-border py-3 rounded-lg hover:bg-muted transition-colors text-sm">
+                <button
+                  onClick={() => setShowPayment(false)}
+                  disabled={isPaymentSubmitting}
+                  className="flex-1 border border-border py-3 rounded-lg hover:bg-muted transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Cancel
                 </button>
                 <button
                   onClick={handlePaymentSubmit}
-                  disabled={paymentMethod === 'Cash' && (!cashAmount || parseFloat(cashAmount) < total)}
+                  disabled={isPaymentSubmitting || (paymentMethod === 'Cash' && (!cashAmount || parseFloat(cashAmount) < total))}
                   className="flex-1 bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Complete Payment
+                  {isPaymentSubmitting ? 'Processing...' : 'Complete Payment'}
                 </button>
               </div>
             </div>
