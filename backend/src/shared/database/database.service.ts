@@ -1985,6 +1985,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           p.payment_method,
           p.amount_paid,
           p.change_amount,
+          COALESCE(payment_user.full_name, cashier_user.full_name) AS cashier_name,
           COALESCE(
             json_agg(
               json_build_object(
@@ -2008,6 +2009,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ) AS items
         FROM orders o
         LEFT JOIN payments p ON p.order_id = o.id
+        LEFT JOIN users cashier_user ON cashier_user.id = o.cashier_id
+        LEFT JOIN users payment_user ON payment_user.id = p.processed_by
         LEFT JOIN order_items oi ON oi.order_id = o.id
         LEFT JOIN products prod ON prod.id = oi.product_id
         LEFT JOIN product_variants pv ON pv.id = oi.variant_id
@@ -2016,7 +2019,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             ($2 = 'RETAIL_STORE' AND o.order_type = 'RETAIL')
             OR ($2 = 'RESTAURANT' AND o.order_type <> 'RETAIL')
           )
-        GROUP BY o.id, p.payment_number, p.payment_method, p.amount_paid, p.change_amount
+        GROUP BY o.id, p.payment_number, p.payment_method, p.amount_paid, p.change_amount, cashier_user.full_name, payment_user.full_name
         ORDER BY o.created_at DESC, o.id DESC
         LIMIT 500
       `,

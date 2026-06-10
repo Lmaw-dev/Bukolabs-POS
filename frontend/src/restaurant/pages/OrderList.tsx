@@ -661,7 +661,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
             </div>
 
             <ThermalReceipt
-              orderNumber={selectedOrder.id}
+              orderNumber={selectedOrder.orderNumber || selectedOrder.id}
               customerName={selectedOrder.customer}
               orderType={selectedOrder.type as 'Dine-In' | 'Takeout' | 'Mixed'}
               table={selectedOrder.table !== '—' ? selectedOrder.table : undefined}

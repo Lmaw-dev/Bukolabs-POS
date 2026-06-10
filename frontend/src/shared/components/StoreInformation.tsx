@@ -6,6 +6,7 @@ import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import { ThermalReceipt } from './ThermalReceipt';
+import { ThermalReceipt as RetailThermalReceipt } from '../../retail/pages/RetailThermalReceipt';
 import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
@@ -180,6 +181,18 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
   const sampleDiscountName = discounts.find((discount) => discount.is_enabled && /senior/i.test(discount.discount_name))?.discount_name
     ?? discounts.find((discount) => discount.is_enabled)?.discount_name
     ?? 'Senior Citizen';
+  const previewStoreBrand = {
+    name: storeInfo.business_name,
+    logo: displayLogo,
+    business_description: storeInfo.business_description,
+    address: storeInfo.address,
+    contact_number: storeInfo.contact_number,
+    email: storeInfo.email,
+    receipt_thank_you_message: storeInfo.receipt_thank_you_message,
+    receipt_footer_message: storeInfo.receipt_footer_message,
+    operating_hours: storeInfo.operating_hours,
+  };
+  const isRetailStore = currentUser?.store_type === 'RETAIL_STORE';
 
   return (
     <div className="flex h-screen">
@@ -319,40 +332,53 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                   <p className="mt-2 text-sm text-muted-foreground">This is how your receipt header and footer will look.</p>
 
                   <div className="mt-5 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg">
-                    <ThermalReceipt
-                      orderNumber="PREVIEW-001"
-                      customerName=""
-                      orderType="Dine-In"
-                      table={null}
-                      items={[
-                        { name: '----------', quantity: 1, price: 120, itemType: 'dine-in' },
-                        { name: '----------', quantity: 1, price: 250, itemType: 'dine-in' },
-                      ]}
-                      subtotal={sampleSubtotal}
-                      serviceFee={sampleServiceCharge}
-                      tax={sampleTax}
-                      discount={sampleDiscount}
-                      discountType={sampleDiscountName}
-                      total={sampleTotal}
-                      cashReceived={500}
-                      changeGiven={500 - sampleTotal}
-                      date="2026-05-31"
-                      time="10:30 AM"
-                      receiptId="REC-PREVIEW"
-                      paymentId="PAY-PREVIEW"
-                      staffName="Staff Name"
-                      storeBrand={{
-                        name: storeInfo.business_name,
-                        logo: displayLogo,
-                        business_description: storeInfo.business_description,
-                        address: storeInfo.address,
-                        contact_number: storeInfo.contact_number,
-                        email: storeInfo.email,
-                        receipt_thank_you_message: storeInfo.receipt_thank_you_message,
-                        receipt_footer_message: storeInfo.receipt_footer_message,
-                        operating_hours: storeInfo.operating_hours,
-                      }}
-                    />
+                    {isRetailStore ? (
+                      <RetailThermalReceipt
+                        orderNumber="RET-2026060910445036"
+                        customerName="Walk-in Customer"
+                        items={[
+                          { name: 'Casual Black Dress', quantity: 1, price: 829, size: 'L', color: 'Black' },
+                        ]}
+                        subtotal={829}
+                        tax={settings.enable_tax ? 829 * (settings.tax_rate / 100) : 0}
+                        discount={0}
+                        total={829 + (settings.enable_tax ? 829 * (settings.tax_rate / 100) : 0)}
+                        cashReceived={830}
+                        changeGiven={1}
+                        paymentMethod="Cash"
+                        date="2026-06-08"
+                        time="04:26 AM"
+                        receiptId="REC-PREVIEW"
+                        paymentId="PAY-PREVIEW"
+                        cashier="Staff Name"
+                        storeBrand={previewStoreBrand}
+                      />
+                    ) : (
+                      <ThermalReceipt
+                        orderNumber="PREVIEW-001"
+                        customerName=""
+                        orderType="Dine-In"
+                        table={null}
+                        items={[
+                          { name: '----------', quantity: 1, price: 120, itemType: 'dine-in' },
+                          { name: '----------', quantity: 1, price: 250, itemType: 'dine-in' },
+                        ]}
+                        subtotal={sampleSubtotal}
+                        serviceFee={sampleServiceCharge}
+                        tax={sampleTax}
+                        discount={sampleDiscount}
+                        discountType={sampleDiscountName}
+                        total={sampleTotal}
+                        cashReceived={500}
+                        changeGiven={500 - sampleTotal}
+                        date="2026-05-31"
+                        time="10:30 AM"
+                        receiptId="REC-PREVIEW"
+                        paymentId="PAY-PREVIEW"
+                        staffName="Staff Name"
+                        storeBrand={previewStoreBrand}
+                      />
+                    )}
                   </div>
                 </div>
 

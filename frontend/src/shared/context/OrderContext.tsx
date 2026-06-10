@@ -379,5 +379,6 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     paymentId: row.payment_number ?? undefined,
     cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,
     changeGiven: row.change_amount !== null && row.change_amount !== undefined ? Number(row.change_amount) : undefined,
+    cashier: row.cashier_name ?? undefined,
   };
 }
