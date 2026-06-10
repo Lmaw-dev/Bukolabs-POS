@@ -255,12 +255,16 @@ function toOrderListFormat(order: any, paid: boolean) {
     order.discountType === 'pwd' ? 'PWD' :
     order.discountType === 'promo' ? 'Promo Discount' :
     order.discountType === 'custom' ? 'Custom Discount' : order.discountType;
+  const tableLabel = order.tableNumber
+    ? `Table ${order.tableNumber}`
+    : Array.isArray(order.tableNumbers) && order.tableNumbers.length > 0
+    ? order.tableNumbers.map((tableNumber: number) => `Table ${tableNumber}`).join(' + ')
+    : order.isQueued ? 'Queue' : '—';
 
   return {
     orderNumber: order.orderNumber,
     customer: order.customerName,
     type,
-    table: order.tableNumber ? `Table ${order.tableNumber}` : order.isQueued ? 'Queue' : '—',
     amountNumber: order.total,
     subtotal: order.subtotal,
     serviceFee: order.serviceFee,
@@ -275,14 +279,18 @@ function toOrderListFormat(order: any, paid: boolean) {
     items: order.items.map((item: CartItem) => ({
       name: item.name,
       quantity: item.quantity,
-      price: item.price * item.quantity,
+      price: item.price,
+      lineTotal: (item.price * item.quantity) + item.ingredients.reduce((sum, ingredient) => sum + Number(ingredient.additional_price ?? 0), 0) * item.quantity,
       image: item.image,
       itemType: item.orderType,
+      notes: item.notes,
+      ingredients: item.ingredients,
     })),
     isQueued: order.isQueued || false,
     queuePosition: order.queuePosition,
     partySize: order.partySize,
     tableNumbers: order.tableNumbers,
+    table: tableLabel,
   };
 }
 
@@ -326,6 +334,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
   const [discountIdNumber, setDiscountIdNumber] = useState<string>('');
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountModalError, setDiscountModalError] = useState('');
   const [validationError, setValidationError] = useState<string>('');
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
@@ -681,6 +690,26 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
 
   const itemAdditionalCost = (item: CartItem) => item.ingredients.reduce((sum, ingredient) => sum + Number(ingredient.additional_price ?? 0), 0) * item.quantity;
   const itemLineTotal = (item: CartItem) => (item.price * item.quantity) + itemAdditionalCost(item);
+  const getIngredientChanges = (item: CartItem) => {
+    const changedIngredients = item.ingredients.filter((ingredient) => {
+      const original = item.originalIngredients.find((originalIngredient) => originalIngredient.name === ingredient.name);
+      return (
+        ingredient.removed ||
+        ingredient.replacement_name ||
+        !original ||
+        Number(ingredient.quantity) !== Number(original.quantity)
+      );
+    });
+
+    return {
+      removedIngredients: changedIngredients.filter((ingredient) => ingredient.removed || Number(ingredient.quantity) <= 0),
+      replacedIngredients: changedIngredients.filter((ingredient) => ingredient.replacement_name && !ingredient.removed),
+      quantityChanges: changedIngredients.filter((ingredient) => {
+        const original = item.originalIngredients.find((originalIngredient) => originalIngredient.name === ingredient.name);
+        return original && !ingredient.removed && !ingredient.replacement_name && Number(ingredient.quantity) !== Number(original.quantity);
+      }),
+    };
+  };
   const subtotal = cart.reduce((sum, item) => sum + itemLineTotal(item), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
   const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
@@ -742,9 +771,12 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         orderType: getOrderTypeForPayload(orderDetails.items),
         tableName: orderDetails.tableNumber
           ? `Table ${orderDetails.tableNumber}`
+          : Array.isArray(orderDetails.tableNumbers) && orderDetails.tableNumbers.length > 0
+          ? orderDetails.tableNumbers.map((tableNumber: number) => `Table ${tableNumber}`).join(' + ')
           : orderDetails.isQueued
           ? `Queue #${orderDetails.queuePosition || 1}`
           : null,
+        partySize: orderDetails.partySize ?? null,
         subtotal: orderDetails.subtotal,
         discount: orderDetails.discount,
         discountType: orderDetails.discountType ?? null,
@@ -777,6 +809,11 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     }
     if (cart.length === 0) {
       setValidationError('Cart is empty.');
+      return false;
+    }
+
+    if (selectedDiscountNeedsId && !discountIdNumber.trim()) {
+      setValidationError(`Please enter the ID number for ${selectedDiscountName}.`);
       return false;
     }
 
@@ -1181,7 +1218,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     <div className="flex h-screen bg-background">
       <Sidebar currentPage="create-order" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
-      <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="flex-1 min-w-0 overflow-auto bg-gray-50">
         <div className="p-5">
           <h2 className="text-lg mb-4">Menu</h2>
 
@@ -1267,7 +1304,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       </div>
 
       {/* Right sidebar - Order Summary */}
-      <div className="w-80 bg-white border-l border-border p-5 flex flex-col">
+      <div className="w-72 xl:w-80 shrink-0 bg-white border-l border-border p-4 xl:p-5 flex flex-col">
         <div className="mb-4">
           <label className="block text-xs text-muted-foreground mb-1.5">Customer Name (Optional):</label>
           <div ref={customerInputRef} className="relative">
@@ -1577,7 +1614,10 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs text-muted-foreground">Discount:</span>
               <button
-                onClick={() => setShowDiscountModal(true)}
+                onClick={() => {
+                  setDiscountModalError('');
+                  setShowDiscountModal(true);
+                }}
                 className="text-xs text-primary hover:underline flex items-center gap-1"
               >
                 <Edit2 className="w-3 h-3" />
@@ -1667,13 +1707,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                   <h3 className="text-sm font-medium mb-2 text-primary">Dine-In Orders:</h3>
                   <div className="space-y-2">
                     {dineInItems.map((item, index) => {
-                      const hasCustomization = item.notes || item.ingredients.some((ing, i) =>
-                        !item.originalIngredients[i] ||
-                        ing.quantity !== item.originalIngredients[i].quantity
-                      );
-                      const removedIngredients = item.originalIngredients.filter(
-                        orig => !item.ingredients.find(ing => ing.name === orig.name)
-                      );
+                      const { removedIngredients, replacedIngredients, quantityChanges } = getIngredientChanges(item);
+                      const hasCustomization = item.notes || removedIngredients.length > 0 || replacedIngredients.length > 0 || quantityChanges.length > 0;
 
                       return (
                         <div key={`preview-dinein-${index}`} className="border border-border rounded-lg p-3 bg-primary/5">
@@ -1686,6 +1721,19 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                               {removedIngredients.length > 0 && (
                                 <p className="text-xs text-red-600">
                                   ❌ No: {removedIngredients.map(ing => ing.name).join(', ')}
+                                </p>
+                              )}
+                              {replacedIngredients.length > 0 && (
+                                <p className="text-xs text-primary">
+                                  Replace: {replacedIngredients.map(ing => `${ing.name} to ${ing.replacement_name}`).join(', ')}
+                                </p>
+                              )}
+                              {quantityChanges.length > 0 && (
+                                <p className="text-xs text-blue-700">
+                                  Quantity: {quantityChanges.map((ing) => {
+                                    const original = item.originalIngredients.find((originalIngredient) => originalIngredient.name === ing.name);
+                                    return `${ing.name} ${original?.quantity ?? 0}${ing.unit ? ` ${ing.unit}` : ''} to ${ing.quantity}${ing.unit ? ` ${ing.unit}` : ''}`;
+                                  }).join(', ')}
                                 </p>
                               )}
                               {item.notes && (
@@ -1708,13 +1756,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                   <h3 className="text-sm font-medium mb-2 text-secondary">Takeout Orders:</h3>
                   <div className="space-y-2">
                     {takeoutItems.map((item, index) => {
-                      const hasCustomization = item.notes || item.ingredients.some((ing, i) =>
-                        !item.originalIngredients[i] ||
-                        ing.quantity !== item.originalIngredients[i].quantity
-                      );
-                      const removedIngredients = item.originalIngredients.filter(
-                        orig => !item.ingredients.find(ing => ing.name === orig.name)
-                      );
+                      const { removedIngredients, replacedIngredients, quantityChanges } = getIngredientChanges(item);
+                      const hasCustomization = item.notes || removedIngredients.length > 0 || replacedIngredients.length > 0 || quantityChanges.length > 0;
 
                       return (
                         <div key={`preview-takeout-${index}`} className="border border-border rounded-lg p-3 bg-secondary/5">
@@ -1727,6 +1770,19 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                               {removedIngredients.length > 0 && (
                                 <p className="text-xs text-red-600">
                                   ❌ No: {removedIngredients.map(ing => ing.name).join(', ')}
+                                </p>
+                              )}
+                              {replacedIngredients.length > 0 && (
+                                <p className="text-xs text-primary">
+                                  Replace: {replacedIngredients.map(ing => `${ing.name} to ${ing.replacement_name}`).join(', ')}
+                                </p>
+                              )}
+                              {quantityChanges.length > 0 && (
+                                <p className="text-xs text-blue-700">
+                                  Quantity: {quantityChanges.map((ing) => {
+                                    const original = item.originalIngredients.find((originalIngredient) => originalIngredient.name === ing.name);
+                                    return `${ing.name} ${original?.quantity ?? 0}${ing.unit ? ` ${ing.unit}` : ''} to ${ing.quantity}${ing.unit ? ` ${ing.unit}` : ''}`;
+                                  }).join(', ')}
                                 </p>
                               )}
                               {item.notes && (
@@ -2242,6 +2298,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                         onChange={(e) => {
                           setDiscountType('none');
                           setDiscountIdNumber('');
+                          setDiscountModalError('');
                           setCustomDiscountPercent(0);
                         }}
                         className="w-4 h-4"
@@ -2258,6 +2315,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                           onChange={() => {
                             setDiscountType(String(discountSetting.id));
                             setDiscountIdNumber('');
+                            setDiscountModalError('');
                           }}
                           className="w-4 h-4"
                         />
@@ -2329,7 +2387,10 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                     <input
                       type="text"
                       value={discountIdNumber}
-                      onChange={(e) => setDiscountIdNumber(e.target.value)}
+                      onChange={(e) => {
+                        setDiscountIdNumber(e.target.value);
+                        setDiscountModalError('');
+                      }}
                       placeholder="Enter ID number"
                       className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                       required
@@ -2339,6 +2400,12 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                     </p>
                   </div>
                 )}
+                {discountModalError && (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {discountModalError}
+                  </div>
+                )}
+
                 {false && (discountType === 'senior' || discountType === 'pwd') && (
                   <div>
                     <label className="block text-sm font-medium mb-2">
@@ -2388,9 +2455,10 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                 <button
                   onClick={() => {
                     if (selectedDiscountNeedsId && !discountIdNumber.trim()) {
-                      alert('Please enter ID number');
+                      setDiscountModalError(`Please enter the ID number for ${selectedDiscountName}.`);
                       return;
                     }
+                    setDiscountModalError('');
                     setShowDiscountModal(false);
                   }}
                   className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors text-sm"

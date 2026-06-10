@@ -252,6 +252,7 @@ CREATE TABLE IF NOT EXISTS orders (
     CHECK (order_type IN ('DINE_IN', 'TAKEOUT', 'MIXED', 'RETAIL')),
   table_id BIGINT REFERENCES restaurant_tables(id) ON DELETE SET NULL,
   table_name VARCHAR(50),
+  party_size INT,
   subtotal DECIMAL(10,2) DEFAULT 0,
   discount_amount DECIMAL(10,2) DEFAULT 0,
   discount_type VARCHAR(100),

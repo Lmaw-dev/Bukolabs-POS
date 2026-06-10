@@ -100,13 +100,18 @@ export function TableProvider({ children }: { children: ReactNode }) {
     })
   );
 
+  const orderUsesTable = (orderTable: string, tableNumber: number) => {
+    const matches = orderTable.match(/Table\s+\d+/gi) ?? [];
+    return matches.some((label) => Number(label.match(/\d+/)?.[0]) === tableNumber);
+  };
+
   // Sync tables with orders
   useEffect(() => {
     setTables(prevTables => {
       const newTables = prevTables.map(table => {
         // Find active order for this table
         const order = orders.find(o =>
-          o.table === `Table ${table.number}` &&
+          orderUsesTable(o.table, table.number) &&
           o.orderStatus !== 'Completed'
         );
 
@@ -353,6 +358,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
     // Update order with table assignment
     updateOrder(orderId, {
       table: tableLabels,
+      tableNumbers,
       isQueued: false,
       queuePosition: undefined,
       orderStatus: order.paymentStatus === 'Paid' ? 'Served' : 'Preparing',

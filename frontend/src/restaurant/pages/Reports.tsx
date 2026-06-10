@@ -49,6 +49,10 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     const start = new Date(today);
     const end = new Date(today);
 
+    if (dateFilter === 'all') {
+      return { start: '', end: '' };
+    }
+
     if (dateFilter === 'today') {
       return { start: todayString, end: todayString };
     }
@@ -76,6 +80,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     if (dateFilter === 'date') return selectedDate || 'Select Date';
     if (dateFilter === 'week') return 'This Week';
     if (dateFilter === 'month') return 'This Month';
+    if (dateFilter === 'all') return 'All Time';
     return 'This Year';
   };
 
@@ -101,11 +106,28 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   const filteredRevenue = filteredOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
-  const dineInOrders = filteredOrders.filter(o => o.type === 'Dine-In' || o.type === 'Mixed');
-  const takeoutOrders = filteredOrders.filter(o => o.type === 'Takeout');
+  const getItemAmount = (item: (typeof filteredOrders)[number]['items'][number]) =>
+    Number(item.lineTotal ?? (item.price * item.quantity));
+  const getOrderItemSubtotal = (order: (typeof filteredOrders)[number]) =>
+    order.items.reduce((sum, item) => sum + getItemAmount(item), 0);
+  const getOrderRevenueByItemType = (order: (typeof filteredOrders)[number], itemType: 'dine-in' | 'takeout') => {
+    const itemSubtotal = getOrderItemSubtotal(order);
+    const typeSubtotal = order.items
+      .filter((item) => item.itemType === itemType)
+      .reduce((sum, item) => sum + getItemAmount(item), 0);
 
-  const dineInRevenue = dineInOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-  const takeoutRevenue = takeoutOrders.reduce((sum, order) => sum + order.amountNumber, 0);
+    if (itemSubtotal <= 0) {
+      return order.type === (itemType === 'dine-in' ? 'Dine-In' : 'Takeout') ? order.amountNumber : 0;
+    }
+
+    return order.amountNumber * (typeSubtotal / itemSubtotal);
+  };
+
+  const dineInOrders = filteredOrders.filter(o => o.type === 'Dine-In' || o.items.some((item) => item.itemType === 'dine-in'));
+  const takeoutOrders = filteredOrders.filter(o => o.type === 'Takeout' || o.items.some((item) => item.itemType === 'takeout'));
+
+  const dineInRevenue = filteredOrders.reduce((sum, order) => sum + getOrderRevenueByItemType(order, 'dine-in'), 0);
+  const takeoutRevenue = filteredOrders.reduce((sum, order) => sum + getOrderRevenueByItemType(order, 'takeout'), 0);
 
   // Generate daily sales data from real orders (last 7 days)
   const generateDailySalesData = () => {
@@ -207,9 +229,9 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
       <Sidebar currentPage="reports" onNavigate={onNavigate} onLogout={onLogout} isAdmin={isAdmin} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
       <div className="flex-1 overflow-auto bg-background">
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
             <div>
               <h1 className="text-primary mb-2">Sales & Analytics Reports</h1>
               <p className="text-muted-foreground text-sm">Detailed insights and revenue analytics</p>
@@ -492,11 +514,11 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                           <div className="flex-1 bg-muted rounded-full h-2 max-w-xs">
                             <div
                               className="bg-primary h-2 rounded-full"
-                              style={{ width: `${(product.sales / topProducts[0].sales) * 100}%` }}
+                              style={{ width: `${topProducts[0]?.sales ? (product.sales / topProducts[0].sales) * 100 : 0}%` }}
                             ></div>
                           </div>
                           <span className="text-sm text-muted-foreground">
-                            {((product.sales / topProducts[0].sales) * 100).toFixed(0)}%
+                            {topProducts[0]?.sales ? ((product.sales / topProducts[0].sales) * 100).toFixed(0) : 0}%
                           </span>
                         </div>
                       </td>
@@ -537,9 +559,6 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                     <th className="px-6 py-3.5 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest">
                       Amount
                     </th>
-                    <th className="px-6 py-3.5 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest">
-                      Status
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-border">
@@ -565,11 +584,6 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         ₱{order.amountNumber.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="inline-flex px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                          {order.paymentStatus}
-                        </span>
                       </td>
                     </tr>
                   ))}

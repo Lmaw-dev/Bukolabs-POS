@@ -120,7 +120,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     const table = tables.find(t => t.id === tableId);
     if (table?.orderId) {
       // Update order to paid status
-      updateOrder(table.orderId, { paymentStatus: 'Paid' });
+      updateOrder(table.orderId, { paymentStatus: 'Paid', orderStatus: 'Completed' });
       setSelectedTableId(null);
     }
   };
@@ -419,7 +419,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     <div className="flex h-screen">
       <Sidebar currentPage="table-management" onNavigate={onNavigate} onLogout={onLogout} storeBrand={storeBrand} userName={userName} storeType={storeType} staffType={staffType} />
 
-      <div className="flex-1 overflow-auto bg-background p-8">
+      <div className="flex-1 overflow-auto bg-background p-4 sm:p-6 lg:p-8">
         <h1 className="text-primary mb-6">Table Management</h1>
 
         {/* Notifications */}
@@ -455,9 +455,9 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
           {/* Tables Grid */}
           <div className={queuedOrders.length > 0 ? 'lg:col-span-2' : ''}>
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                 <h2 className="text-base">Tables</h2>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setShowQueueHistory(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/90 transition-colors text-sm font-medium"
@@ -475,7 +475,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mb-6">
                 {tables.map(table => {
                   const order = getTableOrder(table);
                   const theme = getTableTheme(table.status);

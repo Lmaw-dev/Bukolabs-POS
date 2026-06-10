@@ -6,8 +6,11 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  lineTotal?: number;
   image?: string;
   itemType?: 'dine-in' | 'takeout';
+  notes?: string;
+  ingredients?: any[];
 }
 
 export interface Order {
@@ -345,6 +348,11 @@ function mapDatabaseRestaurantOrder(row: any): Order {
   const items = Array.isArray(row.items) ? row.items : [];
   const tableName = row.table_name ? String(row.table_name) : '-';
   const queueMatch = tableName.match(/^Queue(?:\s*#?(\d+))?/i);
+  const tableNumbers = tableName
+    .match(/Table\s+\d+/gi)
+    ?.map((label) => Number(label.match(/\d+/)?.[0]))
+    .filter((value) => Number.isFinite(value));
+  const partySize = Number(row.party_size ?? row.partySize ?? row.required_seats ?? 0);
   const paymentStatus: Order['paymentStatus'] = row.payment_status === 'PAID' ? 'Paid' : 'Not Paid';
   const orderStatus: Order['orderStatus'] =
     row.order_status === 'PREPARING' ? 'Preparing' :
@@ -378,8 +386,11 @@ function mapDatabaseRestaurantOrder(row: any): Order {
       name: item.product_name,
       quantity: Number(item.quantity ?? 0),
       price: Number(item.unit_price ?? 0),
+      lineTotal: Number(item.line_total ?? (Number(item.unit_price ?? 0) * Number(item.quantity ?? 0))),
       image: item.image_url ?? item.image ?? undefined,
-      itemType: item.item_type === 'dine-in' ? 'dine-in' : 'takeout',
+      itemType: item.item_type === 'dine-in' || item.item_type === 'DINE_IN' ? 'dine-in' : 'takeout',
+      notes: item.notes ?? undefined,
+      ingredients: item.ingredients ?? undefined,
     })),
     paymentId: row.payment_number ?? undefined,
     cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,
@@ -387,5 +398,8 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     cashier: row.cashier_name ?? undefined,
     isQueued,
     queuePosition: isQueued && queueMatch?.[1] ? Number(queueMatch[1]) : undefined,
+    partySize: partySize > 0 ? partySize : undefined,
+    requiredSeats: partySize > 0 ? partySize : undefined,
+    tableNumbers,
   };
 }

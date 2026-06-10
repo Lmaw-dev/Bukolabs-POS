@@ -1829,6 +1829,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createPaidPosOrder(input: any) {
+    await this.ensurePosOrderSchema();
     const user = await this.getUserStoreScope(input.userId);
 
     if (!user.store_id || !user.store_type) {
@@ -1846,10 +1847,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           `
             INSERT INTO orders (
               store_id, cashier_id, order_number, customer_name, order_type, table_name,
-              subtotal, discount_amount, discount_type, tax_amount, service_charge,
+              party_size, subtotal, discount_amount, discount_type, tax_amount, service_charge,
               total_amount, order_status, payment_status, completed_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING id
           `,
           [
@@ -1859,6 +1860,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             input.customerName ?? null,
             input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
             input.tableName ?? null,
+            input.partySize ?? null,
             input.subtotal ?? 0,
             input.discount ?? 0,
             input.discountType ?? null,
@@ -1957,6 +1959,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async listPosOrders(userId: number) {
+    await this.ensurePosOrderSchema();
     const user = await this.getUserStoreScope(userId);
 
     if (!user.store_id || !user.store_type) {
@@ -1971,6 +1974,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           o.customer_name,
           o.order_type,
           o.table_name,
+          o.party_size,
           o.subtotal,
           o.discount_amount,
           o.discount_type,
@@ -2475,6 +2479,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           ADD COLUMN IF NOT EXISTS enabled_payment_methods TEXT[] DEFAULT ARRAY['Cash', 'GCash', 'Maya', 'Bank Transfer'],
           ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `,
+    );
+  }
+
+  private async ensurePosOrderSchema() {
+    await this.query(
+      `
+        ALTER TABLE orders
+          ADD COLUMN IF NOT EXISTS party_size INT
       `,
     );
   }

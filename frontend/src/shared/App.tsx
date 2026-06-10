@@ -27,6 +27,9 @@ import { getApiBaseUrl } from '../auth/services/auth';
 import type { AuthenticatedUser } from '../auth/types/auth';
 import { getDefaultStoreLogo } from './utils/defaultStoreLogo';
 
+const SESSION_USER_KEY = 'bukolabs-pos-current-user';
+const SESSION_PAGE_KEY = 'bukolabs-pos-current-page';
+
 export type Page =
   | 'login'
   | 'superadmin-dashboard'
@@ -68,6 +71,21 @@ export default function App() {
   const [storeBrand, setStoreBrand] = useState<StoreBrand>({ name: null, logo: null });
 
   useEffect(() => {
+    const savedUser = window.localStorage.getItem(SESSION_USER_KEY);
+    if (!savedUser) return;
+
+    try {
+      const parsedUser = JSON.parse(savedUser) as AuthenticatedUser;
+      const savedPage = window.localStorage.getItem(SESSION_PAGE_KEY) as Page | null;
+      setCurrentUser(parsedUser);
+      setCurrentPage(savedPage && savedPage !== 'login' ? savedPage : getDefaultPageForUser(parsedUser));
+    } catch {
+      window.localStorage.removeItem(SESSION_USER_KEY);
+      window.localStorage.removeItem(SESSION_PAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
     const loadStoreBrand = async () => {
       if (!currentUser?.id || currentUser.role === 'SUPERADMIN') {
         setStoreBrand({ name: null, logo: null });
@@ -103,36 +121,39 @@ export default function App() {
 
   const handleLogin = (user: AuthenticatedUser) => {
     setCurrentUser(user);
+    window.localStorage.setItem(SESSION_USER_KEY, JSON.stringify(user));
 
     if (user.role === 'SUPERADMIN') {
-      setCurrentPage('superadmin-dashboard');
+      navigateTo('superadmin-dashboard');
       return;
     }
 
     if (user.role === 'ADMIN' && user.store_type === 'RETAIL_STORE') {
-      setCurrentPage('retail-pos-dashboard');
+      navigateTo('retail-pos-dashboard');
       return;
     }
 
     if (user.role === 'ADMIN' && user.store_type === 'RESTAURANT') {
-      setCurrentPage('pos-dashboard');
+      navigateTo('pos-dashboard');
       return;
     }
 
     if (user.role === 'STAFF' && user.store_type === 'RETAIL_STORE') {
-      setCurrentPage('retail-pos-dashboard');
+      navigateTo('retail-pos-dashboard');
       return;
     }
 
     if (user.role === 'STAFF' && user.store_type === 'RESTAURANT') {
-      setCurrentPage('pos-dashboard');
+      navigateTo('pos-dashboard');
       return;
     }
 
-    setCurrentPage('login');
+    navigateTo('login');
   };
 
   const handleLogout = () => {
+    window.localStorage.removeItem(SESSION_USER_KEY);
+    window.localStorage.removeItem(SESSION_PAGE_KEY);
     setCurrentUser(null);
     setCurrentPage('login');
     setCurrentOrder(null);
@@ -140,6 +161,11 @@ export default function App() {
   };
 
   const navigateTo = (page: Page) => {
+    if (page === 'login') {
+      window.localStorage.removeItem(SESSION_PAGE_KEY);
+    } else {
+      window.localStorage.setItem(SESSION_PAGE_KEY, page);
+    }
     setCurrentPage(page);
   };
 
@@ -267,6 +293,13 @@ export default function App() {
       </StoreSettingsProvider>
     </div>
   );
+}
+
+function getDefaultPageForUser(user: AuthenticatedUser): Page {
+  if (user.role === 'SUPERADMIN') return 'superadmin-dashboard';
+  if (user.store_type === 'RETAIL_STORE') return 'retail-pos-dashboard';
+  if (user.store_type === 'RESTAURANT') return 'pos-dashboard';
+  return 'login';
 }
 
 function TableManagementRoute({
