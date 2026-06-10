@@ -4,6 +4,7 @@ import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
+import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, X } from 'lucide-react';
 
@@ -38,8 +39,10 @@ function TopItemImage({ src, name }: { src?: string | null; name: string }) {
 export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType, staffType }: POSDashboardProps) {
   const { orders, queuedOrders } = useOrders();
   const { tables, getAvailableTablesCount } = useTables();
+  const { settings } = useStoreSettings();
   const [dateFilter, setDateFilter] = useState('this-month');
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
+  const showTableManagementCards = settings.enable_table_management;
 
   const today = new Date().toISOString().split('T')[0];
   const todayOrders = orders.filter(o => o.date === today);
@@ -249,6 +252,8 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
               <p className="text-sm text-muted-foreground mb-1">Active Orders</p>
               <h2 className="text-2xl text-primary">{activeOrders}</h2>
             </div>
+            {showTableManagementCards && (
+              <>
             <div className="bg-card rounded-xl shadow-sm border border-border p-5">
               <p className="text-sm text-muted-foreground mb-1">Available Tables</p>
               <h2 className="text-2xl text-primary">{availableTables} / {totalTables}</h2>
@@ -270,6 +275,8 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                 {peopleWaiting > 0 ? `Total party sizes in queue` : 'No one waiting'}
               </p>
             </div>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
