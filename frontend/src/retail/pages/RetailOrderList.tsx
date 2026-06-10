@@ -161,7 +161,9 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
 
       <div className="flex-1 overflow-auto p-8">
         <div className="mb-6">
-          <h1 className="text-2xl text-primary mb-1">Transaction History</h1>
+          <h1 className="text-[28px] text-primary" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, letterSpacing: '0.04em' }}>
+            Transaction History
+          </h1>
           <p className="text-sm text-muted-foreground">View and manage all sales transactions</p>
         </div>
 

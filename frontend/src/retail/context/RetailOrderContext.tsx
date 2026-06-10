@@ -18,6 +18,7 @@ export interface Order {
   id: string;
   transactionNumber?: string;
   customer?: string;
+  contactNumber?: string;
   amountNumber: number;
   subtotal: number;
   tax: number;

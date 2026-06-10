@@ -178,7 +178,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-[28px] text-primary" style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, letterSpacing: '0.04em' }}>
-            ORDER LIST
+            Transaction History
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">Manage and track all restaurant orders</p>
         </div>
@@ -251,97 +251,98 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
         </div>
 
         {/* Table Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
-              <thead>
-                <tr className="bg-primary">
-                  <th className="text-left px-5 py-3.5 text-xs text-white/80 uppercase tracking-wider">Order #</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Customer</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Type</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Table</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Party</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Queue</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Total</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Payment</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Date & Time</th>
-                  <th className="text-center px-4 py-3.5 text-xs text-white/80 uppercase tracking-wider">Actions</th>
+            <table className="w-full min-w-[1300px]">
+              <thead className="bg-muted/30">
+                <tr>
+                  <th className="w-[13%] text-left px-5 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Order Number</th>
+                  <th className="w-[10%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Customer</th>
+                  <th className="w-[8%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Type</th>
+                  <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Table</th>
+                  <th className="w-[6%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Party</th>
+                  <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Queue</th>
+                  <th className="w-[9%] text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
+                  <th className="w-[8%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Payments</th>
+                  <th className="w-[9%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Status</th>
+                  <th className="w-[9%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Date and Time</th>
+                  <th className="w-[14%] text-center px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-border">
                 {filteredOrders.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="text-center py-16 text-gray-400 text-sm">
                       No orders found matching your filters.
                     </td>
                   </tr>
-                ) : filteredOrders.map((order, idx) => {
+                ) : filteredOrders.map((order) => {
                   const waitingTime = order.isQueued ? Math.floor((new Date().getTime() - new Date(`${order.date} ${order.time}`).getTime()) / 60000) : 0;
 
-                  return (<tr key={order.id} className={`hover:bg-[#f4f6fb]/60 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafbfd]'}`}>
-                    <td className="px-5 py-4">
-                      <span className="text-sm text-primary font-medium">{order.orderNumber || order.id}</span>
+                  return (<tr key={order.id} className="hover:bg-muted/20 transition-colors">
+                    <td className="px-5 py-5 text-sm font-mono text-primary whitespace-nowrap overflow-hidden text-ellipsis">
+                      {order.orderNumber || order.id}
                     </td>
-                    <td className="px-4 py-4">
-                      <span className="text-sm text-gray-800">{order.customer}</span>
+                    <td className="px-4 py-5 text-sm text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {order.customer}
                     </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getTypeBadge(order.type)}`}>
+                    <td className="px-4 py-5">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getTypeBadge(order.type)}`}>
                         {order.type}
                       </span>
                     </td>
-                    <td className="px-4 py-4">
-                      <span className="text-sm text-gray-600">{order.table}</span>
+                    <td className="px-4 py-5 text-sm text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {order.table}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-5">
                       {order.partySize ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium whitespace-nowrap">
                           <Users className="w-3 h-3" />
                           {order.partySize}
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-5">
                       {order.isQueued ? (
                         <div className="flex flex-col gap-0.5">
-                          <span className="inline-flex items-center justify-center w-fit px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full">
+                          <span className="inline-flex items-center justify-center w-fit px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full whitespace-nowrap">
                             #{order.queuePosition}
                           </span>
-                          <span className="text-xs text-gray-500">{waitingTime} min</span>
+                          <span className="text-xs text-gray-500 whitespace-nowrap">{waitingTime} min</span>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-4">
-                      <span className="text-sm text-gray-900 font-medium">₱{order.amountNumber.toFixed(2)}</span>
+                    <td className="px-4 py-5 text-sm text-right font-medium whitespace-nowrap">
+                      <span className="text-primary">&#8369;{order.amountNumber.toFixed(2)}</span>
                     </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getPaymentBadge(order.paymentStatus)}`}>
+                    <td className="px-4 py-5">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs border whitespace-nowrap ${getPaymentBadge(order.paymentStatus)}`}>
                         {order.paymentStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-4">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadge(order.orderStatus)}`}>
+                    <td className="px-4 py-5">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusBadge(order.orderStatus)}`}>
                         {order.orderStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="text-xs text-gray-600">{order.date}</div>
-                      <div className="text-xs text-gray-400">{order.time}</div>
+                    <td className="px-4 py-5">
+                      <div className="text-xs text-gray-600 whitespace-nowrap">{order.date}</div>
+                      <div className="text-xs text-gray-400 whitespace-nowrap">{order.time}</div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="px-4 py-5">
+                      <div className="flex items-center justify-center gap-1 whitespace-nowrap">
                         {/* View Details - always */}
                         <button
                           onClick={() => openModal(order, 'details')}
                           title="View Details"
-                          className="p-1.5 bg-gray-100 hover:bg-primary hover:text-white text-gray-600 rounded-lg transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded-lg transition-colors whitespace-nowrap"
                         >
                           <Eye className="w-3.5 h-3.5" />
+                          View
                         </button>
 
                         {/* Process Payment - only if Not Paid */}
@@ -349,9 +350,10 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                           <button
                             onClick={() => openModal(order, 'payment')}
                             title="Process Payment"
-                            className="p-1.5 bg-primary/10 hover:bg-primary hover:text-white text-primary rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded-lg transition-colors whitespace-nowrap"
                           >
                             <CreditCard className="w-3.5 h-3.5" />
+                            Payment
                           </button>
                         )}
 
@@ -360,9 +362,10 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                           <button
                             onClick={() => openModal(order, 'receipt')}
                             title="View Receipt"
-                            className="p-1.5 bg-primary/10 hover:bg-primary hover:text-white text-primary rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded-lg transition-colors whitespace-nowrap"
                           >
                             <Printer className="w-3.5 h-3.5" />
+                            Receipt
                           </button>
                         )}
 
@@ -371,9 +374,10 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                           <button
                             onClick={() => openModal(order, 'refund')}
                             title="Process Refund"
-                            className="p-1.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-500 rounded-lg transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
+                            Refund
                           </button>
                         )}
                       </div>
