@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Calendar } from 'lucide-react';
 
-export type DateFilterMode = 'today' | 'date' | 'week' | 'month' | 'year';
+export type DateFilterMode = 'all' | 'today' | 'date' | 'week' | 'month' | 'year';
 
 interface DateFilterControlProps {
   mode: DateFilterMode;
@@ -55,6 +55,7 @@ export function DateFilterControl({
         className={className}
       >
         {mode === 'date' && selectedDate && <option value="date">{selectedDate}</option>}
+        <option value="all">All</option>
         <option value="today">Today</option>
         <option value="week">This Week</option>
         <option value="month">This Month</option>

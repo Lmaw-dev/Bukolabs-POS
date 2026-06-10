@@ -24,7 +24,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
-  const [datePreset, setDatePreset] = useState<DateFilterMode>('today');
+  const [datePreset, setDatePreset] = useState<DateFilterMode>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -48,6 +48,10 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
     const todayString = new Date().toISOString().split('T')[0];
     const today = new Date(todayString);
     const start = new Date(today);
+
+    if (datePreset === 'all') {
+      return true;
+    }
 
     if (datePreset === 'today') {
       return date === todayString;
@@ -196,13 +200,13 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
               className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
             />
 
-            {(searchTerm || paymentFilter !== 'All' || dateFilter || datePreset !== 'today') && (
+            {(searchTerm || paymentFilter !== 'All' || dateFilter || datePreset !== 'all') && (
               <button
                 onClick={() => {
                   setSearchTerm('');
                   setPaymentFilter('All');
                   setDateFilter('');
-                  setDatePreset('today');
+                  setDatePreset('all');
                 }}
                 className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
               >
