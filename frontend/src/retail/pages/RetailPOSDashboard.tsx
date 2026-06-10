@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { useOrders } from '../context/RetailOrderContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, ShoppingBag, X, TrendingUp } from 'lucide-react';
+import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
 
 interface RetailPOSDashboardProps {
   onLogout: () => void;
@@ -36,10 +37,11 @@ function TopItemImage({ src, name }: { src?: string | null; name: string }) {
 
 export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailPOSDashboardProps) {
   const { orders } = useOrders();
-  const [dateFilter, setDateFilter] = useState('this-month');
+  const today = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [dateFilter, setDateFilter] = useState<DateFilterMode>('date');
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
   // Exclude void and fully refunded transactions from dashboard metrics
   const todayOrders = orders.filter(o => o.date === today && (o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded'));
   const totalSalesToday = todayOrders.reduce((sum, o) => sum + o.amountNumber, 0);
@@ -109,7 +111,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
   const topSellingItems = allTopSellingItems.slice(0, 4);
 
   const salesDataByFilter = {
-    'this-week': [
+    week: [
       { id: 'week-mon', label: 'Mon', sales: 3200 },
       { id: 'week-tue', label: 'Tue', sales: 4100 },
       { id: 'week-wed', label: 'Wed', sales: 3800 },
@@ -118,19 +120,13 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       { id: 'week-sat', label: 'Sat', sales: 7800 },
       { id: 'week-sun', label: 'Sun', sales: 6500 },
     ],
-    'this-month': [
+    month: [
       { id: 'month-w1', label: 'Week 1', sales: 18000 },
       { id: 'month-w2', label: 'Week 2', sales: 22000 },
       { id: 'month-w3', label: 'Week 3', sales: 19500 },
       { id: 'month-w4', label: 'Week 4', sales: 25000 },
     ],
-    'last-month': [
-      { id: 'lastmonth-w1', label: 'Week 1', sales: 15000 },
-      { id: 'lastmonth-w2', label: 'Week 2', sales: 17800 },
-      { id: 'lastmonth-w3', label: 'Week 3', sales: 19200 },
-      { id: 'lastmonth-w4', label: 'Week 4', sales: 21500 },
-    ],
-    'this-year': [
+    year: [
       { id: 'year-jan', label: 'Jan', sales: 65000 },
       { id: 'year-feb', label: 'Feb', sales: 71000 },
       { id: 'year-mar', label: 'Mar', sales: 78000 },
@@ -140,14 +136,22 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
   };
 
   const salesData = useMemo(() => {
-    return salesDataByFilter[dateFilter as keyof typeof salesDataByFilter] || salesDataByFilter['this-month'];
+    return salesDataByFilter[dateFilter as keyof typeof salesDataByFilter] || salesDataByFilter.week;
   }, [dateFilter]);
 
   const databaseSalesData = useMemo(() => {
     const paidOrders = orders.filter((order) => order.paymentStatus === 'Paid' || order.paymentStatus === 'Partially Refunded');
     const now = new Date();
 
-    if (dateFilter === 'this-week') {
+    if (dateFilter === 'date') {
+      return [{
+        id: `date-${selectedDate}`,
+        label: selectedDate,
+        sales: paidOrders.filter((order) => order.date === selectedDate).reduce((sum, order) => sum + order.amountNumber, 0),
+      }];
+    }
+
+    if (dateFilter === 'week') {
       return Array.from({ length: 7 }, (_, index) => {
         const date = new Date(now);
         date.setDate(now.getDate() - (6 - index));
@@ -160,7 +164,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       });
     }
 
-    if (dateFilter === 'this-year') {
+    if (dateFilter === 'year') {
       return Array.from({ length: 12 }, (_, month) => {
         const date = new Date(now.getFullYear(), month, 1);
         return {
@@ -176,7 +180,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       });
     }
 
-    const target = new Date(now.getFullYear(), now.getMonth() - (dateFilter === 'last-month' ? 1 : 0), 1);
+    const target = new Date(now.getFullYear(), now.getMonth(), 1);
     return Array.from({ length: 5 }, (_, week) => ({
       id: `week-${week + 1}`,
       label: `Week ${week + 1}`,
@@ -189,7 +193,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
         })
         .reduce((sum, order) => sum + order.amountNumber, 0),
     }));
-  }, [dateFilter, orders]);
+  }, [dateFilter, orders, selectedDate]);
 
   const databaseTopSellingItems = useMemo(() => {
     const itemMap = new Map<string, { id: string; name: string; sold: number; revenue: string; revenueValue: number; image: string }>();
@@ -260,16 +264,13 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
                 <h3 className="text-base text-primary">Sales Overview</h3>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-                  <select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
+                  <DateFilterControl
+                    mode={dateFilter}
+                    selectedDate={selectedDate}
+                    onModeChange={setDateFilter}
+                    onDateChange={setSelectedDate}
                     className="px-2.5 py-1 border border-border rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary bg-input-background"
-                  >
-                    <option value="this-week">This Week</option>
-                    <option value="this-month">This Month</option>
-                    <option value="last-month">Last Month</option>
-                    <option value="this-year">This Year</option>
-                  </select>
+                  />
                 </div>
               </div>
 

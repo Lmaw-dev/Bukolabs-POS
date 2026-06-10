@@ -5,6 +5,7 @@ import type { StaffType, StoreType } from '../../auth/types/auth';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
+import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
 
 // Custom Peso Icon Component using ₱ symbol
 const PesoIcon = ({ className }: { className?: string }) => (
@@ -37,44 +38,57 @@ interface ReportsProps {
 
 export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: ReportsProps) {
   const { orders } = useOrders();
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'year'>('today');
-  const [revenueTrendFilter, setRevenueTrendFilter] = useState<'4weeks' | '3months' | 'year'>('4weeks');
+  const todayString = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayString);
+  const [dateFilter, setDateFilter] = useState<DateFilterMode>('date');
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
 
+  const getFilterRange = () => {
+    const today = new Date(todayString);
+    const start = new Date(today);
+    const end = new Date(today);
+
+    if (dateFilter === 'date') {
+      return { start: selectedDate, end: selectedDate };
+    }
+
+    if (dateFilter === 'week') {
+      start.setDate(today.getDate() - 6);
+    } else if (dateFilter === 'month') {
+      start.setDate(1);
+    } else if (dateFilter === 'year') {
+      start.setMonth(0, 1);
+    }
+
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    };
+  };
+
+  const getReportDateLabel = () => {
+    if (dateFilter === 'date') return selectedDate;
+    if (dateFilter === 'week') return 'This Week';
+    if (dateFilter === 'month') return 'This Month';
+    return 'This Year';
+  };
+
   // Helper function to filter orders by date range
-  const getFilteredOrders = (filter: typeof dateFilter) => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+  const getFilteredOrders = () => {
+    const { start, end } = getFilterRange();
 
     return orders.filter(o => {
       if (o.paymentStatus !== 'Paid') return false;
 
-      const orderDate = new Date(o.date);
-
-      switch (filter) {
-        case 'today':
-          return o.date === todayStr;
-        case 'week':
-          const weekAgo = new Date(today);
-          weekAgo.setDate(today.getDate() - 7);
-          return orderDate >= weekAgo;
-        case 'month':
-          const monthAgo = new Date(today);
-          monthAgo.setMonth(today.getMonth() - 1);
-          return orderDate >= monthAgo;
-        case 'year':
-          const yearAgo = new Date(today);
-          yearAgo.setFullYear(today.getFullYear() - 1);
-          return orderDate >= yearAgo;
-        default:
-          return true;
-      }
+      if (start && o.date < start) return false;
+      if (end && o.date > end) return false;
+      return true;
     });
   };
 
   // Calculate metrics from filtered orders
-  const filteredOrders = getFilteredOrders(dateFilter);
+  const filteredOrders = getFilteredOrders();
   const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.amountNumber, 0);
   const todayOrders = paidOrders.filter(o => o.date === new Date().toISOString().split('T')[0]);
@@ -143,77 +157,22 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     .slice(0, 10);
   const visibleProducts = showAllProducts ? topProducts : topProducts.slice(0, 5);
 
-  // Generate revenue trend data based on filter
+  // Generate revenue trend data based on selected date range
   const generateRevenueTrendData = () => {
-    const today = new Date();
+    const revenueByDate: Record<string, { orders: number; revenue: number }> = {};
+    filteredOrders.forEach((order) => {
+      revenueByDate[order.date] = revenueByDate[order.date] ?? { orders: 0, revenue: 0 };
+      revenueByDate[order.date].orders += 1;
+      revenueByDate[order.date].revenue += order.amountNumber;
+    });
 
-    if (revenueTrendFilter === '4weeks') {
-      const result = [];
-      for (let i = 3; i >= 0; i--) {
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - (i + 1) * 7);
-        const weekEnd = new Date(today);
-        weekEnd.setDate(today.getDate() - i * 7);
-
-        const weekOrders = paidOrders.filter(o => {
-          const orderDate = new Date(o.date);
-          return orderDate >= weekStart && orderDate < weekEnd;
-        });
-
-        const weekRevenue = weekOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-        result.push({
-          id: `week-${i}`,
-          week: `Week ${4 - i}`,
-          revenue: weekRevenue
-        });
-      }
-      return result;
-    } else if (revenueTrendFilter === '3months') {
-      const result = [];
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-      for (let i = 2; i >= 0; i--) {
-        const monthDate = new Date(today);
-        monthDate.setMonth(today.getMonth() - i);
-        const monthStr = months[monthDate.getMonth()];
-
-        const monthOrders = paidOrders.filter(o => {
-          const orderDate = new Date(o.date);
-          return orderDate.getMonth() === monthDate.getMonth() &&
-                 orderDate.getFullYear() === monthDate.getFullYear();
-        });
-
-        const monthRevenue = monthOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-        result.push({
-          id: `month-${i}`,
-          week: monthStr,
-          revenue: monthRevenue
-        });
-      }
-      return result;
-    } else {
-      // Year view - quarters
-      const result = [];
-      for (let i = 3; i >= 0; i--) {
-        const quarterStart = new Date(today);
-        quarterStart.setMonth(today.getMonth() - (i + 1) * 3);
-        const quarterEnd = new Date(today);
-        quarterEnd.setMonth(today.getMonth() - i * 3);
-
-        const quarterOrders = paidOrders.filter(o => {
-          const orderDate = new Date(o.date);
-          return orderDate >= quarterStart && orderDate < quarterEnd;
-        });
-
-        const quarterRevenue = quarterOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-        result.push({
-          id: `quarter-${i}`,
-          week: `Q${4 - i}`,
-          revenue: quarterRevenue
-        });
-      }
-      return result;
-    }
+    return Object.entries(revenueByDate)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, data]) => ({
+        id: `date-${date}`,
+        week: date,
+        revenue: data.revenue,
+      }));
   };
 
   const revenueTrendData = generateRevenueTrendData();
@@ -250,17 +209,14 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
               <h1 className="text-primary mb-2">Sales & Analytics Reports</h1>
               <p className="text-muted-foreground text-sm">Detailed insights and revenue analytics</p>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value as any)}
-                className="px-4 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="year">This Year</option>
-              </select>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <DateFilterControl
+                mode={dateFilter}
+                selectedDate={selectedDate}
+                onModeChange={setDateFilter}
+                onDateChange={setSelectedDate}
+                className="rounded-lg border border-border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
               <button
                 onClick={handlePrint}
                 className="flex items-center gap-2 bg-secondary text-secondary-foreground px-4 py-2 rounded-lg hover:bg-secondary/90 transition-colors text-sm"
@@ -276,10 +232,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-muted-foreground">
-                  {dateFilter === 'today' ? "Today's Sales" :
-                   dateFilter === 'week' ? "This Week's Sales" :
-                   dateFilter === 'month' ? "This Month's Sales" :
-                   "This Year's Sales"}
+                  Sales for {getReportDateLabel()}
                 </p>
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                   <PesoIcon className="w-5 h-5 text-green-600" />
@@ -340,15 +293,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
             <div className="lg:col-span-2 bg-card rounded-lg shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-primary">Revenue Trend</h3>
-                <select
-                  value={revenueTrendFilter}
-                  onChange={(e) => setRevenueTrendFilter(e.target.value as any)}
-                  className="px-3 py-1.5 border border-border rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  <option value="4weeks">Last 4 Weeks</option>
-                  <option value="3months">Last 3 Months</option>
-                  <option value="year">Last Year</option>
-                </select>
+                <span className="text-sm text-muted-foreground">{getReportDateLabel()}</span>
               </div>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={revenueTrendData}>

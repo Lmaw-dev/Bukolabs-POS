@@ -7,6 +7,7 @@ import { useOrders, Order } from '../../shared/context/OrderContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
+import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
 
 interface OrderListProps {
   onNavigate: (page: Page) => void;
@@ -36,6 +37,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
+  const [datePreset, setDatePreset] = useState<DateFilterMode>('date');
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -98,6 +100,27 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const cashFloat = parseFloat(cashReceived) || 0;
   const isEnough = selectedOrder ? cashFloat >= selectedOrder.amountNumber : false;
 
+  const isWithinDateFilter = (date: string) => {
+    const todayString = new Date().toISOString().split('T')[0];
+    const today = new Date(todayString);
+    const start = new Date(today);
+
+    if (datePreset === 'date') {
+      return !dateFilter || date === dateFilter;
+    }
+
+    if (datePreset === 'week') {
+      start.setDate(today.getDate() - 6);
+    } else if (datePreset === 'month') {
+      start.setDate(1);
+    } else {
+      start.setMonth(0, 1);
+    }
+
+    const startString = start.toISOString().split('T')[0];
+    return date >= startString && date <= todayString;
+  };
+
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
     const matchesSearch = !term ||
@@ -106,7 +129,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     const matchesType = typeFilter === 'All' || order.type === typeFilter;
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
     const matchesStatus = statusFilter === 'All' || order.orderStatus === statusFilter;
-    const matchesDate = !dateFilter || order.date === dateFilter;
+    const matchesDate = isWithinDateFilter(order.date);
     return matchesSearch && matchesType && matchesPayment && matchesStatus && matchesDate;
   });
 
@@ -207,14 +230,13 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
             </div>
 
             {/* Date Filter */}
-            <div className="relative">
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={e => setDateFilter(e.target.value)}
-                className="pl-3 pr-3 py-2.5 bg-muted border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
-              />
-            </div>
+            <DateFilterControl
+              mode={datePreset}
+              selectedDate={dateFilter}
+              onModeChange={setDatePreset}
+              onDateChange={setDateFilter}
+              className="appearance-none pl-3 pr-8 py-2.5 bg-muted border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+            />
 
             <span className="text-xs text-gray-400 ml-auto">{filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}</span>
           </div>

@@ -6,6 +6,7 @@ import { X, Search, Eye, Receipt, RotateCcw, Printer, XCircle } from 'lucide-rea
 import { useOrders, Order } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
+import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
 
 interface RetailOrderListProps {
   onNavigate: (page: Page) => void;
@@ -23,6 +24,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
+  const [datePreset, setDatePreset] = useState<DateFilterMode>('date');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
@@ -42,6 +44,27 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
     return `RET-${order.id}`;
   };
 
+  const isWithinDateFilter = (date: string) => {
+    const todayString = new Date().toISOString().split('T')[0];
+    const today = new Date(todayString);
+    const start = new Date(today);
+
+    if (datePreset === 'date') {
+      return !dateFilter || date === dateFilter;
+    }
+
+    if (datePreset === 'week') {
+      start.setDate(today.getDate() - 6);
+    } else if (datePreset === 'month') {
+      start.setDate(1);
+    } else {
+      start.setMonth(0, 1);
+    }
+
+    const startString = start.toISOString().split('T')[0];
+    return date >= startString && date <= todayString;
+  };
+
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
     const transactionNumber = getTransactionNumber(order).toLowerCase();
@@ -49,7 +72,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
       transactionNumber.includes(term) ||
       (order.customer && order.customer.toLowerCase().includes(term));
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
-    const matchesDate = !dateFilter || order.date === dateFilter;
+    const matchesDate = isWithinDateFilter(order.date);
     return matchesSearch && matchesPayment && matchesDate;
   });
 
@@ -161,19 +184,21 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
               <option value="Void">Void</option>
             </select>
 
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+            <DateFilterControl
+              mode={datePreset}
+              selectedDate={dateFilter}
+              onModeChange={setDatePreset}
+              onDateChange={setDateFilter}
               className="px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
             />
 
-            {(searchTerm || paymentFilter !== 'All' || dateFilter) && (
+            {(searchTerm || paymentFilter !== 'All' || dateFilter || datePreset !== 'date') && (
               <button
                 onClick={() => {
                   setSearchTerm('');
                   setPaymentFilter('All');
                   setDateFilter('');
+                  setDatePreset('date');
                 }}
                 className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
               >

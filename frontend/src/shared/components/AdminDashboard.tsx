@@ -34,14 +34,13 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   const [statusActionUserId, setStatusActionUserId] = useState<number | null>(null);
   const [deleteActionUserId, setDeleteActionUserId] = useState<number | null>(null);
   const [deactivatingUser, setDeactivatingUser] = useState<StaffUser | null>(null);
+  const [activatingUser, setActivatingUser] = useState<StaffUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
 
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [formStaffType, setFormStaffType] = useState<Exclude<StaffType, null>>('POS_STAFF');
-
   useEffect(() => {
     const loadStaff = async () => {
       if (!currentUser?.id) {
@@ -75,7 +74,6 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     setFormEmail('');
     setFormPassword('');
     setShowPassword(false);
-    setFormStaffType('POS_STAFF');
     setError('');
     setShowModal(true);
   };
@@ -86,7 +84,6 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
     setFormEmail(user.email);
     setFormPassword('');
     setShowPassword(false);
-    setFormStaffType(user.staff_type ?? 'POS_STAFF');
     setError('');
     setShowModal(true);
   };
@@ -111,7 +108,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
           full_name: formName,
           email: formEmail,
           password: formPassword || undefined,
-          staff_type: formStaffType,
+          staff_type: 'POS_STAFF',
         }),
       });
       const data = await response.json();
@@ -183,6 +180,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
       }
 
       setUsers((current) => current.map((staff) => (staff.id === user.id ? { ...staff, status: 'ACTIVE' } : staff)));
+      setActivatingUser(null);
     } catch (activateError) {
       setError(activateError instanceof Error ? activateError.message : 'Unable to activate staff account.');
     } finally {
@@ -314,7 +312,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleActivateUser(user)}
+                              onClick={() => setActivatingUser(user)}
                               disabled={statusActionUserId === user.id}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
                               title="Activate account"
@@ -407,21 +405,6 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                   </button>
                 </div>
               </div>
-              <div>
-                <label className="block mb-2 font-medium">Staff Type <span className="text-red-500">*</span></label>
-                <select
-                  value={formStaffType}
-                  onChange={(event) => setFormStaffType(event.target.value as Exclude<StaffType, null>)}
-                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary bg-input-background"
-                >
-                  <option value="POS_STAFF">POS Staff</option>
-                </select>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-xs text-blue-800">
-                  Staff will automatically inherit store ID {currentUser?.store_id ?? 'N/A'} and store type {currentUser?.store_type ?? 'N/A'}.
-                </p>
-              </div>
               <div className="flex gap-3 justify-end pt-4">
                 <button
                   type="button"
@@ -453,6 +436,15 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
         onCancel={() => setDeactivatingUser(null)}
         onConfirm={() => {
           if (deactivatingUser) void handleDeactivateUser(deactivatingUser);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(activatingUser)}
+        title="Confirm Reactivation"
+        description={`Are you sure you want to reactivate ${activatingUser?.full_name ?? 'this staff account'}? They will be able to log in again.`}
+        onCancel={() => setActivatingUser(null)}
+        onConfirm={() => {
+          if (activatingUser) void handleActivateUser(activatingUser);
         }}
       />
       <DeleteConfirmDialog

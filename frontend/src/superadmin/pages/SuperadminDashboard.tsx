@@ -90,6 +90,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
+  const [activatingAdmin, setActivatingAdmin] = useState<AdminSummary | null>(null);
   const [permanentlyDeletingAdminId, setPermanentlyDeletingAdminId] = useState<number | null>(null);
   const [permanentlyDeletingAdmin, setPermanentlyDeletingAdmin] = useState<AdminSummary | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -257,6 +258,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       }
 
       setAdmins((current) => current.map((item) => (item.id === admin.id ? { ...item, status: 'ACTIVE' } : item)));
+      setActivatingAdmin(null);
     } catch (activateError) {
       setError(activateError instanceof Error ? activateError.message : 'Unable to activate admin account.');
     } finally {
@@ -468,6 +470,15 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         onCancel={() => setPermanentlyDeletingAdmin(null)}
         onConfirm={() => {
           if (permanentlyDeletingAdmin) void handlePermanentlyDeleteAdmin(permanentlyDeletingAdmin);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(activatingAdmin)}
+        title="Confirm Reactivation"
+        description={`Are you sure you want to reactivate ${activatingAdmin?.full_name ?? 'this admin account'}? They will be able to log in again.`}
+        onCancel={() => setActivatingAdmin(null)}
+        onConfirm={() => {
+          if (activatingAdmin) void handleActivateAdmin(activatingAdmin);
         }}
       />
 
@@ -747,7 +758,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => void handleActivateAdmin(admin)}
+                                    onClick={() => setActivatingAdmin(admin)}
                                     disabled={deletingAdminId === admin.id}
                                     className="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
                                     title="Activate account"
