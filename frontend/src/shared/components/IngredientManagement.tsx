@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { getApiBaseUrl } from '../../auth/services/auth';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface IngredientManagementProps {
   currentUser: AuthenticatedUser | null;
@@ -61,6 +62,8 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
   const [additionalPrice, setAdditionalPrice] = useState('0');
   const [alternativeAvailable, setAlternativeAvailable] = useState(true);
   const [message, setMessage] = useState('');
+  const [deletingIngredient, setDeletingIngredient] = useState<Ingredient | null>(null);
+  const [deletingAlternative, setDeletingAlternative] = useState<IngredientAlternative | null>(null);
 
   const load = async () => {
     if (!currentUser?.id) return;
@@ -152,9 +155,10 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
   };
 
   const remove = async (ingredient: Ingredient) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${ingredient.ingredient_name}?`)) return;
+    if (!currentUser?.id) return;
     await fetch(`${getApiBaseUrl()}/admin/ingredients/${ingredient.id}?admin_user_id=${currentUser.id}`, { method: 'DELETE' });
     await load();
+    setDeletingIngredient(null);
   };
 
   const submitAlternative = async (event: FormEvent) => {
@@ -198,9 +202,10 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
   };
 
   const removeAlternative = async (alternative: IngredientAlternative) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${alternative.alternative_ingredient_name} as an alternative for ${alternative.parent_ingredient_name}?`)) return;
+    if (!currentUser?.id) return;
     await fetch(`${getApiBaseUrl()}/admin/ingredient-alternatives/${alternative.id}?admin_user_id=${currentUser.id}`, { method: 'DELETE' });
     await load();
+    setDeletingAlternative(null);
   };
 
   return (
@@ -249,7 +254,7 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button type="button" onClick={() => edit(ingredient)} className="rounded-lg border border-border px-3 py-1.5 text-primary"><Pencil className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => remove(ingredient)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeletingIngredient(ingredient)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -348,7 +353,7 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
                       <td className="px-6 py-4">
                         <div className="flex gap-2">
                           <button type="button" onClick={() => editAlternative(alternative)} className="rounded-lg border border-border px-3 py-1.5 text-primary"><Pencil className="h-4 w-4" /></button>
-                          <button type="button" onClick={() => removeAlternative(alternative)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                          <button type="button" onClick={() => setDeletingAlternative(alternative)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>
@@ -364,6 +369,24 @@ export function IngredientManagement({ currentUser, storeBrand, onLogout, onNavi
           </div>
         </main>
       </div>
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingIngredient)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingIngredient?.ingredient_name ?? 'this ingredient'}?`}
+        onCancel={() => setDeletingIngredient(null)}
+        onConfirm={() => {
+          if (deletingIngredient) void remove(deletingIngredient);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingAlternative)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingAlternative?.alternative_ingredient_name ?? 'this alternative'} as an alternative for ${deletingAlternative?.parent_ingredient_name ?? 'this ingredient'}?`}
+        onCancel={() => setDeletingAlternative(null)}
+        onConfirm={() => {
+          if (deletingAlternative) void removeAlternative(deletingAlternative);
+        }}
+      />
     </div>
   );
 }

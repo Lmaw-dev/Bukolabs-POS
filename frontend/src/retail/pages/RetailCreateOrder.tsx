@@ -6,6 +6,7 @@ import { Minus, Plus, Search, X, AlertCircle, ShoppingBag, Shirt, Barcode, Recei
 import { useOrders } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
+import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 
@@ -279,6 +280,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedProductGroup, setSelectedProductGroup] = useState<RetailProductGroup | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [deletingCartItem, setDeletingCartItem] = useState<{ index: number; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -539,6 +541,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
   const removeItem = (index: number) => {
     setCart(cart.filter((_, i) => i !== index));
+    setDeletingCartItem(null);
   };
 
   const filteredProducts = posProducts.filter(p => {
@@ -971,7 +974,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                         </button>
                       </div>
                       <button
-                        onClick={() => removeItem(index)}
+                        onClick={() => setDeletingCartItem({ index, name: item.name })}
                         className="w-5 h-5 rounded bg-white border border-red-200 hover:bg-red-50 flex items-center justify-center text-red-600"
                         title="Remove item"
                       >
@@ -1373,6 +1376,15 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
           </div>
         </div>
       )}
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingCartItem)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingCartItem?.name ?? 'this item'} from the order?`}
+        onCancel={() => setDeletingCartItem(null)}
+        onConfirm={() => {
+          if (deletingCartItem) removeItem(deletingCartItem.index);
+        }}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import { normalizeStoreSettings, useStoreSettings, type DiscountSetting, type StoreSettingValues } from '../context/StoreSettingsContext';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface StoreSettingsProps {
   currentUser: AuthenticatedUser | null;
@@ -84,6 +85,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [deletingDiscount, setDeletingDiscount] = useState<DiscountSetting | null>(null);
   const isRestaurant = currentUser?.store_type === 'RESTAURANT';
   const visibleSettings = isRestaurant ? restaurantSettings : retailSettings;
 
@@ -196,7 +198,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
   };
 
   const deleteDiscount = async (discount: DiscountSetting) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${discount.discount_name}?`)) return;
+    if (!currentUser?.id) return;
     setSaving(true);
     try {
       const response = await fetch(`${getApiBaseUrl()}/admin/discount-settings/${discount.id}?admin_user_id=${currentUser.id}`, {
@@ -207,6 +209,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
       if (!response.ok) throw new Error(data?.message ?? 'Unable to delete discount.');
       await reload();
       setMessage('Discount deleted.');
+      setDeletingDiscount(null);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to delete discount.');
     } finally {
@@ -357,7 +360,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                           <button type="button" onClick={() => setDiscountForm({ id: discount.id, discount_name: discount.discount_name, discount_rate: Number(discount.discount_rate) })} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" title="Edit discount">
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button type="button" onClick={() => void deleteDiscount(discount)} className="rounded-md p-2 text-destructive hover:bg-destructive/10" title="Delete discount">
+                          <button type="button" onClick={() => setDeletingDiscount(discount)} className="rounded-md p-2 text-destructive hover:bg-destructive/10" title="Delete discount">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
@@ -369,6 +372,15 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
           </div>
         </main>
       </div>
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingDiscount)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingDiscount?.discount_name ?? 'this discount'}?`}
+        onCancel={() => setDeletingDiscount(null)}
+        onConfirm={() => {
+          if (deletingDiscount) void deleteDiscount(deletingDiscount);
+        }}
+      />
     </div>
   );
 }

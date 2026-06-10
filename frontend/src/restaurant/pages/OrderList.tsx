@@ -6,6 +6,7 @@ import { X, Search, Eye, CreditCard, Printer, RotateCcw, CheckCircle, ChevronDow
 import { useOrders, Order } from '../../shared/context/OrderContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
+import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 
 interface OrderListProps {
   onNavigate: (page: Page) => void;
@@ -43,6 +44,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [currentPaymentId, setCurrentPaymentId] = useState('');
   const [currentReceiptId, setCurrentReceiptId] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  const [refundingOrder, setRefundingOrder] = useState<Order | null>(null);
 
   const openModal = (order: Order, modal: ActiveModal) => {
     if (modal === 'refund' && !settings.enable_refund) return;
@@ -86,8 +88,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const handleRefundSubmit = () => {
     if (!settings.enable_refund) return;
     if (!selectedOrder || !refundReason.trim()) return;
-    removeOrder(selectedOrder.id);
-    closeModal();
+    setRefundingOrder(selectedOrder);
   };
 
   const handlePrintReceipt = () => {
@@ -778,6 +779,18 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
           </div>
         </div>
       )}
+      <DeleteConfirmDialog
+        isOpen={Boolean(refundingOrder)}
+        title="Confirm Delete"
+        description={`Are you sure you want to refund and remove order ${refundingOrder?.id ?? ''}?`}
+        onCancel={() => setRefundingOrder(null)}
+        onConfirm={() => {
+          if (!refundingOrder) return;
+          removeOrder(refundingOrder.id);
+          setRefundingOrder(null);
+          closeModal();
+        }}
+      />
     </div>
   );
 }

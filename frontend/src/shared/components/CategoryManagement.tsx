@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface CategoryManagementProps {
   currentUser: AuthenticatedUser | null;
@@ -25,6 +26,7 @@ export function CategoryManagement({ currentUser, storeBrand, onLogout, onNaviga
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [message, setMessage] = useState('');
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
 
   const load = async () => {
     if (!currentUser?.id) return;
@@ -64,9 +66,10 @@ export function CategoryManagement({ currentUser, storeBrand, onLogout, onNaviga
   };
 
   const remove = async (category: Category) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${category.name}?`)) return;
+    if (!currentUser?.id) return;
     await fetch(`${getApiBaseUrl()}/admin/categories/${category.id}?admin_user_id=${currentUser.id}`, { method: 'DELETE' });
     await load();
+    setDeletingCategory(null);
   };
 
   return (
@@ -104,7 +107,7 @@ export function CategoryManagement({ currentUser, storeBrand, onLogout, onNaviga
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button type="button" onClick={() => { setEditing(category); setName(category.name); setDescription(category.description ?? ''); }} className="rounded-lg border border-border px-3 py-1.5 text-primary"><Pencil className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => remove(category)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeletingCategory(category)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -114,6 +117,15 @@ export function CategoryManagement({ currentUser, storeBrand, onLogout, onNaviga
           </div>
         </main>
       </div>
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingCategory)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingCategory?.name ?? 'this category'}?`}
+        onCancel={() => setDeletingCategory(null)}
+        onConfirm={() => {
+          if (deletingCategory) void remove(deletingCategory);
+        }}
+      />
     </div>
   );
 }

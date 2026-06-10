@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import { ThermalReceipt } from './ThermalReceipt';
 import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface StoreInformationData {
   id: number;
@@ -56,6 +57,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [showRemoveLogoConfirm, setShowRemoveLogoConfirm] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -245,7 +247,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                         </label>
                         <button
                           type="button"
-                          onClick={() => updateField('logo', null)}
+                          onClick={() => setShowRemoveLogoConfirm(true)}
                           className="self-end rounded-lg border border-border px-4 py-2 text-sm text-primary transition-colors hover:bg-muted"
                         >
                           <span className="flex items-center gap-2"><Trash2 className="h-4 w-4 text-destructive" /> Remove Logo</span>
@@ -370,6 +372,16 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
           )}
         </main>
       </div>
+      <DeleteConfirmDialog
+        isOpen={showRemoveLogoConfirm}
+        title="Confirm Delete"
+        description="Are you sure you want to remove this store logo?"
+        onCancel={() => setShowRemoveLogoConfirm(false)}
+        onConfirm={() => {
+          updateField('logo', null);
+          setShowRemoveLogoConfirm(false);
+        }}
+      />
     </div>
   );
 }

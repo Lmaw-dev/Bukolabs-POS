@@ -6,6 +6,7 @@ import { Clock, Edit2, X, Users, Bell, CheckCircle, MoreVertical, Save, Plus, Tr
 import { useOrders, Order } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { TableAssignmentNotification } from '../../shared/components/TableAssignmentNotification';
+import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 
 interface TableManagementProps {
   onNavigate: (page: Page) => void;
@@ -45,8 +46,8 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState('');
   const [newTableSeats, setNewTableSeats] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingTable, setDeletingTable] = useState<any>(null);
+  const [removingQueuedOrder, setRemovingQueuedOrder] = useState<(typeof queuedOrders)[number] | null>(null);
   const [showQueueHistory, setShowQueueHistory] = useState(false);
   const [showTableHistory, setShowTableHistory] = useState(false);
   const [selectedTableForHistory, setSelectedTableForHistory] = useState<number | null>(null);
@@ -207,7 +208,6 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
 
   const handleOpenDeleteConfirm = (table: any) => {
     setDeletingTable(table);
-    setShowDeleteConfirm(true);
     setOpenMenuId(null);
   };
 
@@ -218,12 +218,10 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
 
     if (!success) {
       alert('Cannot delete table with an active order. Please complete the order first.');
-      setShowDeleteConfirm(false);
       setDeletingTable(null);
       return;
     }
 
-    setShowDeleteConfirm(false);
     setDeletingTable(null);
   };
 
@@ -519,7 +517,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                           <p className="text-xs text-muted-foreground mt-1">{order.orderNumber}</p>
                         </div>
                         <button
-                          onClick={() => removeFromQueue(order.id)}
+                          onClick={() => setRemovingQueuedOrder(order)}
                           className="text-muted-foreground hover:text-destructive p-1"
                           title="Remove from queue"
                         >
@@ -742,76 +740,25 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && deletingTable && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-red-600">Delete Table</h2>
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeletingTable(null);
-                }}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* Warning */}
-              <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <Trash2 className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-medium text-red-900 text-sm mb-1">Warning: This action cannot be undone</h3>
-                    <p className="text-sm text-red-700">
-                      You are about to permanently delete this table. All configuration will be lost.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Table Preview */}
-              <div className="flex items-center justify-center gap-4 p-4 bg-gray-50 rounded-lg border-2 border-gray-300">
-                <div className={`w-16 h-16 rounded-full ${getTableColor(deletingTable.status)} shadow-lg flex items-center justify-center text-white text-xl font-bold`}>
-                  {deletingTable.number}
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-gray-900">Table {deletingTable.number}</p>
-                  <p className="text-sm text-gray-600">{deletingTable.seats} seats</p>
-                  <p className="text-xs text-gray-500 capitalize">Status: {deletingTable.status}</p>
-                </div>
-              </div>
-
-              {/* Confirmation Text */}
-              <p className="text-sm text-gray-700 text-center">
-                Are you sure you want to delete <strong>Table {deletingTable.number}</strong>?
-              </p>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-              <button
-                onClick={() => {
-                  setShowDeleteConfirm(false);
-                  setDeletingTable(null);
-                }}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-semibold flex items-center justify-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete Table
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingTable)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingTable ? `Table ${deletingTable.number}` : 'this table'}?`}
+        onCancel={() => setDeletingTable(null)}
+        onConfirm={handleConfirmDelete}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(removingQueuedOrder)}
+        title="Confirm Delete"
+        description={`Are you sure you want to remove ${removingQueuedOrder?.customerName ?? 'this customer'} from the queue?`}
+        onCancel={() => setRemovingQueuedOrder(null)}
+        onConfirm={() => {
+          if (removingQueuedOrder) {
+            removeFromQueue(removingQueuedOrder.id);
+            setRemovingQueuedOrder(null);
+          }
+        }}
+      />
 
       {/* Assignment Notification Modal */}
       {assignmentNotification && (

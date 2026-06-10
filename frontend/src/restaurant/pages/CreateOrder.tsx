@@ -7,6 +7,7 @@ import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
+import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
 import wagyuSteakImg from '../../imports/image-4.png';
@@ -302,6 +303,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [recommendedProducts, setRecommendedProducts] = useState<MenuProduct[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [deletingCartItem, setDeletingCartItem] = useState<{ index: number; name: string } | null>(null);
+  const [deletingIngredient, setDeletingIngredient] = useState<{ index: number; name: string } | null>(null);
   const [diningOption, setDiningOption] = useState<'' | 'dine-in' | 'takeout'>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [customizeItemIndex, setCustomizeItemIndex] = useState<number | null>(null);
@@ -659,6 +662,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       }
       return item;
     }));
+    setDeletingIngredient(null);
   };
 
   const removeItem = (index: number) => {
@@ -666,6 +670,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     if (customizeItemIndex === index) {
       setCustomizeItemIndex(null);
     }
+    setDeletingCartItem(null);
   };
 
   const filteredProducts = posProducts.filter(p => {
@@ -1245,7 +1250,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                               </button>
                             </div>
                             <button
-                              onClick={() => removeItem(index)}
+                              onClick={() => setDeletingCartItem({ index, name: item.name })}
                               className="text-destructive hover:bg-destructive/10 p-1 rounded"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -1294,7 +1299,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                               </button>
                             </div>
                             <button
-                              onClick={() => removeItem(index)}
+                              onClick={() => setDeletingCartItem({ index, name: item.name })}
                               className="text-destructive hover:bg-destructive/10 p-1 rounded"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -1342,7 +1347,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                           </button>
                         </div>
                         <button
-                          onClick={() => removeItem(index)}
+                          onClick={() => setDeletingCartItem({ index, name: item.name })}
                           className="text-destructive hover:bg-destructive/10 p-1 rounded"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -1644,7 +1649,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                           </button>
                         </div>
                         <button
-                          onClick={() => deleteIngredient(customizeItemIndex, ingredient.name)}
+                          onClick={() => setDeletingIngredient({ index: customizeItemIndex, name: ingredient.name })}
                           className="text-destructive hover:bg-destructive/10 p-1.5 rounded"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2519,6 +2524,24 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
           </div>
         );
       })()}
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingCartItem)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingCartItem?.name ?? 'this item'} from the order?`}
+        onCancel={() => setDeletingCartItem(null)}
+        onConfirm={() => {
+          if (deletingCartItem) removeItem(deletingCartItem.index);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingIngredient)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingIngredient?.name ?? 'this ingredient'} from this item?`}
+        onCancel={() => setDeletingIngredient(null)}
+        onConfirm={() => {
+          if (deletingIngredient) deleteIngredient(deletingIngredient.index, deletingIngredient.name);
+        }}
+      />
     </div>
   );
 }

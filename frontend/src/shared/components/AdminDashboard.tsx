@@ -4,6 +4,7 @@ import { Ban, CircleCheck, Eye, EyeOff, KeyRound, Pencil, Trash2, UserPlus, X } 
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser, StaffType } from '../../auth/types/auth';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface StaffUser {
   id: number;
@@ -32,6 +33,8 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
   const [statusActionUserId, setStatusActionUserId] = useState<number | null>(null);
   const [deleteActionUserId, setDeleteActionUserId] = useState<number | null>(null);
+  const [deactivatingUser, setDeactivatingUser] = useState<StaffUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState<StaffUser | null>(null);
 
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -135,7 +138,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
       : <span className="inline-flex rounded bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">Deactivated</span>;
 
   const handleDeactivateUser = async (user: StaffUser) => {
-    if (!currentUser?.id || !window.confirm(`Deactivate ${user.full_name}? They will no longer be able to log in.`)) {
+    if (!currentUser?.id) {
       return;
     }
 
@@ -153,6 +156,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
       }
 
       setUsers((current) => current.map((staff) => (staff.id === user.id ? { ...staff, status: 'INACTIVE' } : staff)));
+      setDeactivatingUser(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to deactivate staff account.');
     } finally {
@@ -187,7 +191,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
   };
 
   const handleDeleteUser = async (user: StaffUser) => {
-    if (!currentUser?.id || !window.confirm(`Permanently delete ${user.full_name}? This action cannot be undone.`)) {
+    if (!currentUser?.id) {
       return;
     }
 
@@ -205,6 +209,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
       }
 
       setUsers((current) => current.filter((staff) => staff.id !== user.id));
+      setDeletingUser(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete staff account.');
     } finally {
@@ -298,7 +303,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                           {isStaffActive(user) ? (
                             <button
                               type="button"
-                              onClick={() => handleDeactivateUser(user)}
+                              onClick={() => setDeactivatingUser(user)}
                               disabled={statusActionUserId === user.id}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
                               title="Deactivate staff"
@@ -320,7 +325,7 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
                           )}
                           <button
                             type="button"
-                            onClick={() => handleDeleteUser(user)}
+                            onClick={() => setDeletingUser(user)}
                             disabled={deleteActionUserId === user.id}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[#64748b] transition-colors hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
                             title="Delete staff"
@@ -441,6 +446,24 @@ export function AdminDashboard({ currentUser, storeBrand, onLogout, onNavigate }
           </form>
         </div>
       )}
+      <DeleteConfirmDialog
+        isOpen={Boolean(deactivatingUser)}
+        title="Confirm Deactivation"
+        description={`Are you sure you want to deactivate ${deactivatingUser?.full_name ?? 'this staff account'}? They will no longer be able to log in.`}
+        onCancel={() => setDeactivatingUser(null)}
+        onConfirm={() => {
+          if (deactivatingUser) void handleDeactivateUser(deactivatingUser);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingUser)}
+        title="Confirm Delete"
+        description={`Are you sure you want to permanently delete ${deletingUser?.full_name ?? 'this staff account'}? This action cannot be undone.`}
+        onCancel={() => setDeletingUser(null)}
+        onConfirm={() => {
+          if (deletingUser) void handleDeleteUser(deletingUser);
+        }}
+      />
     </div>
   );
 }

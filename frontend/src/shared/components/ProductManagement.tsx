@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Page, type StoreBrand } from '../App';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface ProductManagementProps {
   currentUser: AuthenticatedUser | null;
@@ -113,6 +114,8 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   const [form, setForm] = useState<Record<string, string | boolean>>(emptyProduct);
   const [message, setMessage] = useState('');
   const [codeSeed, setCodeSeed] = useState(() => Date.now());
+  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deletingFormRow, setDeletingFormRow] = useState<{ type: 'variant' | 'ingredient'; index: number } | null>(null);
   const isRestaurant = currentUser?.store_type === 'RESTAURANT';
   const productImagePreview = String(form.image_url || storeBrand?.logo || '');
 
@@ -347,9 +350,10 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
   };
 
   const remove = async (product: Product) => {
-    if (!currentUser?.id || !window.confirm(`Delete ${product.name}?`)) return;
+    if (!currentUser?.id) return;
     await fetch(`${getApiBaseUrl()}/admin/products/${product.id}?admin_user_id=${currentUser.id}`, { method: 'DELETE' });
     await load();
+    setDeletingProduct(null);
   };
 
   return (
@@ -440,7 +444,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                           Photo
                           <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => handleVariantImageUpload(index, event)} className="hidden" />
                         </label>
-                        <button type="button" onClick={() => removeVariantRow(index)} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeletingFormRow({ type: 'variant', index })} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     ))}
                   </div>
@@ -484,7 +488,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                         <input type="checkbox" checked={ingredient.is_removable} onChange={(event) => updateIngredientRow(index, { is_removable: event.target.checked })} className="h-5 w-5 accent-primary" />
                         Removable
                       </label>
-                      <button type="button" onClick={() => removeIngredientRow(index)} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => setDeletingFormRow({ type: 'ingredient', index })} className="rounded-lg border border-destructive/20 px-3 py-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
                     </div>
                   ))}
                   {productIngredients.length === 0 && (
@@ -546,7 +550,7 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button type="button" onClick={() => edit(product)} className="rounded-lg border border-border px-3 py-1.5 text-primary"><Pencil className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => remove(product)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeletingProduct(product)} className="rounded-lg border border-destructive/20 px-3 py-1.5 text-destructive"><Trash2 className="h-4 w-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -593,6 +597,30 @@ export function ProductManagement({ currentUser, storeBrand, onLogout, onNavigat
           )}
         </main>
       </div>
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingProduct)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete ${deletingProduct?.name ?? 'this product'}?`}
+        onCancel={() => setDeletingProduct(null)}
+        onConfirm={() => {
+          if (deletingProduct) void remove(deletingProduct);
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(deletingFormRow)}
+        title="Confirm Delete"
+        description={`Are you sure you want to delete this ${deletingFormRow?.type ?? 'row'}?`}
+        onCancel={() => setDeletingFormRow(null)}
+        onConfirm={() => {
+          if (!deletingFormRow) return;
+          if (deletingFormRow.type === 'variant') {
+            removeVariantRow(deletingFormRow.index);
+          } else {
+            removeIngredientRow(deletingFormRow.index);
+          }
+          setDeletingFormRow(null);
+        }}
+      />
     </div>
   );
 }

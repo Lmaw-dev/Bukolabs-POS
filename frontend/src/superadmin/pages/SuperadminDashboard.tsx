@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { LogoutConfirmDialog } from '../../shared/components/LogoutConfirmDialog';
+import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 
 interface AdminSummary {
   id: number;
@@ -90,6 +91,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
   const [deletingAdminId, setDeletingAdminId] = useState<number | null>(null);
   const [permanentlyDeletingAdminId, setPermanentlyDeletingAdminId] = useState<number | null>(null);
+  const [permanentlyDeletingAdmin, setPermanentlyDeletingAdmin] = useState<AdminSummary | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -263,10 +265,6 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   };
 
   const handlePermanentlyDeleteAdmin = async (admin: AdminSummary) => {
-    if (!window.confirm(`Permanently delete ${admin.full_name}? This action cannot be undone.`)) {
-      return;
-    }
-
     setPermanentlyDeletingAdminId(admin.id);
     setError('');
 
@@ -281,6 +279,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
       }
 
       setAdmins((current) => current.filter((item) => item.id !== admin.id));
+      setPermanentlyDeletingAdmin(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete admin account.');
     } finally {
@@ -460,6 +459,15 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
         onConfirm={() => {
           setShowLogoutConfirm(false);
           onLogout();
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(permanentlyDeletingAdmin)}
+        title="Confirm Delete"
+        description={`Are you sure you want to permanently delete ${permanentlyDeletingAdmin?.full_name ?? 'this admin account'}? This action cannot be undone.`}
+        onCancel={() => setPermanentlyDeletingAdmin(null)}
+        onConfirm={() => {
+          if (permanentlyDeletingAdmin) void handlePermanentlyDeleteAdmin(permanentlyDeletingAdmin);
         }}
       />
 
@@ -750,7 +758,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => void handlePermanentlyDeleteAdmin(admin)}
+                                  onClick={() => setPermanentlyDeletingAdmin(admin)}
                                   disabled={permanentlyDeletingAdminId === admin.id}
                                   className="rounded-md p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-60"
                                   title="Delete admin"
