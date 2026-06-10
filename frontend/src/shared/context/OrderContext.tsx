@@ -263,7 +263,7 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
 
   // Derive queued orders from orders with isQueued = true
   const queuedOrders: QueuedOrder[] = orders
-    .filter(o => o.isQueued && o.paymentStatus === 'Not Paid')
+    .filter(o => o.isQueued && o.orderStatus !== 'Completed')
     .sort((a, b) => (a.queuePosition || 0) - (b.queuePosition || 0))
     .map(o => ({
       id: o.id,
@@ -343,6 +343,16 @@ export function useOrders() {
 function mapDatabaseRestaurantOrder(row: any): Order {
   const createdAt = row.created_at ? new Date(row.created_at) : new Date();
   const items = Array.isArray(row.items) ? row.items : [];
+  const tableName = row.table_name ? String(row.table_name) : '-';
+  const queueMatch = tableName.match(/^Queue(?:\s*#?(\d+))?/i);
+  const paymentStatus: Order['paymentStatus'] = row.payment_status === 'PAID' ? 'Paid' : 'Not Paid';
+  const orderStatus: Order['orderStatus'] =
+    row.order_status === 'PREPARING' ? 'Preparing' :
+    row.order_status === 'READY' ? 'Ready' :
+    row.order_status === 'SERVED' ? 'Served' :
+    row.order_status === 'COMPLETED' ? 'Completed' :
+    'Pending';
+  const isQueued = Boolean(queueMatch) && orderStatus !== 'Completed';
   const type: Order['type'] =
     row.order_type === 'DINE_IN' ? 'Dine-In' :
     row.order_type === 'MIXED' ? 'Mixed' :
@@ -353,20 +363,15 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     orderNumber: row.order_number ?? String(row.id).padStart(6, '0'),
     customer: row.customer_name || 'Walk-in Customer',
     type,
-    table: row.table_name || '-',
+    table: isQueued ? 'Queue' : tableName,
     amountNumber: Number(row.total_amount ?? 0),
     subtotal: Number(row.subtotal ?? 0),
     serviceFee: Number(row.service_charge ?? 0),
     tax: Number(row.tax_amount ?? 0),
     discount: Number(row.discount_amount ?? 0),
     discountType: row.discount_type ?? undefined,
-    paymentStatus: row.payment_status === 'PAID' ? 'Paid' : 'Not Paid',
-    orderStatus:
-      row.order_status === 'PREPARING' ? 'Preparing' :
-      row.order_status === 'READY' ? 'Ready' :
-      row.order_status === 'SERVED' ? 'Served' :
-      row.order_status === 'COMPLETED' ? 'Completed' :
-      'Pending',
+    paymentStatus,
+    orderStatus,
     date: createdAt.toISOString().split('T')[0],
     time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     items: items.map((item: any) => ({
@@ -380,5 +385,7 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     cashReceived: row.amount_paid !== null && row.amount_paid !== undefined ? Number(row.amount_paid) : undefined,
     changeGiven: row.change_amount !== null && row.change_amount !== undefined ? Number(row.change_amount) : undefined,
     cashier: row.cashier_name ?? undefined,
+    isQueued,
+    queuePosition: isQueued && queueMatch?.[1] ? Number(queueMatch[1]) : undefined,
   };
 }

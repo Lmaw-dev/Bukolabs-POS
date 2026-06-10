@@ -740,14 +740,18 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         orderNumber: orderDetails.orderNumber,
         customerName: orderDetails.customerName || null,
         orderType: getOrderTypeForPayload(orderDetails.items),
-        tableName: orderDetails.tableNumber ? `Table ${orderDetails.tableNumber}` : null,
+        tableName: orderDetails.tableNumber
+          ? `Table ${orderDetails.tableNumber}`
+          : orderDetails.isQueued
+          ? `Queue #${orderDetails.queuePosition || 1}`
+          : null,
         subtotal: orderDetails.subtotal,
         discount: orderDetails.discount,
         discountType: orderDetails.discountType ?? null,
         serviceFee: orderDetails.serviceFee,
         tax: orderDetails.tax,
         total: orderDetails.total,
-        orderStatus: paid ? 'COMPLETED' : 'PENDING',
+        orderStatus: paid && !orderDetails.isQueued ? 'COMPLETED' : 'PENDING',
         paymentStatus: paid ? 'PAID' : 'NOT_PAID',
         items: orderDetails.items.map(serializeItemForOrder),
         payment: paid && payment ? {
@@ -2700,8 +2704,9 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
 
       {/* Receipt Preview Modal */}
       {showReceiptPreview && successOrderDetails && (() => {
-        const receiptDineInItems = successOrderDetails.items.filter((i: CartItem) => i.itemType === 'dine-in');
-        const receiptTakeoutItems = successOrderDetails.items.filter((i: CartItem) => i.itemType === 'takeout');
+        const getReceiptItemType = (item: CartItem & { itemType?: 'dine-in' | 'takeout' }) => item.itemType ?? item.orderType;
+        const receiptDineInItems = successOrderDetails.items.filter((i: CartItem & { itemType?: 'dine-in' | 'takeout' }) => getReceiptItemType(i) === 'dine-in');
+        const receiptTakeoutItems = successOrderDetails.items.filter((i: CartItem & { itemType?: 'dine-in' | 'takeout' }) => getReceiptItemType(i) === 'takeout');
         const receiptIsMixed = receiptDineInItems.length > 0 && receiptTakeoutItems.length > 0;
 
         const orderType = receiptIsMixed ? 'Mixed' : receiptDineInItems.length > 0 ? 'Dine-In' : 'Takeout';
@@ -2723,12 +2728,12 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                 orderNumber={currentOrderNumber}
                 customerName={successOrderDetails.customerName}
                 orderType={orderType as 'Dine-In' | 'Takeout' | 'Mixed'}
-                table={successOrderDetails.tableNumber ? `#${successOrderDetails.tableNumber}` : undefined}
-                items={successOrderDetails.items.map((item: CartItem) => ({
+                table={successOrderDetails.tableNumber ? `#${successOrderDetails.tableNumber}` : successOrderDetails.isQueued ? 'Queue' : undefined}
+                items={successOrderDetails.items.map((item: CartItem & { itemType?: 'dine-in' | 'takeout' }) => ({
                   name: item.name,
                   quantity: item.quantity,
                   price: item.price,
-                  itemType: item.itemType,
+                  itemType: getReceiptItemType(item),
                 }))}
                 subtotal={successOrderDetails.subtotal}
                 serviceFee={successOrderDetails.serviceFee}

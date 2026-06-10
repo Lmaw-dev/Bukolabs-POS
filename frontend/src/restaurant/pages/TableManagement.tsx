@@ -72,6 +72,19 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
   // Note: Queue management is handled in CreateOrder component
   // Queued orders automatically show here from OrderContext
 
+  const getBestAvailableTableForQueuedOrder = (order: (typeof queuedOrders)[number]) => {
+    const requiredSeats = order.requiredSeats || order.partySize || 0;
+    return [...tables]
+      .filter(table => table.status === 'available' && table.seats >= requiredSeats)
+      .sort((a, b) => a.seats - b.seats || a.number - b.number)[0];
+  };
+
+  const handleSeatQueuedOrder = (order: (typeof queuedOrders)[number]) => {
+    const table = getBestAvailableTableForQueuedOrder(order);
+    if (!table) return;
+    assignToTable(order.id, [table.number]);
+  };
+
   const handleTableClick = (table: typeof tables[0]) => {
     if (table.status === 'occupied') {
       // Select/deselect occupied table
@@ -734,7 +747,10 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                 </div>
 
                 <div className="space-y-3">
-                  {queuedOrders.map((order, index) => (
+                  {queuedOrders.map((order, index) => {
+                    const bestAvailableTable = getBestAvailableTableForQueuedOrder(order);
+
+                    return (
                     <div
                       key={order.id}
                       className={`border border-border rounded-lg p-3 ${
@@ -765,15 +781,28 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
                         <Clock className="w-3 h-3" />
-                        <span>Waiting for table...</span>
+                        <span>
+                          {bestAvailableTable
+                            ? `Table ${bestAvailableTable.number} is available`
+                            : 'Waiting for table...'}
+                        </span>
                       </div>
+                      {bestAvailableTable && (
+                        <button
+                          onClick={() => handleSeatQueuedOrder(order)}
+                          className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                        >
+                          Seat at Table {bestAvailableTable.number}
+                        </button>
+                      )}
                       {index === 0 && (
                         <div className="mt-2 pt-2 border-t border-orange-200">
                           <p className="text-xs text-orange-600 font-medium">Next to be seated</p>
                         </div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <p className="text-xs text-muted-foreground mt-4 text-center">
@@ -1039,6 +1068,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           entry.status === 'Assigned' ? 'bg-green-100 text-green-800' :
                           entry.status === 'Skipped' ? 'bg-orange-100 text-orange-800' :
+                          entry.status === 'Waiting' ? 'bg-blue-100 text-blue-800' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {entry.status}

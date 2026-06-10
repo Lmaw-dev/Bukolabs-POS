@@ -23,7 +23,7 @@ export interface QueueHistoryEntry {
   queueTime: Date;
   assignedTables?: number[];
   timeAssigned?: Date;
-  status: 'Assigned' | 'Cancelled' | 'Skipped';
+  status: 'Waiting' | 'Assigned' | 'Cancelled' | 'Skipped';
   staffAction: string;
   orderId: string;
 }
@@ -82,6 +82,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   const prevTablesRef = useRef<Table[]>([]);
   const queuedOrdersRef = useRef(queuedOrders);
   const assignmentNotificationRef = useRef(assignmentNotification);
+  const knownQueuedOrderIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => { queuedOrdersRef.current = queuedOrders; }, [queuedOrders]);
   useEffect(() => { assignmentNotificationRef.current = assignmentNotification; }, [assignmentNotification]);
 
@@ -106,7 +107,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
         // Find active order for this table
         const order = orders.find(o =>
           o.table === `Table ${table.number}` &&
-          o.paymentStatus === 'Not Paid'
+          o.orderStatus !== 'Completed'
         );
 
         // Preserve manually set maintenance and reserved status
@@ -147,6 +148,27 @@ export function TableProvider({ children }: { children: ReactNode }) {
       return newTables;
     });
   }, [orders, queuedOrders, updateOrder]);
+
+  // Record customers as soon as they enter the queue, not only after assignment.
+  useEffect(() => {
+    const newQueuedOrders = queuedOrders.filter(order => !knownQueuedOrderIdsRef.current.has(order.id));
+    if (newQueuedOrders.length === 0) return;
+
+    newQueuedOrders.forEach(order => knownQueuedOrderIdsRef.current.add(order.id));
+    const newEntries: QueueHistoryEntry[] = newQueuedOrders.map(order => ({
+      id: `queue-waiting-${order.id}-${Date.now()}`,
+      queueNumber: order.queuePosition || 0,
+      customerName: order.customerName,
+      partySize: order.partySize || 0,
+      requiredSeats: order.requiredSeats || order.partySize || 0,
+      queueTime: order.timestamp,
+      status: 'Waiting',
+      staffAction: 'Joined queue',
+      orderId: order.id,
+    }));
+
+    setQueueHistory(prev => [...newEntries, ...prev]);
+  }, [queuedOrders]);
 
   // Detect occupied → available transitions and trigger queue assignment notification
   useEffect(() => {
@@ -208,6 +230,50 @@ export function TableProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [tables]);
+
+  // Also notify when a suitable table is already available or becomes available from reserved/maintenance.
+  useEffect(() => {
+    if (assignmentNotification) return;
+    if (queuedOrders.length === 0) return;
+
+    const availableTables = tables
+      .filter(table => table.status === 'available')
+      .sort((a, b) => a.seats - b.seats);
+    if (availableTables.length === 0) return;
+
+    const firstInQueue = queuedOrders[0];
+    const fittingTable = availableTables.find(table => table.seats >= (firstInQueue.partySize || 0));
+    if (fittingTable) {
+      setAssignmentNotification({
+        availableTable: fittingTable,
+        queuedCustomer: {
+          id: firstInQueue.id,
+          name: firstInQueue.customerName,
+          partySize: firstInQueue.partySize || 0,
+          queuePosition: firstInQueue.queuePosition || 0,
+          orderId: firstInQueue.id,
+        },
+      });
+      return;
+    }
+
+    for (const table of availableTables) {
+      const compatible = queuedOrders.find(order => (order.partySize || 0) <= table.seats);
+      if (compatible) {
+        setAssignmentNotification({
+          availableTable: table,
+          queuedCustomer: {
+            id: compatible.id,
+            name: compatible.customerName,
+            partySize: compatible.partySize || 0,
+            queuePosition: compatible.queuePosition || 0,
+            orderId: compatible.id,
+          },
+        });
+        return;
+      }
+    }
+  }, [tables, queuedOrders, assignmentNotification]);
 
   const setTableStatus = (tableNumber: number, status: 'available' | 'maintenance' | 'reserved') => {
     setTables(prevTables =>
@@ -289,6 +355,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       table: tableLabels,
       isQueued: false,
       queuePosition: undefined,
+      orderStatus: order.paymentStatus === 'Paid' ? 'Served' : 'Preparing',
     });
 
     // Add to queue history
