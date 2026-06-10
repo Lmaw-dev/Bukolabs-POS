@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
@@ -72,24 +72,6 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
   // Note: Queue management is handled in CreateOrder component
   // Queued orders automatically show here from OrderContext
 
-  const getStatusBadgeStyle = (status: string) => {
-    switch (status) {
-      case 'available': return 'bg-emerald-100 text-emerald-700';
-      case 'occupied': return 'bg-orange-100 text-orange-700';
-      case 'maintenance': return 'bg-gray-200 text-gray-700';
-      default: return 'bg-gray-100 text-gray-600';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'available': return 'Available';
-      case 'occupied': return 'Occupied';
-      case 'maintenance': return 'Maintenance';
-      default: return status;
-    }
-  };
-
   const handleTableClick = (table: typeof tables[0]) => {
     if (table.status === 'occupied') {
       // Select/deselect occupied table
@@ -144,6 +126,201 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
       default: return 'bg-gradient-to-br from-gray-400 to-gray-600';
     }
   };
+
+  const getTableTheme = (status: string) => {
+    switch (status) {
+      case 'available':
+        return {
+          accent: '#10b981',
+          accentSoft: 'rgba(16, 185, 129, 0.16)',
+          border: 'rgba(16, 185, 129, 0.7)',
+          glow: 'rgba(16, 185, 129, 0.22)',
+          label: 'text-emerald-700',
+          surface: 'linear-gradient(145deg, #f8fafc 0%, #eef4f7 100%)',
+          frame: '#dce7ec',
+        };
+      case 'occupied':
+        return {
+          accent: '#f97316',
+          accentSoft: 'rgba(249, 115, 22, 0.16)',
+          border: 'rgba(249, 115, 22, 0.7)',
+          glow: 'rgba(249, 115, 22, 0.22)',
+          label: 'text-orange-700',
+          surface: 'linear-gradient(145deg, #fff9f4 0%, #fff2e8 100%)',
+          frame: '#f7d5bf',
+        };
+      case 'reserved':
+        return {
+          accent: '#3b82f6',
+          accentSoft: 'rgba(59, 130, 246, 0.16)',
+          border: 'rgba(59, 130, 246, 0.72)',
+          glow: 'rgba(59, 130, 246, 0.22)',
+          label: 'text-blue-700',
+          surface: 'linear-gradient(145deg, #f7fbff 0%, #edf5ff 100%)',
+          frame: '#c9dbfb',
+        };
+      case 'maintenance':
+        return {
+          accent: '#6b7280',
+          accentSoft: 'rgba(107, 114, 128, 0.18)',
+          border: 'rgba(107, 114, 128, 0.72)',
+          glow: 'rgba(107, 114, 128, 0.18)',
+          label: 'text-gray-700',
+          surface: 'linear-gradient(145deg, #fbfbfc 0%, #eef1f4 100%)',
+          frame: '#d8dee5',
+        };
+      default:
+        return {
+          accent: '#6b7280',
+          accentSoft: 'rgba(107, 114, 128, 0.18)',
+          border: 'rgba(107, 114, 128, 0.72)',
+          glow: 'rgba(107, 114, 128, 0.18)',
+          label: 'text-gray-700',
+          surface: 'linear-gradient(145deg, #fbfbfc 0%, #eef1f4 100%)',
+          frame: '#d8dee5',
+        };
+    }
+  };
+
+  type ChairSide = 'top' | 'right' | 'bottom' | 'left';
+
+  const getChairLayout = (seats: number, rectangular: boolean) => {
+    if (seats <= 1) {
+      return [{ side: 'bottom' as ChairSide, offset: 50 }];
+    }
+
+    if (seats === 2) {
+      return [
+        { side: 'left' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (seats === 3) {
+      return [
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'left' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (seats <= 4) {
+      return [
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'left' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (rectangular && seats === 5) {
+      return [
+        { side: 'top' as ChairSide, offset: 24 },
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'top' as ChairSide, offset: 76 },
+        { side: 'bottom' as ChairSide, offset: 35 },
+        { side: 'bottom' as ChairSide, offset: 65 },
+      ];
+    }
+
+    if (rectangular && seats === 6) {
+      return [
+        { side: 'top' as ChairSide, offset: 24 },
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'top' as ChairSide, offset: 76 },
+        { side: 'bottom' as ChairSide, offset: 24 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 76 },
+      ];
+    }
+
+    if (rectangular && seats === 7) {
+      return [
+        { side: 'top' as ChairSide, offset: 18 },
+        { side: 'top' as ChairSide, offset: 39 },
+        { side: 'top' as ChairSide, offset: 61 },
+        { side: 'top' as ChairSide, offset: 82 },
+        { side: 'bottom' as ChairSide, offset: 24 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 76 },
+      ];
+    }
+
+    if (rectangular) {
+      return [
+        { side: 'top' as ChairSide, offset: 18 },
+        { side: 'top' as ChairSide, offset: 39 },
+        { side: 'top' as ChairSide, offset: 61 },
+        { side: 'top' as ChairSide, offset: 82 },
+        { side: 'bottom' as ChairSide, offset: 18 },
+        { side: 'bottom' as ChairSide, offset: 39 },
+        { side: 'bottom' as ChairSide, offset: 61 },
+        { side: 'bottom' as ChairSide, offset: 82 },
+      ];
+    }
+
+    return [
+      { side: 'top' as ChairSide, offset: 24 },
+      { side: 'top' as ChairSide, offset: 50 },
+      { side: 'top' as ChairSide, offset: 76 },
+      { side: 'right' as ChairSide, offset: 50 },
+      { side: 'bottom' as ChairSide, offset: 76 },
+      { side: 'bottom' as ChairSide, offset: 50 },
+      { side: 'bottom' as ChairSide, offset: 24 },
+      { side: 'left' as ChairSide, offset: 50 },
+    ];
+  };
+
+  const getChairStyle = (side: ChairSide, offset: number, rectangular: boolean): CSSProperties => {
+    const edgeInset = rectangular ? 16 : 10;
+    const sideInset = rectangular ? 12 : 10;
+
+    switch (side) {
+      case 'top':
+        return {
+          left: `${offset}%`,
+          top: edgeInset,
+          transform: 'translate(-50%, 0) rotate(0deg)',
+        };
+      case 'right':
+        return {
+          right: sideInset,
+          top: `${offset}%`,
+          transform: 'translate(0, -50%) rotate(90deg)',
+        };
+      case 'bottom':
+        return {
+          left: `${offset}%`,
+          bottom: edgeInset,
+          transform: 'translate(-50%, 0) rotate(180deg)',
+        };
+      case 'left':
+        return {
+          left: sideInset,
+          top: `${offset}%`,
+          transform: 'translate(0, -50%) rotate(-90deg)',
+        };
+      default:
+        return {};
+    }
+  };
+
+  const renderChairIcon = (key: string, side: ChairSide, offset: number, accent: string, rectangular: boolean) => (
+    <div
+      key={key}
+      className="absolute h-10 w-10 drop-shadow-[0_6px_10px_rgba(15,23,42,0.14)]"
+      style={getChairStyle(side, offset, rectangular)}
+    >
+      <svg viewBox="0 0 48 48" className="h-full w-full">
+        <path d="M12 13c-3.5 3-5.5 7-5.5 11s2 8 5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M36 13c3.5 3 5.5 7 5.5 11s-2 8-5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
+        <rect x="14" y="10" width="20" height="5" rx="2.5" fill="#525b67" />
+        <rect x="12" y="14" width="24" height="21" rx="7" fill="#626c79" />
+        <rect x="15" y="17" width="18" height="12" rx="5" fill={accent} opacity="0.9" />
+        <rect x="16" y="31" width="16" height="4" rx="2" fill="#d8dee6" />
+      </svg>
+    </div>
+  );
 
   const handleOpenEditModal = (table: any) => {
     setEditingTable(table);
@@ -285,26 +462,33 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
                 {tables.map(table => {
                   const order = getTableOrder(table);
+                  const theme = getTableTheme(table.status);
+                  const rectangular = table.seats > 4;
+                  const chairs = getChairLayout(table.seats, rectangular);
+                  const displayedChairs = chairs.slice(0, 8);
                   return (
                     <div
                       key={table.id}
-                      className={`bg-white rounded-xl shadow-sm border-2 transition-all p-4 flex flex-col items-center gap-3 relative ${
+                      className={`rounded-2xl border transition-all p-2.5 flex flex-col gap-2.5 relative overflow-hidden ${
                         selectedTableId === table.id
-                          ? 'border-primary ring-2 ring-primary/20'
-                          : 'border-gray-200'
+                          ? 'border-blue-400 ring-2 ring-blue-100 shadow-[0_18px_34px_rgba(59,130,246,0.18)]'
+                          : 'border-slate-200 shadow-[0_10px_26px_rgba(15,23,42,0.08)]'
                       }`}
+                      style={{
+                        background: 'linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)',
+                      }}
                     >
                       {/* Three-dot menu button */}
-                      <div className="absolute top-2 right-2">
+                      <div className="absolute top-2.5 right-2.5 z-20">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenMenuId(openMenuId === table.id ? null : table.id);
                           }}
-                          className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                          className="p-1.5 hover:bg-black/5 rounded-full transition-colors"
                         >
                           <MoreVertical className="w-4 h-4 text-gray-600" />
                         </button>
@@ -341,49 +525,100 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                         )}
                       </div>
 
-                      {/* Circular badge with table number - color based on status */}
-                      <button
-                        onClick={() => handleTableClick(table)}
-                        className="relative focus:outline-none"
-                      >
-                        <div className={`w-20 h-20 rounded-full ${getTableColor(table.status)} shadow-lg flex items-center justify-center text-white text-2xl font-bold transition-transform hover:scale-105`}>
-                          {table.number}
-                        </div>
-                      </button>
-
-                      {/* Table label */}
-                      <div className="text-center w-full">
-                        <p className="font-semibold text-gray-800">Table {table.number}</p>
-                        <div className="flex items-center justify-center gap-1 text-xs text-gray-500 mt-1">
-                          <Users className="w-3 h-3" />
-                          <span>{table.seats} seats</span>
+                      <div className="relative z-10 min-h-[34px]">
+                        <div>
+                          <p className="text-[13px] font-semibold text-slate-800">Table {table.number}</p>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <Users className="w-3 h-3" />
+                            <span>{table.seats} seats</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Status Dropdown */}
-                      <select
-                        value={table.status}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleStatusChange(table.number, e.target.value as any);
-                        }}
-                        className={`w-full px-3 py-2 rounded-lg text-sm font-medium border-2 focus:outline-none focus:ring-2 focus:ring-primary transition-colors ${
-                          table.status === 'available' ? 'border-green-200 bg-green-50 text-green-700' :
-                          table.status === 'occupied' ? 'border-orange-200 bg-orange-50 text-orange-700 cursor-not-allowed' :
-                          table.status === 'reserved' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                          'border-gray-200 bg-gray-50 text-gray-700'
-                        }`}
-                        disabled={table.status === 'occupied'}
+                      <button
+                        onClick={() => handleTableClick(table)}
+                        className="relative h-32 w-full rounded-[18px] focus:outline-none transition-transform hover:scale-[1.01]"
                       >
-                        <option value="available">Available</option>
-                        <option value="occupied">Occupied</option>
-                        <option value="reserved">Reserved</option>
-                        <option value="maintenance">Maintenance</option>
-                      </select>
+                        {displayedChairs.map((chair, index) =>
+                          renderChairIcon(`chair-${table.id}-${index}`, chair.side, chair.offset, theme.accent, rectangular)
+                        )}
+
+                        <div
+                          className="absolute left-1/2 top-1/2 overflow-hidden"
+                          style={{
+                            width: rectangular ? 138 : 84,
+                            height: rectangular ? 64 : 84,
+                            transform: 'translate(-50%, -50%)',
+                            borderRadius: rectangular ? 16 : 999,
+                            border: `1.5px solid ${theme.frame}`,
+                            background: theme.surface,
+                            boxShadow: `0 10px 18px rgba(15, 23, 42, 0.11), 0 0 0 4px ${theme.glow}`,
+                          }}
+                        >
+                          <div
+                            className="absolute inset-x-4 top-2 h-px opacity-80"
+                            style={{
+                              background: 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(203,213,225,0.55) 50%, rgba(255,255,255,0.9) 100%)',
+                            }}
+                          />
+                          <div
+                            className="absolute inset-0 opacity-50"
+                            style={{
+                              backgroundImage: rectangular
+                                ? 'linear-gradient(90deg, rgba(255,255,255,0.75) 0%, rgba(226,232,240,0.45) 48%, rgba(255,255,255,0.75) 100%)'
+                                : 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(226,232,240,0.18) 55%, rgba(255,255,255,0.72) 100%)',
+                            }}
+                          />
+                          <div
+                            className={`absolute inset-[4px] ${rectangular ? 'rounded-[12px]' : 'rounded-full'}`}
+                            style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.7)' }}
+                          />
+                          <div className="relative z-10 flex h-full items-center justify-center">
+                            <div
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)]"
+                              style={{ backgroundColor: theme.accent }}
+                            >
+                              T{String(table.number).padStart(2, '0')}
+                            </div>
+                          </div>
+                        </div>
+
+                        {selectedTableId === table.id && (
+                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2 py-1 text-[9px] font-medium text-white shadow-md">
+                            Selected
+                          </div>
+                        )}
+                      </button>
+
+                      <div className="relative z-10">
+                        <span
+                          className="pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full"
+                          style={{ backgroundColor: theme.accent }}
+                        />
+                        <select
+                          value={table.status}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleStatusChange(table.number, e.target.value as any);
+                          }}
+                          className={`w-full appearance-none px-7 pr-8 py-1.5 rounded-xl text-[13px] font-medium border focus:outline-none focus:ring-2 focus:ring-primary transition-colors ${
+                            table.status === 'available' ? 'border-green-200 bg-green-50/70 text-green-700' :
+                            table.status === 'occupied' ? 'border-orange-200 bg-orange-50/80 text-orange-700 cursor-not-allowed' :
+                            table.status === 'reserved' ? 'border-blue-200 bg-blue-50/80 text-blue-700' :
+                            'border-gray-200 bg-gray-50 text-gray-700'
+                          }`}
+                          disabled={table.status === 'occupied'}
+                        >
+                          <option value="available">Available</option>
+                          <option value="occupied">Occupied</option>
+                          <option value="reserved">Reserved</option>
+                          <option value="maintenance">Maintenance</option>
+                        </select>
+                      </div>
 
                       {/* Show order info if occupied */}
                       {order && (
-                        <div className="w-full text-center text-xs text-gray-600 mt-1">
+                        <div className="relative z-10 w-full text-center text-[10px] text-gray-500 -mt-1">
                           <p className="font-medium truncate">{order.customer}</p>
                           {order.partySize ? (
                             <p className="text-primary">{order.partySize} {order.partySize === 1 ? 'person' : 'people'}</p>

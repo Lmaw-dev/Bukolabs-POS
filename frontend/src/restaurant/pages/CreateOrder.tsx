@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
-import { Banknote, Building2, Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users, Smartphone, Wallet } from 'lucide-react';
+import { Banknote, Building2, Minus, Plus, Search, Edit2, Trash2, X, AlertCircle, Printer, Download, Users, Smartphone, Wallet, MoreVertical } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
@@ -978,15 +978,195 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
     // For now we're just tracking the position
   };
 
-  const getTableColor = (status: string) => {
+  const getTableTheme = (status: string) => {
     switch (status) {
-      case 'available': return 'bg-gradient-to-br from-green-400 to-green-600';
-      case 'occupied': return 'bg-gradient-to-br from-orange-400 to-orange-600';
-      case 'reserved': return 'bg-gradient-to-br from-blue-400 to-blue-600';
-      case 'maintenance': return 'bg-gradient-to-br from-gray-400 to-gray-600';
-      default: return 'bg-gradient-to-br from-gray-400 to-gray-600';
+      case 'available':
+        return {
+          accent: '#10b981',
+          accentSoft: 'rgba(16, 185, 129, 0.16)',
+          border: 'rgba(16, 185, 129, 0.7)',
+          glow: 'rgba(16, 185, 129, 0.22)',
+          frame: '#dce7ec',
+          surface: 'linear-gradient(145deg, #f8fafc 0%, #eef4f7 100%)',
+        };
+      case 'occupied':
+        return {
+          accent: '#f97316',
+          accentSoft: 'rgba(249, 115, 22, 0.16)',
+          border: 'rgba(249, 115, 22, 0.7)',
+          glow: 'rgba(249, 115, 22, 0.22)',
+          frame: '#f7d5bf',
+          surface: 'linear-gradient(145deg, #fff9f4 0%, #fff2e8 100%)',
+        };
+      case 'reserved':
+        return {
+          accent: '#3b82f6',
+          accentSoft: 'rgba(59, 130, 246, 0.16)',
+          border: 'rgba(59, 130, 246, 0.72)',
+          glow: 'rgba(59, 130, 246, 0.22)',
+          frame: '#c9dbfb',
+          surface: 'linear-gradient(145deg, #f7fbff 0%, #edf5ff 100%)',
+        };
+      case 'maintenance':
+        return {
+          accent: '#6b7280',
+          accentSoft: 'rgba(107, 114, 128, 0.18)',
+          border: 'rgba(107, 114, 128, 0.72)',
+          glow: 'rgba(107, 114, 128, 0.18)',
+          frame: '#d8dee5',
+          surface: 'linear-gradient(145deg, #fbfbfc 0%, #eef1f4 100%)',
+        };
+      default:
+        return {
+          accent: '#6b7280',
+          accentSoft: 'rgba(107, 114, 128, 0.18)',
+          border: 'rgba(107, 114, 128, 0.72)',
+          glow: 'rgba(107, 114, 128, 0.18)',
+          frame: '#d8dee5',
+          surface: 'linear-gradient(145deg, #fbfbfc 0%, #eef1f4 100%)',
+        };
     }
   };
+
+  type ChairSide = 'top' | 'right' | 'bottom' | 'left';
+
+  const getChairLayout = (seats: number, rectangular: boolean) => {
+    if (seats <= 1) {
+      return [{ side: 'bottom' as ChairSide, offset: 50 }];
+    }
+
+    if (seats === 2) {
+      return [
+        { side: 'left' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (seats === 3) {
+      return [
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'left' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (seats <= 4) {
+      return [
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'right' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'left' as ChairSide, offset: 50 },
+      ];
+    }
+
+    if (rectangular && seats === 5) {
+      return [
+        { side: 'top' as ChairSide, offset: 24 },
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'top' as ChairSide, offset: 76 },
+        { side: 'bottom' as ChairSide, offset: 35 },
+        { side: 'bottom' as ChairSide, offset: 65 },
+      ];
+    }
+
+    if (rectangular && seats === 6) {
+      return [
+        { side: 'top' as ChairSide, offset: 24 },
+        { side: 'top' as ChairSide, offset: 50 },
+        { side: 'top' as ChairSide, offset: 76 },
+        { side: 'bottom' as ChairSide, offset: 24 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 76 },
+      ];
+    }
+
+    if (rectangular && seats === 7) {
+      return [
+        { side: 'top' as ChairSide, offset: 18 },
+        { side: 'top' as ChairSide, offset: 39 },
+        { side: 'top' as ChairSide, offset: 61 },
+        { side: 'top' as ChairSide, offset: 82 },
+        { side: 'bottom' as ChairSide, offset: 24 },
+        { side: 'bottom' as ChairSide, offset: 50 },
+        { side: 'bottom' as ChairSide, offset: 76 },
+      ];
+    }
+
+    if (rectangular) {
+      return [
+        { side: 'top' as ChairSide, offset: 18 },
+        { side: 'top' as ChairSide, offset: 39 },
+        { side: 'top' as ChairSide, offset: 61 },
+        { side: 'top' as ChairSide, offset: 82 },
+        { side: 'bottom' as ChairSide, offset: 18 },
+        { side: 'bottom' as ChairSide, offset: 39 },
+        { side: 'bottom' as ChairSide, offset: 61 },
+        { side: 'bottom' as ChairSide, offset: 82 },
+      ];
+    }
+
+    return [
+      { side: 'top' as ChairSide, offset: 24 },
+      { side: 'top' as ChairSide, offset: 50 },
+      { side: 'top' as ChairSide, offset: 76 },
+      { side: 'right' as ChairSide, offset: 50 },
+      { side: 'bottom' as ChairSide, offset: 76 },
+      { side: 'bottom' as ChairSide, offset: 50 },
+      { side: 'bottom' as ChairSide, offset: 24 },
+      { side: 'left' as ChairSide, offset: 50 },
+    ];
+  };
+
+  const getChairStyle = (side: ChairSide, offset: number, rectangular: boolean): CSSProperties => {
+    const edgeInset = rectangular ? 16 : 10;
+    const sideInset = rectangular ? 12 : 10;
+
+    switch (side) {
+      case 'top':
+        return {
+          left: `${offset}%`,
+          top: edgeInset,
+          transform: 'translate(-50%, 0) rotate(0deg)',
+        };
+      case 'right':
+        return {
+          right: sideInset,
+          top: `${offset}%`,
+          transform: 'translate(0, -50%) rotate(90deg)',
+        };
+      case 'bottom':
+        return {
+          left: `${offset}%`,
+          bottom: edgeInset,
+          transform: 'translate(-50%, 0) rotate(180deg)',
+        };
+      case 'left':
+        return {
+          left: sideInset,
+          top: `${offset}%`,
+          transform: 'translate(0, -50%) rotate(-90deg)',
+        };
+      default:
+        return {};
+    }
+  };
+
+  const renderChairIcon = (key: string, side: ChairSide, offset: number, accent: string, rectangular: boolean) => (
+    <div
+      key={key}
+      className="absolute h-10 w-10 drop-shadow-[0_6px_10px_rgba(15,23,42,0.14)]"
+      style={getChairStyle(side, offset, rectangular)}
+    >
+      <svg viewBox="0 0 48 48" className="h-full w-full">
+        <path d="M12 13c-3.5 3-5.5 7-5.5 11s2 8 5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M36 13c3.5 3 5.5 7 5.5 11s-2 8-5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
+        <rect x="14" y="10" width="20" height="5" rx="2.5" fill="#525b67" />
+        <rect x="12" y="14" width="24" height="21" rx="7" fill="#626c79" />
+        <rect x="15" y="17" width="18" height="12" rx="5" fill={accent} opacity="0.9" />
+        <rect x="16" y="31" width="16" height="4" rx="2" fill="#d8dee6" />
+      </svg>
+    </div>
+  );
 
   const availableTables = tables.filter(t => t.status === 'available');
 
@@ -2222,7 +2402,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       {/* Table Selection Modal */}
       {showTableSelection && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl w-full max-w-3xl my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-xl w-full max-w-[1180px] my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
               <h2 className="text-lg text-primary">Select Available Table</h2>
               <button
@@ -2290,31 +2470,58 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                 </div>
               )}
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
                 {tables.map(table => {
                   const party = parseInt(partySize) || 0;
                   const isSelected = selectedTables.includes(table.number);
                   const isBestMatch = table.status === 'available' && table.seats >= party &&
                     table.seats === availableTables.filter(t => t.seats >= party).sort((a, b) => a.seats - b.seats)[0]?.seats;
+                  const theme = getTableTheme(table.status);
+                  const rectangular = table.seats > 4;
+                  const chairs = getChairLayout(table.seats, rectangular);
+                  const displayedChairs = chairs.slice(0, 8);
+                  const statusLabel = table.status === 'available'
+                    ? 'Available'
+                    : table.status === 'occupied'
+                    ? 'Occupied'
+                    : table.status === 'reserved'
+                    ? 'Reserved'
+                    : 'Maintenance';
 
                   return (
                     <div
                       key={table.id}
-                      className={`bg-white rounded-xl shadow-sm border-2 transition-all p-4 flex flex-col items-center gap-3 relative ${
+                      className={`rounded-2xl border transition-all p-2.5 flex flex-col gap-2.5 relative overflow-hidden ${
                         isSelected
-                          ? 'border-primary ring-2 ring-primary/20'
+                          ? 'border-blue-400 ring-2 ring-blue-100 shadow-[0_18px_34px_rgba(59,130,246,0.18)]'
                           : isBestMatch
-                          ? 'border-blue-400 ring-2 ring-blue-200'
-                          : 'border-gray-200'
+                          ? 'border-blue-300 ring-2 ring-blue-100 shadow-[0_14px_30px_rgba(59,130,246,0.12)]'
+                          : 'border-slate-200 shadow-[0_10px_26px_rgba(15,23,42,0.08)]'
                       }`}
+                      style={{
+                        background: 'linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)',
+                      }}
                     >
+                      <div className="absolute top-2.5 right-2.5 z-20 p-1.5 rounded-full text-gray-600">
+                        <MoreVertical className="w-4 h-4" />
+                      </div>
+
                       {isBestMatch && (
-                        <div className="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium z-10">
+                        <div className="absolute top-2 left-2 bg-blue-500 text-white text-[10px] px-2 py-1 rounded-full font-medium z-20">
                           Best Match
                         </div>
                       )}
 
-                      {/* Circular badge with table number - color based on status */}
+                      <div className="relative z-10 min-h-[34px]">
+                        <div>
+                          <p className="text-[13px] font-semibold text-slate-800">Table {table.number}</p>
+                          <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                            <Users className="w-3 h-3" />
+                            <span>{table.seats} seats</span>
+                          </div>
+                        </div>
+                      </div>
+
                       <button
                         onClick={() => {
                           if (table.status === 'available') {
@@ -2326,17 +2533,56 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                           }
                         }}
                         disabled={table.status !== 'available'}
-                        className={`relative focus:outline-none ${
-                          table.status === 'available' ? 'cursor-pointer' : 'cursor-not-allowed'
+                        className={`relative h-32 w-full rounded-[18px] focus:outline-none transition-transform ${
+                          table.status === 'available' ? 'cursor-pointer hover:scale-[1.01]' : 'cursor-not-allowed opacity-80'
                         }`}
                       >
-                        <div className={`w-20 h-20 rounded-full ${getTableColor(table.status)} shadow-lg flex items-center justify-center text-white text-2xl font-bold transition-transform ${
-                          table.status === 'available' ? 'hover:scale-105' : 'opacity-70'
-                        }`}>
-                          {table.number}
+                        {displayedChairs.map((chair, index) =>
+                          renderChairIcon(`modal-chair-${table.id}-${index}`, chair.side, chair.offset, theme.accent, rectangular)
+                        )}
+
+                        <div
+                          className="absolute left-1/2 top-1/2 overflow-hidden"
+                          style={{
+                            width: rectangular ? 138 : 84,
+                            height: rectangular ? 64 : 84,
+                            transform: 'translate(-50%, -50%)',
+                            borderRadius: rectangular ? 16 : 999,
+                            border: `1.5px solid ${theme.frame}`,
+                            background: theme.surface,
+                            boxShadow: `0 10px 18px rgba(15, 23, 42, 0.11), 0 0 0 4px ${theme.glow}`,
+                          }}
+                        >
+                          <div
+                            className="absolute inset-x-4 top-2 h-px opacity-80"
+                            style={{
+                              background: 'linear-gradient(90deg, rgba(255,255,255,0.9) 0%, rgba(203,213,225,0.55) 50%, rgba(255,255,255,0.9) 100%)',
+                            }}
+                          />
+                          <div
+                            className="absolute inset-0 opacity-50"
+                            style={{
+                              backgroundImage: rectangular
+                                ? 'linear-gradient(90deg, rgba(255,255,255,0.75) 0%, rgba(226,232,240,0.45) 48%, rgba(255,255,255,0.75) 100%)'
+                                : 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.95), rgba(226,232,240,0.18) 55%, rgba(255,255,255,0.72) 100%)',
+                            }}
+                          />
+                          <div
+                            className={`absolute inset-[4px] ${rectangular ? 'rounded-[12px]' : 'rounded-full'}`}
+                            style={{ boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.7)' }}
+                          />
+                          <div className="relative z-10 flex h-full items-center justify-center">
+                            <div
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)]"
+                              style={{ backgroundColor: theme.accent }}
+                            >
+                              T{String(table.number).padStart(2, '0')}
+                            </div>
+                          </div>
                         </div>
+
                         {isSelected && (
-                          <div className="absolute -top-1 -right-1 bg-primary rounded-full w-6 h-6 flex items-center justify-center">
+                          <div className="absolute top-2 right-2 bg-primary rounded-full w-5.5 h-5.5 flex items-center justify-center shadow-md">
                             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
@@ -2344,26 +2590,24 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                         )}
                       </button>
 
-                      {/* Table label */}
-                      <div className="text-center w-full">
-                        <p className="font-semibold text-gray-800">Table {table.number}</p>
-                        <div className="flex items-center justify-center gap-1 text-xs text-gray-500 mt-1">
-                          <Users className="w-3 h-3" />
-                          <span>{table.seats} seats</span>
+                      <div className="relative z-10">
+                        <span
+                          className="pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full"
+                          style={{ backgroundColor: theme.accent }}
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 z-10 -translate-y-1/2 text-gray-400">
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
+                          </svg>
+                        </span>
+                        <div className={`w-full px-7 pr-8 py-1.5 rounded-xl text-[13px] font-medium border ${
+                          table.status === 'available' ? 'border-green-200 bg-green-50/70 text-green-700' :
+                          table.status === 'occupied' ? 'border-orange-200 bg-orange-50/80 text-orange-700' :
+                          table.status === 'reserved' ? 'border-blue-200 bg-blue-50/80 text-blue-700' :
+                          'border-gray-200 bg-gray-50 text-gray-700'
+                        }`}>
+                          {statusLabel}
                         </div>
-                      </div>
-
-                      {/* Status badge */}
-                      <div className={`w-full px-3 py-2 rounded-lg text-sm font-medium border-2 text-center ${
-                        table.status === 'available' ? 'border-green-200 bg-green-50 text-green-700' :
-                        table.status === 'occupied' ? 'border-orange-200 bg-orange-50 text-orange-700' :
-                        table.status === 'reserved' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                        'border-gray-200 bg-gray-50 text-gray-700'
-                      }`}>
-                        {table.status === 'available' ? 'Available' :
-                         table.status === 'occupied' ? 'Occupied' :
-                         table.status === 'reserved' ? 'Reserved' :
-                         'Maintenance'}
                       </div>
                     </div>
                   );

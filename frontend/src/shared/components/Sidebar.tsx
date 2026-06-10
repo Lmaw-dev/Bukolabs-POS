@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ChevronDown, Home, ShoppingCart, List, BarChart3, LogOut, Users, UtensilsCrossed, Store, ShoppingBag, Archive, Info, SlidersHorizontal, Tags, Package, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Page, type StoreBrand } from '../App';
 import type { StaffType } from '../../auth/types/auth';
@@ -29,6 +29,7 @@ type MenuItem = {
 };
 
 export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RESTAURANT', staffType = 'POS_STAFF' }: SidebarProps) {
+  const SIDEBAR_COLLAPSED_STORAGE_KEY = 'bukolabs-pos-sidebar-collapsed';
   const isRetail = storeType === 'RETAIL_STORE';
   const { settings } = useStoreSettings();
 
@@ -50,8 +51,18 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
     Store: storePages.includes(currentPage),
     Temporary: temporaryPages.includes(currentPage),
   });
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+  });
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(isCollapsed));
+  }, [isCollapsed]);
 
   const restaurantAdminMenuItems: MenuItem[] = [
     { icon: Home, label: 'Dashboard', page: 'pos-dashboard' as Page },
