@@ -21,7 +21,6 @@ interface OrderListProps {
 
 type ActiveModal = 'details' | 'payment' | 'payment-success' | 'receipt' | 'refund' | null;
 
-const ORDER_STATUSES = ['Pending', 'Preparing', 'Ready', 'Served', 'Completed'];
 const ORDER_TYPES = ['Dine-In', 'Takeout', 'Mixed'];
 const PAYMENT_STATUSES = ['Paid', 'Not Paid'];
 
@@ -35,7 +34,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
   const [paymentFilter, setPaymentFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
   const [datePreset, setDatePreset] = useState<DateFilterMode>('all');
 
@@ -136,25 +134,13 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
       order.customer.toLowerCase().includes(term);
     const matchesType = typeFilter === 'All' || order.type === typeFilter;
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
-    const matchesStatus = statusFilter === 'All' || order.orderStatus === statusFilter;
     const matchesDate = isWithinDateFilter(order.date);
-    return matchesSearch && matchesType && matchesPayment && matchesStatus && matchesDate;
+    return matchesSearch && matchesType && matchesPayment && matchesDate;
   });
 
   const getPaymentBadge = (status: string) => {
     if (status === 'Paid') return 'bg-[#dcfce7] text-[#15803d]';
     return 'bg-[#fef2f2] text-[#ef4444]';
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Completed': return 'bg-[#dcfce7] text-[#15803d]';
-      case 'Served': return 'bg-[#f0fdf4] text-[#008967]';
-      case 'Ready': return 'bg-[#f0fdf4] text-[#008967]';
-      case 'Preparing': return 'bg-[#f5f3ff] text-[#8b5cf6]';
-      case 'Pending': return 'bg-[#fffbeb] text-[#f59e0b]';
-      default: return 'bg-[#f1f5f9] text-[#64748b]';
-    }
   };
 
   const getTypeBadge = (type: string) => {
@@ -224,19 +210,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
             </div>
 
-            {/* Status Filter */}
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="appearance-none pl-3 pr-8 py-2.5 bg-muted border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
-              >
-                <option value="All">All Statuses</option>
-                {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            </div>
-
             {/* Date Filter */}
             <DateFilterControl
               mode={datePreset}
@@ -253,7 +226,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
         {/* Table Card */}
         <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1300px]">
+            <table className="w-full min-w-[1180px]">
               <thead className="bg-muted/30">
                 <tr>
                   <th className="w-[13%] text-left px-5 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Order Number</th>
@@ -264,7 +237,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                   <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Queue</th>
                   <th className="w-[9%] text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
                   <th className="w-[8%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Payments</th>
-                  <th className="w-[9%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Status</th>
                   <th className="w-[9%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Date and Time</th>
                   <th className="w-[14%] text-center px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Action</th>
                 </tr>
@@ -272,7 +244,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               <tbody className="divide-y divide-border">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="text-center py-16 text-gray-400 text-sm">
+                    <td colSpan={10} className="text-center py-16 text-gray-400 text-sm">
                       No orders found matching your filters.
                     </td>
                   </tr>
@@ -322,11 +294,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                     <td className="px-4 py-5">
                       <span className={`inline-block px-2.5 py-1 rounded-full text-xs border whitespace-nowrap ${getPaymentBadge(order.paymentStatus)}`}>
                         {order.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-4 py-5">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusBadge(order.orderStatus)}`}>
-                        {order.orderStatus}
                       </span>
                     </td>
                     <td className="px-4 py-5">
@@ -427,13 +394,10 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                 </div>
               </div>
 
-              {/* Status Badges */}
+              {/* Payment Badge */}
               <div className="flex gap-2">
                 <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentBadge(selectedOrder.paymentStatus)}`}>
                   {selectedOrder.paymentStatus}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(selectedOrder.orderStatus)}`}>
-                  {selectedOrder.orderStatus}
                 </span>
               </div>
 
