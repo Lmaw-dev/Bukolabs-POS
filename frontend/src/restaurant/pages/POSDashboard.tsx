@@ -342,26 +342,31 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
             </div>
 
             <div className="bg-card rounded-xl shadow-sm border border-border p-5">
-              <h3 className="text-base text-primary mb-4">Top Selling Items</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base text-primary">Top Selling Items</h3>
+                <button
+                  onClick={() => setShowTopItemsModal(true)}
+                  className="text-xs text-primary hover:underline"
+                >
+                  See all
+                </button>
+              </div>
               <div className="space-y-2 mb-3">
                 {visibleTopSellingItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-lg transition-colors">
-                    <div className="flex items-center gap-2.5">
+                  <div key={item.id} className="flex items-center justify-between gap-3 p-2 hover:bg-muted/50 rounded-lg transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <TopItemImage src={item.image} name={item.name} />
-                      <div>
-                        <p className="text-xs">{item.name}</p>
+                      <div className="min-w-0">
+                        <p className="text-xs truncate">{item.name}</p>
                         <p className="text-xs text-muted-foreground">{item.sold} sold</p>
                       </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs text-primary">{item.revenue}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              <button
-                onClick={() => setShowTopItemsModal(true)}
-                className="w-full text-xs text-primary hover:underline py-2"
-              >
-                See all
-              </button>
             </div>
           </div>
 

@@ -377,29 +377,43 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       {/* Top Items Modal */}
       {showTopItemsModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-hidden">
             <div className="flex justify-between items-center p-5 border-b border-border">
-              <h2 className="text-lg text-primary">All Best Selling Items</h2>
+              <h2 className="text-lg text-primary">All Top Selling Items</h2>
               <button onClick={() => setShowTopItemsModal(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="overflow-y-auto p-5">
-              <div className="space-y-3">
-                {databaseTopSellingItems.map((item, index) => (
-                  <div key={item.id} className="flex items-center gap-3 p-3 border border-border rounded-lg hover:bg-muted/30 transition-colors">
-                    <TopItemImage src={item.image} name={item.name} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.sold} sold</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-primary">{item.revenue}</p>
-                      <p className="text-xs text-muted-foreground">Revenue</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="overflow-y-auto max-h-[calc(80vh-80px)]">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-[#0f172a]">
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Rank</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Item</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Sold</th>
+                    <th className="sticky top-0 bg-[#0f172a] px-4 py-3 text-left text-xs font-semibold text-emerald-400 uppercase tracking-widest z-10 shadow-[0_1px_0_0_#008967]">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {databaseTopSellingItems.map((item, index) => (
+                    <tr key={item.id} className="border-t border-border hover:bg-muted/50 transition-colors">
+                      <td className="px-3 py-3">
+                        <span className="flex items-center justify-center w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs">
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <TopItemImage src={item.image} name={item.name} />
+                          <p className="text-sm truncate">{item.name}</p>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm">{item.sold} orders</td>
+                      <td className="px-3 py-3 text-sm text-primary">{item.revenue}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
