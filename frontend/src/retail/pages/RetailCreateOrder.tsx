@@ -689,10 +689,14 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
             tax,
             total,
             items: cart.map((item) => ({
-              ...item,
               productId: item.id,
               variantId: item.variantId,
+              name: item.name,
               categoryName: item.category,
+              size: item.size ?? null,
+              color: item.color ?? null,
+              quantity: item.quantity,
+              price: item.price,
             })),
             payment: {
               paymentNumber: `PAY-${transactionNumber}`,
@@ -1175,15 +1179,62 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-md my-8 max-h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-5 border-b border-border flex-shrink-0">
-              <h2 className="text-lg text-primary">Payment</h2>
+              <h2 className="text-lg text-primary">Payment Summary</h2>
               <button onClick={() => setShowPayment(false)} className="text-muted-foreground hover:text-foreground transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 overflow-y-auto flex-1">
+              <div className="mb-4">
+                <p className="text-sm mb-2"><strong>Order Number:</strong> RET-{currentTransactionNumber}</p>
+                <p className="text-sm mb-2"><strong>Customer:</strong> {customerName.trim() || 'Walk-in Customer'}</p>
+                <div className="bg-muted rounded-lg p-3 mb-3">
+                  <h4 className="text-xs font-medium mb-2">Ordered Items:</h4>
+                  <div className="space-y-1">
+                    {cart.map((item, idx) => (
+                      <div key={idx} className="flex justify-between gap-3 text-xs">
+                        <span className="min-w-0 truncate">
+                          {item.quantity}x {item.name}
+                          {(item.size || item.color) && (
+                            <span className="text-muted-foreground"> {item.size ? `| ${item.size}` : ''}{item.color ? ` · ${item.color}` : ''}</span>
+                          )}
+                        </span>
+                        <span className="shrink-0">₱{(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-muted rounded-lg p-4 mb-4">
-                <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
-                <p className="text-3xl text-primary font-medium">₱ {total.toFixed(2)}</p>
+                <div className="space-y-1 text-sm mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span>₱{subtotal.toFixed(2)}</span>
+                  </div>
+                  {settings.enable_service_charge && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
+                      <span>₱{serviceFee.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {settings.enable_tax && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
+                      <span>₱{tax.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between text-destructive text-xs">
+                      <span>Discount:</span>
+                      <span>- ₱{discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="border-t border-border pt-2">
+                  <p className="text-xs text-muted-foreground mb-1">Total Amount Due</p>
+                  <p className="text-3xl text-primary font-medium">₱ {total.toFixed(2)}</p>
+                </div>
               </div>
 
               <div className="mb-4">
