@@ -1,6 +1,7 @@
 import { useRef } from 'react';
+import { Calendar } from 'lucide-react';
 
-export type DateFilterMode = 'date' | 'week' | 'month' | 'year';
+export type DateFilterMode = 'today' | 'date' | 'week' | 'month' | 'year';
 
 interface DateFilterControlProps {
   mode: DateFilterMode;
@@ -20,7 +21,6 @@ export function DateFilterControl({
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const openDatePicker = () => {
-    onModeChange('date');
     const input = dateInputRef.current;
     if (!input) return;
 
@@ -32,7 +32,16 @@ export function DateFilterControl({
   };
 
   return (
-    <div className="relative inline-flex">
+    <div className="relative inline-flex items-stretch">
+      <button
+        type="button"
+        onClick={openDatePicker}
+        className="mr-2 inline-flex items-center justify-center rounded-lg border border-border bg-white px-3 text-primary transition hover:bg-muted focus:outline-none focus:ring-2 focus:ring-primary"
+        aria-label="Choose date"
+        title={selectedDate || 'Choose date'}
+      >
+        <Calendar className="h-4 w-4" />
+      </button>
       <select
         value={mode}
         onChange={(event) => {
@@ -45,7 +54,8 @@ export function DateFilterControl({
         }}
         className={className}
       >
-        <option value="date">Selected Date</option>
+        {mode === 'date' && selectedDate && <option value="date">{selectedDate}</option>}
+        <option value="today">Today</option>
         <option value="week">This Week</option>
         <option value="month">This Month</option>
         <option value="year">This Year</option>

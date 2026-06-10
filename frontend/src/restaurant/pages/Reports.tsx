@@ -39,8 +39,8 @@ interface ReportsProps {
 export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: ReportsProps) {
   const { orders } = useOrders();
   const todayString = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(todayString);
-  const [dateFilter, setDateFilter] = useState<DateFilterMode>('date');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilterMode>('today');
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
 
@@ -49,8 +49,12 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     const start = new Date(today);
     const end = new Date(today);
 
+    if (dateFilter === 'today') {
+      return { start: todayString, end: todayString };
+    }
+
     if (dateFilter === 'date') {
-      return { start: selectedDate, end: selectedDate };
+      return { start: selectedDate || todayString, end: selectedDate || todayString };
     }
 
     if (dateFilter === 'week') {
@@ -68,7 +72,8 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   };
 
   const getReportDateLabel = () => {
-    if (dateFilter === 'date') return selectedDate;
+    if (dateFilter === 'today') return 'Today';
+    if (dateFilter === 'date') return selectedDate || 'Select Date';
     if (dateFilter === 'week') return 'This Week';
     if (dateFilter === 'month') return 'This Month';
     return 'This Year';

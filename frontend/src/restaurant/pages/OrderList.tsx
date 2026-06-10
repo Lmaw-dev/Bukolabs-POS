@@ -37,7 +37,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('');
-  const [datePreset, setDatePreset] = useState<DateFilterMode>('date');
+  const [datePreset, setDatePreset] = useState<DateFilterMode>('today');
 
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
@@ -104,6 +104,10 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     const todayString = new Date().toISOString().split('T')[0];
     const today = new Date(todayString);
     const start = new Date(today);
+
+    if (datePreset === 'today') {
+      return date === todayString;
+    }
 
     if (datePreset === 'date') {
       return !dateFilter || date === dateFilter;

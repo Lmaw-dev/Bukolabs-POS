@@ -42,8 +42,8 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
   const { tables, getAvailableTablesCount } = useTables();
   const { settings } = useStoreSettings();
   const today = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [dateFilter, setDateFilter] = useState<DateFilterMode>('date');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilterMode>('today');
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
   const showTableManagementCards = settings.enable_table_management;
 
@@ -158,11 +158,19 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
     const paidOrders = orders.filter((order) => order.paymentStatus === 'Paid');
     const now = new Date();
 
+    if (dateFilter === 'today') {
+      return [{
+        id: `today-${today}`,
+        label: 'Today',
+        sales: paidOrders.filter((order) => order.date === today).reduce((sum, order) => sum + order.amountNumber, 0),
+      }];
+    }
+
     if (dateFilter === 'date') {
       return [{
-        id: `date-${selectedDate}`,
-        label: selectedDate,
-        sales: paidOrders.filter((order) => order.date === selectedDate).reduce((sum, order) => sum + order.amountNumber, 0),
+        id: `date-${selectedDate || today}`,
+        label: selectedDate || today,
+        sales: paidOrders.filter((order) => order.date === (selectedDate || today)).reduce((sum, order) => sum + order.amountNumber, 0),
       }];
     }
 
@@ -288,7 +296,6 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-base text-primary">Sales Overview</h3>
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
                   <DateFilterControl
                     mode={dateFilter}
                     selectedDate={selectedDate}
