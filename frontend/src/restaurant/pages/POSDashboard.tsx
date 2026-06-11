@@ -277,14 +277,9 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
               <p className="text-sm text-muted-foreground mb-1">Customers Waiting</p>
               <h2 className="text-2xl text-primary">{customersWaiting}</h2>
               <p className="text-xs text-muted-foreground mt-1">
-                {customersWaiting > 0 ? `Next: Queue #${queuedOrders[0]?.queuePosition || 1}` : 'No queue'}
-              </p>
-            </div>
-            <div className="bg-card rounded-xl shadow-sm border border-border p-5">
-              <p className="text-sm text-muted-foreground mb-1">People Waiting</p>
-              <h2 className="text-2xl text-primary">{peopleWaiting}</h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                {peopleWaiting > 0 ? `Total party sizes in queue` : 'No one waiting'}
+                {customersWaiting > 0
+                  ? `${peopleWaiting} people total · Next: Queue #${queuedOrders[0]?.queuePosition || 1}`
+                  : 'No queue'}
               </p>
             </div>
               </>

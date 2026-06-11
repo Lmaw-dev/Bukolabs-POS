@@ -64,7 +64,7 @@ interface TableContextType {
   tableHistory: TableHistoryEntry[];
   assignmentNotification: AssignmentNotification | null;
   dismissAssignmentNotification: () => void;
-  assignToTable: (orderId: string, tableNumbers: number[]) => void;
+  assignToTable: (orderId: string, tableNumbers: number[]) => Promise<void>;
   skipQueueCustomer: (orderId: string) => void;
   getTableHistory: (tableNumber: number) => TableHistoryEntry[];
 }
@@ -72,7 +72,7 @@ interface TableContextType {
 const TableContext = createContext<TableContextType | null>(null);
 
 export function TableProvider({ children }: { children: ReactNode }) {
-  const { orders, queuedOrders, updateOrder } = useOrders();
+  const { orders, queuedOrders, updateOrder, assignQueuedOrderToTable } = useOrders();
   const [notifications, setNotifications] = useState<Array<{ id: string; message: string }>>([]);
   const [queueHistory, setQueueHistory] = useState<QueueHistoryEntry[]>([]);
   const [tableHistory, setTableHistory] = useState<TableHistoryEntry[]>([]);
@@ -236,50 +236,6 @@ export function TableProvider({ children }: { children: ReactNode }) {
     }
   }, [tables]);
 
-  // Also notify when a suitable table is already available or becomes available from reserved/maintenance.
-  useEffect(() => {
-    if (assignmentNotification) return;
-    if (queuedOrders.length === 0) return;
-
-    const availableTables = tables
-      .filter(table => table.status === 'available')
-      .sort((a, b) => a.seats - b.seats);
-    if (availableTables.length === 0) return;
-
-    const firstInQueue = queuedOrders[0];
-    const fittingTable = availableTables.find(table => table.seats >= (firstInQueue.partySize || 0));
-    if (fittingTable) {
-      setAssignmentNotification({
-        availableTable: fittingTable,
-        queuedCustomer: {
-          id: firstInQueue.id,
-          name: firstInQueue.customerName,
-          partySize: firstInQueue.partySize || 0,
-          queuePosition: firstInQueue.queuePosition || 0,
-          orderId: firstInQueue.id,
-        },
-      });
-      return;
-    }
-
-    for (const table of availableTables) {
-      const compatible = queuedOrders.find(order => (order.partySize || 0) <= table.seats);
-      if (compatible) {
-        setAssignmentNotification({
-          availableTable: table,
-          queuedCustomer: {
-            id: compatible.id,
-            name: compatible.customerName,
-            partySize: compatible.partySize || 0,
-            queuePosition: compatible.queuePosition || 0,
-            orderId: compatible.id,
-          },
-        });
-        return;
-      }
-    }
-  }, [tables, queuedOrders, assignmentNotification]);
-
   const setTableStatus = (tableNumber: number, status: 'available' | 'maintenance' | 'reserved') => {
     setTables(prevTables =>
       prevTables.map(t =>
@@ -349,20 +305,25 @@ export function TableProvider({ children }: { children: ReactNode }) {
     setAssignmentNotification(null);
   };
 
-  const assignToTable = (orderId: string, tableNumbers: number[]) => {
+  const assignToTable = async (orderId: string, tableNumbers: number[]) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
 
     const tableLabels = tableNumbers.map(n => `Table ${n}`).join(' + ');
+    const nextOrderStatus: typeof order.orderStatus = order.paymentStatus === 'Paid' ? 'Served' : 'Preparing';
 
-    // Update order with table assignment
-    updateOrder(orderId, {
-      table: tableLabels,
-      tableNumbers,
-      isQueued: false,
-      queuePosition: undefined,
-      orderStatus: order.paymentStatus === 'Paid' ? 'Served' : 'Preparing',
-    });
+    try {
+      await assignQueuedOrderToTable(orderId, tableLabels, nextOrderStatus);
+      updateOrder(orderId, { tableNumbers });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to assign table.';
+      const notificationId = `notify-${Date.now()}`;
+      setNotifications(prev => [...prev, { id: notificationId, message }]);
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      }, 5000);
+      return;
+    }
 
     // Add to queue history
     const queueEntry: QueueHistoryEntry = {

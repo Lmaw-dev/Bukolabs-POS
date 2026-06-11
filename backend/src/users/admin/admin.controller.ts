@@ -653,4 +653,13 @@ export class AdminController {
       userId: Number(body.user_id),
     });
   }
+
+  @Patch('pos/orders/:orderNumber')
+  updatePosOrder(@Param('orderNumber') orderNumber: string, @Body() body: any) {
+    return this.adminService.updatePosOrder({
+      ...body,
+      orderNumber,
+      userId: Number(body.user_id),
+    });
+  }
 }

@@ -1842,6 +1842,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         const orderStatus = input.orderStatus ?? (isPaid ? 'COMPLETED' : 'PENDING');
         const paymentStatus = input.paymentStatus ?? (isPaid ? 'PAID' : 'NOT_PAID');
         const orderNumber = await this.createUniqueOrderNumber(client, input.orderNumber);
+        const partySize = Number(input.partySize ?? input.party_size ?? input.requiredSeats ?? 0);
         const orderRows = await this.queryWithClient<{ id: number }>(
           client,
           `
@@ -1860,7 +1861,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             input.customerName ?? null,
             input.orderType ?? (user.store_type === 'RETAIL_STORE' ? 'RETAIL' : 'TAKEOUT'),
             input.tableName ?? null,
-            input.partySize ?? null,
+            Number.isFinite(partySize) && partySize > 0 ? partySize : null,
             input.subtotal ?? 0,
             input.discount ?? 0,
             input.discountType ?? null,
@@ -1956,6 +1957,53 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     );
 
     return { order_number: String(rows[0]?.next_order_number ?? 100001).padStart(6, '0') };
+  }
+
+  async updatePosOrder(input: any) {
+    await this.ensurePosOrderSchema();
+    const user = await this.getUserStoreScope(input.userId);
+
+    if (!user.store_id || !user.store_type) {
+      throw new InternalServerErrorException('User account is not linked to a store.');
+    }
+
+    const updates: string[] = [];
+    const values: any[] = [user.store_id, input.orderNumber];
+
+    const addUpdate = (column: string, value: any) => {
+      values.push(value);
+      updates.push(`${column} = $${values.length}`);
+    };
+
+    if (input.tableName !== undefined) addUpdate('table_name', input.tableName);
+    if (input.orderStatus !== undefined) addUpdate('order_status', input.orderStatus);
+    if (input.paymentStatus !== undefined) addUpdate('payment_status', input.paymentStatus);
+    if (input.orderStatus === 'COMPLETED') addUpdate('completed_at', new Date());
+
+    if (updates.length === 0) {
+      throw new BadRequestException('No order updates were provided.');
+    }
+
+    const rows = await this.query<{ id: number; order_number: string }>(
+      `
+        UPDATE orders
+        SET ${updates.join(', ')}
+        WHERE store_id = $1
+          AND order_number = $2
+          AND (
+            ($${values.length + 1} = 'RETAIL_STORE' AND order_type = 'RETAIL')
+            OR ($${values.length + 1} = 'RESTAURANT' AND order_type <> 'RETAIL')
+          )
+        RETURNING id, order_number
+      `,
+      [...values, user.store_type],
+    );
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Order not found.');
+    }
+
+    return rows[0];
   }
 
   async listPosOrders(userId: number) {

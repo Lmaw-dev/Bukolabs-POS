@@ -227,6 +227,7 @@ interface OrderContextType {
   updateOrder: (id: string, updates: Partial<Order>) => void;
   removeOrder: (id: string) => void;
   removeFromQueue: (id: string) => void;
+  assignQueuedOrderToTable: (id: string, table: string, orderStatus: Order['orderStatus']) => Promise<void>;
   completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => void;
   paymentCompletedSignal: number; // Signal for when payment is completed
 }
@@ -266,7 +267,7 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
 
   // Derive queued orders from orders with isQueued = true
   const queuedOrders: QueuedOrder[] = orders
-    .filter(o => o.isQueued && o.orderStatus !== 'Completed')
+    .filter(o => o.isQueued && o.table === 'Queue' && o.orderStatus !== 'Completed')
     .sort((a, b) => (a.queuePosition || 0) - (b.queuePosition || 0))
     .map(o => ({
       id: o.id,
@@ -300,6 +301,45 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
     ));
   };
 
+  const toDatabaseOrderStatus = (status: Order['orderStatus']) =>
+    status === 'Preparing' ? 'PREPARING' :
+    status === 'Ready' ? 'READY' :
+    status === 'Served' ? 'SERVED' :
+    status === 'Completed' ? 'COMPLETED' :
+    'PENDING';
+
+  const assignQueuedOrderToTable = async (id: string, table: string, orderStatus: Order['orderStatus']) => {
+    const order = orders.find(o => o.id === id);
+    if (!order) return;
+
+    setOrders(prev => prev.map(o =>
+      o.id === id
+        ? { ...o, table, isQueued: false, queuePosition: undefined, orderStatus }
+        : o
+    ));
+
+    if (!currentUser?.id || !order.orderNumber) return;
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders/${encodeURIComponent(order.orderNumber)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          tableName: table,
+          orderStatus: toDatabaseOrderStatus(orderStatus),
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? 'Unable to update table assignment.');
+      }
+    } catch (error) {
+      setOrders(prev => prev.map(o => o.id === id ? order : o));
+      throw error;
+    }
+  };
+
   const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => {
     // Update order to paid status
     setOrders(prev => prev.map(o =>
@@ -329,6 +369,7 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
       updateOrder,
       removeOrder,
       removeFromQueue,
+      assignQueuedOrderToTable,
       completePayment,
       paymentCompletedSignal,
     }}>

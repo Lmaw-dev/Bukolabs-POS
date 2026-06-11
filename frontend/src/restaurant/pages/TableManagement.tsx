@@ -48,6 +48,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
   const [newTableSeats, setNewTableSeats] = useState('');
   const [deletingTable, setDeletingTable] = useState<any>(null);
   const [removingQueuedOrder, setRemovingQueuedOrder] = useState<(typeof queuedOrders)[number] | null>(null);
+  const [assigningQueuedOrderId, setAssigningQueuedOrderId] = useState<string | null>(null);
   const [showQueueHistory, setShowQueueHistory] = useState(false);
   const [showTableHistory, setShowTableHistory] = useState(false);
   const [selectedTableForHistory, setSelectedTableForHistory] = useState<number | null>(null);
@@ -79,10 +80,16 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
       .sort((a, b) => a.seats - b.seats || a.number - b.number)[0];
   };
 
-  const handleSeatQueuedOrder = (order: (typeof queuedOrders)[number]) => {
+  const handleSeatQueuedOrder = async (order: (typeof queuedOrders)[number]) => {
+    if (assigningQueuedOrderId) return;
     const table = getBestAvailableTableForQueuedOrder(order);
     if (!table) return;
-    assignToTable(order.id, [table.number]);
+    setAssigningQueuedOrderId(order.id);
+    try {
+      await assignToTable(order.id, [table.number]);
+    } finally {
+      setAssigningQueuedOrderId(null);
+    }
   };
 
   const handleTableClick = (table: typeof tables[0]) => {
@@ -787,14 +794,15 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                             : 'Waiting for table...'}
                         </span>
                       </div>
-                      {bestAvailableTable && (
-                        <button
-                          onClick={() => handleSeatQueuedOrder(order)}
-                          className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                          Seat at Table {bestAvailableTable.number}
-                        </button>
-                      )}
+                        {bestAvailableTable && (
+                          <button
+                            onClick={() => handleSeatQueuedOrder(order)}
+                            disabled={assigningQueuedOrderId !== null}
+                            className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {assigningQueuedOrderId === order.id ? 'Assigning...' : `Seat at Table ${bestAvailableTable.number}`}
+                          </button>
+                        )}
                       {index === 0 && (
                         <div className="mt-2 pt-2 border-t border-orange-200">
                           <p className="text-xs text-orange-600 font-medium">Next to be seated</p>

@@ -295,7 +295,7 @@ function toOrderListFormat(order: any, paid: boolean) {
 }
 
 export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout, storeBrand, userName, storeType, staffType }: CreateOrderProps) {
-  const { addOrder, orders } = useOrders();
+  const { addOrder, orders, queuedOrders } = useOrders();
   const { tables } = useTables();
   const { settings, discounts } = useStoreSettings();
   const tableManagementEnabled = settings.enable_table_management;
@@ -340,7 +340,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isInQueue, setIsInQueue] = useState(false);
   const [queuePosition, setQueuePosition] = useState<number | null>(null);
-  const queueCounterRef = useRef(1);
   const enabledPaymentMethods = settings.enabled_payment_methods.length > 0 ? settings.enabled_payment_methods : ['Cash'];
 
   useEffect(() => {
@@ -1009,8 +1008,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
       return;
     }
 
-    const position = queueCounterRef.current;
-    queueCounterRef.current += 1;
+    const position = queuedOrders.length + 1;
     setQueuePosition(position);
     setIsInQueue(true);
     setShowTableSelection(false);

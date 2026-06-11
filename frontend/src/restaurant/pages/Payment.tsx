@@ -38,6 +38,7 @@ export function Payment({ currentUser, onNavigate, currentOrder, onLogout, store
             customerName: currentOrder.customerName ?? null,
             orderType: currentOrder.orderType ?? 'DINE_IN',
             tableName: currentOrder.tableNumber ? `Table ${currentOrder.tableNumber}` : null,
+            partySize: currentOrder.partySize ?? currentOrder.requiredSeats ?? null,
             subtotal: currentOrder.subtotal ?? 0,
             discount: currentOrder.discount ?? 0,
             discountType: currentOrder.discountType ?? null,
