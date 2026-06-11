@@ -1976,28 +1976,80 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     };
 
     if (input.tableName !== undefined) addUpdate('table_name', input.tableName);
+    const isPaymentUpdate = Boolean(input.payment);
     if (input.orderStatus !== undefined) addUpdate('order_status', input.orderStatus);
     if (input.paymentStatus !== undefined) addUpdate('payment_status', input.paymentStatus);
+    if (isPaymentUpdate && input.paymentStatus === undefined) addUpdate('payment_status', 'PAID');
     if (input.orderStatus === 'COMPLETED') addUpdate('completed_at', new Date());
 
-    if (updates.length === 0) {
+    if (updates.length === 0 && !isPaymentUpdate) {
       throw new BadRequestException('No order updates were provided.');
     }
 
-    const rows = await this.query<{ id: number; order_number: string }>(
-      `
-        UPDATE orders
-        SET ${updates.join(', ')}
-        WHERE store_id = $1
-          AND order_number = $2
-          AND (
-            ($${values.length + 1} = 'RETAIL_STORE' AND order_type = 'RETAIL')
-            OR ($${values.length + 1} = 'RESTAURANT' AND order_type <> 'RETAIL')
+    const rows = await this.withTransaction(async (client) => {
+      const updatedRows = updates.length > 0
+        ? await this.queryWithClient<{ id: number; order_number: string; total_amount: string | number }>(
+            client,
+            `
+              UPDATE orders
+              SET ${updates.join(', ')}
+              WHERE store_id = $1
+                AND order_number = $2
+                AND (
+                  ($${values.length + 1} = 'RETAIL_STORE' AND order_type = 'RETAIL')
+                  OR ($${values.length + 1} = 'RESTAURANT' AND order_type <> 'RETAIL')
+                )
+              RETURNING id, order_number, total_amount
+            `,
+            [...values, user.store_type],
           )
-        RETURNING id, order_number
-      `,
-      [...values, user.store_type],
-    );
+        : await this.queryWithClient<{ id: number; order_number: string; total_amount: string | number }>(
+            client,
+            `
+              SELECT id, order_number, total_amount
+              FROM orders
+              WHERE store_id = $1
+                AND order_number = $2
+                AND (
+                  ($3 = 'RETAIL_STORE' AND order_type = 'RETAIL')
+                  OR ($3 = 'RESTAURANT' AND order_type <> 'RETAIL')
+                )
+              LIMIT 1
+            `,
+            [user.store_id, input.orderNumber, user.store_type],
+          );
+
+      if (updatedRows.length === 0) {
+        return updatedRows;
+      }
+
+      if (isPaymentUpdate) {
+        const order = updatedRows[0];
+        const paymentNumber = await this.createUniquePaymentNumber(client, input.payment.paymentNumber ?? `PAY-${order.order_number}`);
+        await this.queryWithClient(
+          client,
+          `
+            INSERT INTO payments (
+              store_id, order_id, processed_by, payment_number, payment_method,
+              amount_due, amount_paid, change_amount, payment_status
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PAID')
+          `,
+          [
+            user.store_id,
+            order.id,
+            user.id,
+            paymentNumber,
+            input.payment.method ?? 'Cash',
+            Number(order.total_amount ?? 0),
+            input.payment.amountPaid ?? Number(order.total_amount ?? 0),
+            input.payment.changeAmount ?? 0,
+          ],
+        );
+      }
+
+      return updatedRows;
+    });
 
     if (rows.length === 0) {
       throw new NotFoundException('Order not found.');

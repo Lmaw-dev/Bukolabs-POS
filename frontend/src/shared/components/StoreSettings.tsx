@@ -26,7 +26,7 @@ const restaurantSettings: Array<[keyof StoreSettingValues, string, string]> = [
   ['enable_refund', 'Refund Processing', 'Refund actions in paid order workflows.'],
   ['enable_void', 'Void Transactions', 'Void actions for transactions that need cancellation.'],
   ['enable_service_charge', 'Service Charge', 'Service charge line and calculation in order totals.'],
-  ['enable_tax', 'Tax', 'Tax line and calculation in order totals.'],
+  ['enable_tax', 'VAT', 'VAT line and calculation in order totals.'],
   ['enable_discount', 'Discounts', 'Discount management and staff discount selection.'],
 ];
 
@@ -34,7 +34,7 @@ const retailSettings: Array<[keyof StoreSettingValues, string, string]> = [
   ['enable_refund', 'Refund Processing', 'Refund actions in paid order workflows.'],
   ['enable_void', 'Void Transactions', 'Void actions for transactions that need cancellation.'],
   ['enable_service_charge', 'Service Fee / Service Charge', 'Service fee line and calculation in order totals.'],
-  ['enable_tax', 'Tax', 'Tax line and calculation in order totals.'],
+  ['enable_tax', 'VAT', 'VAT line and calculation in order totals.'],
   ['enable_discount', 'Discounts', 'Discount management and staff discount selection.'],
 ];
 
@@ -274,7 +274,7 @@ export function StoreSettings({ currentUser, storeBrand, onLogout, onNavigate }:
                       )}
                       {settings.enable_tax && (
                         <label className="block rounded-lg border border-border p-4">
-                          <span className="mb-2 block font-medium">Tax Rate (%)</span>
+                          <span className="mb-2 block font-medium">VAT Rate (%)</span>
                           <input
                             type="number"
                             value={settings.tax_rate}

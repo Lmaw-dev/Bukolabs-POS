@@ -7,6 +7,7 @@ import { useOrders, Order } from '../context/RetailOrderContext';
 import { ThermalReceipt } from './RetailThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
 
 interface RetailOrderListProps {
   onNavigate: (page: Page) => void;
@@ -16,6 +17,10 @@ interface RetailOrderListProps {
   userName?: string | null;
   storeType?: StoreType;
   staffType?: StaffType;
+}
+
+function normalizeSearchValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailOrderListProps) {
@@ -45,8 +50,8 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
   };
 
   const isWithinDateFilter = (date: string) => {
-    const todayString = new Date().toISOString().split('T')[0];
-    const today = new Date(todayString);
+    const todayString = getLocalDateKey();
+    const today = parseLocalDateKey(todayString);
     const start = new Date(today);
 
     if (datePreset === 'all') {
@@ -69,16 +74,24 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
       start.setMonth(0, 1);
     }
 
-    const startString = start.toISOString().split('T')[0];
+    const startString = getLocalDateKey(start);
     return date >= startString && date <= todayString;
   };
 
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
     const transactionNumber = getTransactionNumber(order).toLowerCase();
+    const normalizedTerm = normalizeSearchValue(searchTerm);
+    const normalizedTransactionNumber = normalizeSearchValue(getTransactionNumber(order));
+    const normalizedOrderId = normalizeSearchValue(order.id);
     const matchesSearch = !term ||
       transactionNumber.includes(term) ||
-      (order.customer && order.customer.toLowerCase().includes(term));
+      order.id.toLowerCase().includes(term) ||
+      (order.customer && order.customer.toLowerCase().includes(term)) ||
+      Boolean(normalizedTerm && (
+        normalizedTransactionNumber.includes(normalizedTerm) ||
+        normalizedOrderId.includes(normalizedTerm)
+      ));
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
     const matchesDate = isWithinDateFilter(order.date);
     return matchesSearch && matchesPayment && matchesDate;
@@ -455,6 +468,12 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₱{selectedOrder.subtotal.toFixed(2)}</span>
                 </div>
+                {selectedOrder.serviceFee > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Service Fee</span>
+                    <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
+                  </div>
+                )}
                 {selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-red-600">
                     <span>Discount {selectedOrder.discountType && `(${selectedOrder.discountType})`}</span>
@@ -635,6 +654,7 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
                 customerName={selectedOrder.customer || 'Walk-in Customer'}
                 items={selectedOrder.items || []}
                 subtotal={selectedOrder.subtotal || 0}
+                serviceFee={selectedOrder.serviceFee || 0}
                 tax={selectedOrder.tax || 0}
                 discount={selectedOrder.discount || 0}
                 discountType={selectedOrder.discountType}

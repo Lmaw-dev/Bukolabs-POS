@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { LogoutConfirmDialog } from '../../shared/components/LogoutConfirmDialog';
 import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
+import { getLocalDateKey } from '../../shared/utils/date';
 
 interface AdminSummary {
   id: number;
@@ -85,7 +86,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<DashboardSection>('stores');
   const [activeSummaryModal, setActiveSummaryModal] = useState<SummaryModal>(null);
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
   const [viewSummaryRecord, setViewSummaryRecord] = useState<AdminSummary | null>(null);
   const [adminActionPreview, setAdminActionPreview] = useState<{ action: AdminActionPreview; admin: AdminSummary } | null>(null);
   const [addStoreModalOpen, setAddStoreModalOpen] = useState(false);
@@ -95,6 +96,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const [permanentlyDeletingAdmin, setPermanentlyDeletingAdmin] = useState<AdminSummary | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [adminPage, setAdminPage] = useState(1);
 
   useEffect(() => {
     const loadAdmins = async () => {
@@ -134,6 +136,11 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   const restaurantStores = stores.filter((store) => store.store_type === 'RESTAURANT');
   const filteredStores = stores.filter((store) => storeFilter === 'ALL' || store.store_type === storeFilter);
   const filteredAdmins = admins.filter((admin) => adminFilter === 'ALL' || admin.store_type === adminFilter);
+  const adminPageSize = 6;
+  const adminPageCount = Math.max(1, Math.ceil(filteredAdmins.length / adminPageSize));
+  const adminPageStartIndex = (adminPage - 1) * adminPageSize;
+  const shownAdminCount = Math.min(adminPageStartIndex + adminPageSize, filteredAdmins.length);
+  const paginatedAdmins = filteredAdmins.slice(adminPageStartIndex, adminPageStartIndex + adminPageSize);
   const retailPercent = stores.length === 0 ? 0 : Math.round((retailStores.length / stores.length) * 100);
   const modalStores =
     activeSummaryModal === 'retail-stores'
@@ -360,6 +367,14 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
           : 'bg-[#00a7a5]';
   const isStoreSummaryModal = activeSummaryModal && activeSummaryModal !== 'all-admins';
   const isFilteredStoreSummaryModal = activeSummaryModal === 'retail-stores' || activeSummaryModal === 'restaurant-stores';
+
+  useEffect(() => {
+    setAdminPage(1);
+  }, [adminFilter]);
+
+  useEffect(() => {
+    setAdminPage((page) => Math.min(page, adminPageCount));
+  }, [adminPageCount]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-[#007a5e]">
@@ -718,7 +733,7 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                           <td colSpan={6} className="px-4 py-10 text-center text-slate-500">No admin accounts match this filter.</td>
                         </tr>
                       ) : (
-                        filteredAdmins.slice(0, 6).map((admin) => (
+                        paginatedAdmins.map((admin) => (
                           <tr key={admin.id} className="text-slate-700">
                             <td className="truncate px-3 py-4 font-medium text-slate-900">{admin.full_name}</td>
                             <td className="px-3 py-4">
@@ -786,12 +801,33 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
                   </table>
                 </div>
                 <div className="mt-5 flex items-center justify-between text-base text-slate-500">
-                  <span>Showing {filteredAdmins.length === 0 ? 0 : 1} to {Math.min(6, filteredAdmins.length)} of {admins.length} admin accounts</span>
+                  <span>
+                    {filteredAdmins.length <= adminPageSize
+                      ? `Showing all ${filteredAdmins.length} admin account${filteredAdmins.length === 1 ? '' : 's'}`
+                      : `Showing ${filteredAdmins.length === 0 ? 0 : adminPageStartIndex + 1} to ${shownAdminCount} of ${filteredAdmins.length} admin accounts`}
+                  </span>
                   <div className="flex items-center gap-2">
-                    <button type="button" className="h-8 w-8 rounded-md bg-blue-600 text-sm font-semibold text-white">1</button>
-                    <button type="button" className="h-8 w-8 rounded-md text-sm font-semibold text-slate-600 hover:bg-slate-100">2</button>
-                    <button type="button" className="h-8 w-8 rounded-md text-sm font-semibold text-slate-600 hover:bg-slate-100">3</button>
-                    <button type="button" className="h-8 w-8 rounded-md text-slate-600 hover:bg-slate-100">
+                    {Array.from({ length: adminPageCount }, (_, index) => {
+                      const page = index + 1;
+                      return (
+                        <button
+                          key={`admin-page-${page}`}
+                          type="button"
+                          onClick={() => setAdminPage(page)}
+                          className={`h-8 w-8 rounded-md text-sm font-semibold ${
+                            adminPage === page ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setAdminPage((page) => Math.min(adminPageCount, page + 1))}
+                      disabled={adminPage === adminPageCount}
+                      className="h-8 w-8 rounded-md text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
                       <ChevronRight className="mx-auto h-4 w-4" />
                     </button>
                   </div>

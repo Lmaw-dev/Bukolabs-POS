@@ -19,7 +19,7 @@ interface TableManagementProps {
 }
 
 export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand, userName, storeType, staffType }: TableManagementProps) {
-  const { orders, updateOrder, queuedOrders, removeFromQueue } = useOrders();
+  const { orders, updateOrder, queuedOrders, removeFromQueue, completeTableOrder } = useOrders();
   const {
     tables: contextTables,
     setTableStatus,
@@ -103,11 +103,21 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     }
   };
 
-  const handleStatusChange = (tableNumber: number, newStatus: 'available' | 'occupied' | 'reserved' | 'maintenance') => {
+  const handleStatusChange = async (tableNumber: number, newStatus: 'available' | 'occupied' | 'reserved' | 'maintenance') => {
     // Check if table has an active order
     const table = tables.find(t => t.number === tableNumber);
     if (table?.orderId && newStatus !== 'occupied') {
-      alert('Cannot change status: Table has an active order. Please process payment first.');
+      const order = orders.find(o => o.id === table.orderId);
+      if (newStatus === 'available' && order?.paymentStatus === 'Paid') {
+        try {
+          await completeTableOrder(table.orderId);
+        } catch (error) {
+          alert(error instanceof Error ? error.message : 'Unable to release table.');
+        }
+        return;
+      }
+
+      alert('Cannot change status: Table has an active order. Only paid orders can be manually released to available.');
       return;
     }
 
@@ -485,6 +495,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
               <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mb-6">
                 {tables.map(table => {
                   const order = getTableOrder(table);
+                  const isPaidOccupiedTable = table.status === 'occupied' && order?.paymentStatus === 'Paid';
                   const theme = getTableTheme(table.status);
                   const rectangular = table.seats > 4;
                   const chairs = getChairLayout(table.seats, rectangular);
@@ -623,22 +634,27 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                           }}
                           className={`w-full appearance-none px-7 pr-8 py-1.5 rounded-xl text-[13px] font-medium border focus:outline-none focus:ring-2 focus:ring-primary transition-colors ${
                             table.status === 'available' ? 'border-green-200 bg-green-50/70 text-green-700' :
-                            table.status === 'occupied' ? 'border-orange-200 bg-orange-50/80 text-orange-700 cursor-not-allowed' :
+                            table.status === 'occupied' ? `border-orange-200 bg-orange-50/80 text-orange-700 ${isPaidOccupiedTable ? 'cursor-pointer' : 'cursor-not-allowed'}` :
                             table.status === 'reserved' ? 'border-blue-200 bg-blue-50/80 text-blue-700' :
                             'border-gray-200 bg-gray-50 text-gray-700'
                           }`}
-                          disabled={table.status === 'occupied'}
+                          disabled={table.status === 'occupied' && !isPaidOccupiedTable}
                         >
                           <option value="available">Available</option>
                           <option value="occupied">Occupied</option>
-                          <option value="reserved">Reserved</option>
-                          <option value="maintenance">Maintenance</option>
+                          <option value="reserved" disabled={table.status === 'occupied'}>Reserved</option>
+                          <option value="maintenance" disabled={table.status === 'occupied'}>Maintenance</option>
                         </select>
                       </div>
 
                       {/* Show order info if occupied */}
                       {order && (
                         <div className="relative z-10 w-full text-center text-[10px] text-gray-500 -mt-1">
+                          {order.paymentStatus === 'Paid' && table.status === 'occupied' && (
+                            <div className="mb-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
+                              Already Paid - Set Available
+                            </div>
+                          )}
                           <p className="font-medium truncate">{order.customer}</p>
                           {order.partySize ? (
                             <p className="text-primary">{order.partySize} {order.partySize === 1 ? 'person' : 'people'}</p>

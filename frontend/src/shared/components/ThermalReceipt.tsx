@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../App';
-import { useStoreSettings } from '../context/StoreSettingsContext';
+import { getLocalDateKey } from '../utils/date';
 import { calculateVatBreakdown, VAT_RATE } from '../utils/vat';
 
 interface ReceiptItem {
@@ -56,8 +56,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     },
     ref
   ) => {
-    const { settings } = useStoreSettings();
-    const currentDate = date || new Date().toISOString().split('T')[0];
+    const currentDate = date || getLocalDateKey();
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const vatBreakdown = calculateVatBreakdown(total);
 
@@ -130,7 +129,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
               <span>{cashier}</span>
             </div>
           )}
-          {table && table !== '—' && (
+          {table && table !== '-' && table !== '—' && (
             <div className="flex justify-between">
               <span className="text-gray-500">Table:</span>
               <span>{table}</span>
@@ -191,13 +190,13 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span>Subtotal</span>
             <span>₱{subtotal.toFixed(2)}</span>
           </div>
-          {settings.enable_service_charge && (
+          {serviceFee > 0 && (
             <div className="flex justify-between text-gray-600">
-              <span>Service Fee ({settings.service_charge_rate}%)</span>
+              <span>Service Fee</span>
               <span>₱{serviceFee.toFixed(2)}</span>
             </div>
           )}
-          {settings.enable_discount && discount > 0 && (
+          {discount > 0 && (
             <div className="flex justify-between text-red-500">
               <span>Discount{discountType ? ` (${discountType})` : ''}</span>
               <span>− ₱{discount.toFixed(2)}</span>
