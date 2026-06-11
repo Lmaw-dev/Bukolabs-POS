@@ -26,6 +26,7 @@ import { StoreSettingsProvider, useStoreSettings } from './context/StoreSettings
 import { getApiBaseUrl } from '../auth/services/auth';
 import type { AuthenticatedUser } from '../auth/types/auth';
 import { getDefaultStoreLogo } from './utils/defaultStoreLogo';
+import { AppAlertProvider } from './components/AppAlertProvider';
 
 const SESSION_USER_KEY = 'bukolabs-pos-current-user';
 const SESSION_PAGE_KEY = 'bukolabs-pos-current-page';
@@ -176,8 +177,9 @@ export default function App() {
   return (
     <div className="size-full bg-background">
       <StoreSettingsProvider currentUser={currentUser}>
-        <OrderProvider currentUser={currentUser}>
-          <TableProvider>
+        <AppAlertProvider>
+          <OrderProvider currentUser={currentUser}>
+            <TableProvider>
           {currentPage === 'login' && (
             <LoginPage onLogin={handleLogin} />
           )}
@@ -288,8 +290,9 @@ export default function App() {
           {currentPage === 'ingredient-management' && (
             <IngredientManagement currentUser={currentUser} storeBrand={storeBrand} onLogout={handleLogout} onNavigate={navigateTo} />
           )}
-          </TableProvider>
-        </OrderProvider>
+            </TableProvider>
+          </OrderProvider>
+        </AppAlertProvider>
       </StoreSettingsProvider>
     </div>
   );

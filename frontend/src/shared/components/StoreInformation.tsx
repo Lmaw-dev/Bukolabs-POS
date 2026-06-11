@@ -176,8 +176,8 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
   const sampleSubtotal = 370;
   const sampleDiscount = settings.enable_discount ? 20 : 0;
   const sampleServiceCharge = settings.enable_service_charge ? (sampleSubtotal - sampleDiscount) * (settings.service_charge_rate / 100) : 0;
-  const sampleTax = settings.enable_tax ? (sampleSubtotal - sampleDiscount + sampleServiceCharge) * (settings.tax_rate / 100) : 0;
-  const sampleTotal = sampleSubtotal - sampleDiscount + sampleServiceCharge + sampleTax;
+  const sampleTax = 0;
+  const sampleTotal = sampleSubtotal - sampleDiscount + sampleServiceCharge;
   const sampleDiscountName = discounts.find((discount) => discount.is_enabled && /senior/i.test(discount.discount_name))?.discount_name
     ?? discounts.find((discount) => discount.is_enabled)?.discount_name
     ?? 'Senior Citizen';
@@ -340,9 +340,9 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
                           { name: 'Casual Black Dress', quantity: 1, price: 829, size: 'L', color: 'Black' },
                         ]}
                         subtotal={829}
-                        tax={settings.enable_tax ? 829 * (settings.tax_rate / 100) : 0}
+                        tax={0}
                         discount={0}
-                        total={829 + (settings.enable_tax ? 829 * (settings.tax_rate / 100) : 0)}
+                        total={829}
                         cashReceived={830}
                         changeGiven={1}
                         paymentMethod="Cash"

@@ -711,7 +711,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   };
   const subtotal = cart.reduce((sum, item) => sum + itemLineTotal(item), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
-  const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
+  const tax = 0;
   const selectedDiscount = enabledDiscounts.find((item) => String(item.id) === discountType);
   const selectedDiscountName = selectedDiscount?.discount_name ?? '';
   const selectedDiscountRate = selectedDiscount ? Number(selectedDiscount.discount_rate) : 0;
@@ -721,7 +721,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const discountRate = discountEnabled && selectedDiscount ? selectedDiscountRate / 100 : 0;
   const discount = subtotal * discountRate;
 
-  const total = subtotal + serviceFee + tax - discount;
+  const total = subtotal + serviceFee - discount;
   const getOrderTypeForPayload = (items: CartItem[]) => {
     const hasDineIn = items.some(item => item.orderType === 'dine-in');
     const hasTakeout = items.some(item => item.orderType === 'takeout');
@@ -1587,7 +1587,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
           )}
         </div>
 
-        {/* Order totals - reorganized: Subtotal, Service Fee, Tax, Add Discount, Total */}
+        {/* Order totals */}
         <div className="space-y-1.5 mb-4 text-xs border-t border-border pt-3">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Subtotal:</span>
@@ -1599,13 +1599,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
               <span>PHP {serviceFee.toFixed(2)}</span>
             </div>
           )}
-          {settings.enable_tax && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
-              <span>PHP {tax.toFixed(2)}</span>
-            </div>
-          )}
-
           {/* Discount section with Edit button */}
           {discountEnabled && (
           <div className="border-t border-border pt-2 mt-2">
@@ -1806,12 +1799,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                 <div className="flex justify-between">
                   <span>Service Fee ({settings.service_charge_rate}%):</span>
                   <span>₱{serviceFee.toFixed(2)}</span>
-                </div>
-                )}
-                {settings.enable_tax && (
-                <div className="flex justify-between">
-                  <span>Tax ({settings.tax_rate}%):</span>
-                  <span>₱{tax.toFixed(2)}</span>
                 </div>
                 )}
                 {discount > 0 && (
@@ -2091,12 +2078,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
                     <span>₱{serviceFee.toFixed(2)}</span>
-                  </div>
-                  )}
-                  {settings.enable_tax && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
-                    <span>₱{tax.toFixed(2)}</span>
                   </div>
                   )}
                   {discount > 0 && (
@@ -2784,7 +2765,7 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
 
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4 overflow-y-auto">
-            <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col my-8">
+            <div className="bg-white rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-2xl flex flex-col my-8">
               <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm text-gray-700" style={{ fontWeight: 600 }}>Receipt Preview</h2>
               </div>

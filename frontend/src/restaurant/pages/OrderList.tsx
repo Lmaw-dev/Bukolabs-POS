@@ -455,10 +455,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                   <span>Service Fee (1%)</span>
                   <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Tax (12%)</span>
-                  <span>₱{selectedOrder.tax.toFixed(2)}</span>
-                </div>
                 {selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-xs text-red-500">
                     <span>Discount ({selectedOrder.discountType} 20%)</span>
@@ -515,10 +511,6 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                   <div className="flex justify-between text-xs text-gray-500">
                     <span>Service Fee (1%)</span>
                     <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Tax (12%)</span>
-                    <span>₱{selectedOrder.tax.toFixed(2)}</span>
                   </div>
                   {selectedOrder.discount > 0 && (
                     <div className="flex justify-between text-xs text-red-500">
@@ -650,7 +642,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
       {/* ── MODAL: Receipt (Thermal Style) ── */}
       {activeModal === 'receipt' && selectedOrder && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl flex flex-col my-8">
+          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[90vh] overflow-hidden shadow-2xl flex flex-col my-8">
             <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100">
               <h2 className="text-sm text-gray-700" style={{ fontWeight: 600 }}>Receipt Preview</h2>
               <button onClick={handleCloseReceiptAfterPayment} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">

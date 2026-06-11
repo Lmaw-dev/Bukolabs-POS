@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../../shared/App';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
-import { getDefaultStoreLogo } from '../../shared/utils/defaultStoreLogo';
+import { calculateVatBreakdown, VAT_RATE } from '../../shared/utils/vat';
 
 interface ReceiptItem {
   name: string;
@@ -48,7 +48,6 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       customerName,
       items,
       subtotal,
-      tax,
       discount,
       discountType,
       total,
@@ -74,17 +73,20 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     const { settings } = useStoreSettings();
     const currentDate = date || new Date().toISOString().split('T')[0];
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const vatBreakdown = calculateVatBreakdown(total);
 
     return (
       <div
         ref={ref}
-        className="bg-white p-6 overflow-y-auto flex-1"
+        className="bg-white p-6 overflow-y-auto flex-1 min-h-0"
         style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif", maxWidth: '400px', margin: '0 auto' }}
       >
         {/* Logo */}
         <div className="text-center mb-3">
-          <div className="w-14 h-14 mx-auto mb-2 flex items-center justify-center">
-            <img src={storeBrand?.logo || getDefaultStoreLogo('RETAIL_STORE')} alt={storeBrand?.name || 'Retail Store Logo'} className="w-full h-full object-contain" />
+          <div className="w-20 h-20 mx-auto mb-3 flex items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50">
+            {storeBrand?.logo && (
+              <img src={storeBrand.logo} alt={storeBrand?.name || 'Retail Store Logo'} className="w-full h-full object-contain p-2" />
+            )}
           </div>
         </div>
 
@@ -236,12 +238,6 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
             <span>Subtotal</span>
             <span className="text-right">₱{subtotal.toFixed(2)}</span>
           </div>
-          {settings.enable_tax && (
-            <div className="flex justify-between text-gray-600">
-              <span>Tax ({settings.tax_rate}%)</span>
-              <span className="text-right">₱{tax.toFixed(2)}</span>
-            </div>
-          )}
           {settings.enable_discount && discount > 0 && (
             <div className="flex justify-between text-red-600">
               <span>Discount {discountType && `(${discountType})`}</span>
@@ -269,6 +265,20 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
               </div>
             </>
           )}
+          <div className="border-t border-dashed border-gray-300 mt-3 pt-2 space-y-1 text-xs text-gray-600">
+            <div className="flex justify-between">
+              <span>VATable Sales</span>
+              <span className="text-right">₱{vatBreakdown.vatableSales.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>VAT ({VAT_RATE * 100}%)</span>
+              <span className="text-right">₱{vatBreakdown.vatAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Amount Due</span>
+              <span className="text-right">₱{vatBreakdown.total.toFixed(2)}</span>
+            </div>
+          </div>
         </div>
 
         <div className="border-t border-dashed border-gray-300 mt-4 pt-3 text-center">

@@ -590,7 +590,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const serviceFee = settings.enable_service_charge ? subtotal * (settings.service_charge_rate / 100) : 0;
-  const tax = settings.enable_tax ? subtotal * (settings.tax_rate / 100) : 0;
+  const tax = 0;
   const selectedDiscount = enabledDiscounts.find((item) => String(item.id) === discountType);
   const selectedDiscountName = selectedDiscount?.discount_name ?? '';
   const selectedDiscountRate = selectedDiscount ? Number(selectedDiscount.discount_rate) : 0;
@@ -598,7 +598,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
   // Calculate discount
   const discountRate = settings.enable_discount && selectedDiscount ? selectedDiscountRate / 100 : 0;
   const discount = subtotal * discountRate;
-  const total = subtotal + serviceFee + tax - discount;
+  const total = subtotal + serviceFee - discount;
 
   const validateOrder = (): boolean => {
     if (cart.length === 0) {
@@ -1003,13 +1003,6 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
               <span>PHP {serviceFee.toFixed(2)}</span>
             </div>
           )}
-          {settings.enable_tax && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
-              <span>PHP {tax.toFixed(2)}</span>
-            </div>
-          )}
-
           {settings.enable_discount && (
           <div className="border-t border-border pt-2 mt-2">
             <div className="flex justify-between items-center mb-2">
@@ -1146,10 +1139,6 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                   <span>Subtotal:</span>
                   <span>₱{subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Tax ({settings.tax_rate}%):</span>
-                  <span>₱{tax.toFixed(2)}</span>
-                </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-destructive">
                     <span>Discount:</span>
@@ -1216,12 +1205,6 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Service Fee ({settings.service_charge_rate}%):</span>
                       <span>₱{serviceFee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {settings.enable_tax && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Tax ({settings.tax_rate}%):</span>
-                      <span>₱{tax.toFixed(2)}</span>
                     </div>
                   )}
                   {discount > 0 && (

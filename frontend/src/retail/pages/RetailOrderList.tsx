@@ -455,10 +455,6 @@ export function RetailOrderList({ onNavigate, onLogout, isAdmin = false, storeBr
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>₱{selectedOrder.subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax (12%)</span>
-                  <span>₱{selectedOrder.tax.toFixed(2)}</span>
-                </div>
                 {selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-red-600">
                     <span>Discount {selectedOrder.discountType && `(${selectedOrder.discountType})`}</span>
