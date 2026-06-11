@@ -9,6 +9,7 @@ import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { getLocalDateKey } from '../../shared/utils/date';
 
 interface RetailCreateOrderProps {
   currentUser: AuthenticatedUser | null;
@@ -665,7 +666,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
       amountNumber: total,
       paymentMethod,
       paymentStatus: 'Paid' as const,
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalDateKey(),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       cashReceived: paymentMethod === 'Cash' ? parseFloat(cashAmount) : total,
       changeGiven: paymentMethod === 'Cash' ? computedChange : 0,
@@ -1293,6 +1294,7 @@ export function RetailCreateOrder({ currentUser, onNavigate, onOrderCreated, onL
                 customerName={completedOrder.customer || 'Walk-in Customer'}
                 items={completedOrder.items || []}
                 subtotal={completedOrder.subtotal || 0}
+                serviceFee={completedOrder.serviceFee || 0}
                 tax={completedOrder.tax || 0}
                 discount={completedOrder.discount || 0}
                 discountType={completedOrder.discountType}

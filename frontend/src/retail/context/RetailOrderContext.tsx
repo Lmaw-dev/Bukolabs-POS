@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { getLocalDateKey } from '../../shared/utils/date';
 
 export interface OrderItem {
   name: string;
@@ -21,6 +22,7 @@ export interface Order {
   contactNumber?: string;
   amountNumber: number;
   subtotal: number;
+  serviceFee: number;
   tax: number;
   discount: number;
   discountType?: string;
@@ -58,6 +60,7 @@ const initialOrders: Order[] = [
     customer: 'Juan Dela Cruz',
     amountNumber: 620.00,
     subtotal: 550.00,
+    serviceFee: 0,
     tax: 66.00,
     discount: 0,
     paymentStatus: 'Paid',
@@ -79,6 +82,7 @@ const initialOrders: Order[] = [
     customer: 'Maria Santos',
     amountNumber: 895.00,
     subtotal: 850.00,
+    serviceFee: 0,
     tax: 102.00,
     discount: 57.00,
     discountType: 'Senior Citizen (20%)',
@@ -101,6 +105,7 @@ const initialOrders: Order[] = [
     customer: 'Mark Reyes',
     amountNumber: 380.00,
     subtotal: 350.00,
+    serviceFee: 0,
     tax: 42.00,
     discount: 12.00,
     discountType: 'PWD (10%)',
@@ -123,6 +128,7 @@ const initialOrders: Order[] = [
     customer: 'Anna Lim',
     amountNumber: 580.00,
     subtotal: 520.00,
+    serviceFee: 0,
     tax: 62.40,
     discount: 0,
     paymentStatus: 'Paid',
@@ -144,6 +150,7 @@ const initialOrders: Order[] = [
     customer: 'Angel Cruize',
     amountNumber: 720.00,
     subtotal: 650.00,
+    serviceFee: 0,
     tax: 78.00,
     discount: 8.00,
     paymentStatus: 'Paid',
@@ -260,7 +267,7 @@ export function RetailOrderProvider({ children, currentUser }: { children: React
         ...order,
         items: updatedItems,
         paymentStatus: newPaymentStatus,
-        refundDate: new Date().toISOString().split('T')[0],
+        refundDate: getLocalDateKey(),
         refundReason: refundReason || 'Customer request',
         refundTransactionId: `REF-${Date.now()}`
       };
@@ -274,7 +281,7 @@ export function RetailOrderProvider({ children, currentUser }: { children: React
       return {
         ...order,
         paymentStatus: 'Void' as const,
-        voidDate: new Date().toISOString().split('T')[0],
+        voidDate: getLocalDateKey(),
         voidReason: voidReason || 'Transaction voided',
         voidBy: voidBy || 'Cashier',
       };
@@ -375,6 +382,7 @@ function mapDatabaseRetailOrder(row: any): Order {
     customer: row.customer_name || undefined,
     amountNumber: Number(row.total_amount ?? 0),
     subtotal: Number(row.subtotal ?? 0),
+    serviceFee: Number(row.service_charge ?? 0),
     tax: Number(row.tax_amount ?? 0),
     discount: Number(row.discount_amount ?? 0),
     discountType: row.discount_type ?? undefined,
@@ -389,7 +397,7 @@ function mapDatabaseRetailOrder(row: any): Order {
       row.payment_method === 'GCash' ? 'GCash' :
       row.payment_method === 'PayMaya' ? 'PayMaya' :
       'Cash',
-    date: createdAt.toISOString().split('T')[0],
+    date: getLocalDateKey(createdAt),
     time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     items: items.map((item: any) => ({
       name: item.product_name,

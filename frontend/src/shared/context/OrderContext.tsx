@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { getLocalDateKey } from '../utils/date';
 
 export interface OrderItem {
   name: string;
@@ -25,7 +26,7 @@ export interface Order {
   tax: number;
   discount: number;
   discountType?: string;
-  paymentStatus: 'Paid' | 'Not Paid';
+  paymentStatus: 'Paid' | 'Not Paid' | 'Void';
   orderStatus: 'Pending' | 'Preparing' | 'Ready' | 'Served' | 'Completed';
   date: string;
   time: string;
@@ -228,7 +229,9 @@ interface OrderContextType {
   removeOrder: (id: string) => void;
   removeFromQueue: (id: string) => void;
   assignQueuedOrderToTable: (id: string, table: string, orderStatus: Order['orderStatus']) => Promise<void>;
-  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => void;
+  completePayment: (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string; paymentId?: string; receiptId?: string }) => Promise<void>;
+  completeTableOrder: (orderId: string) => Promise<void>;
+  voidOrder: (orderId: string) => Promise<void>;
   paymentCompletedSignal: number; // Signal for when payment is completed
 }
 
@@ -295,6 +298,38 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
     setOrders(prev => prev.filter(o => o.id !== id));
   };
 
+  const voidOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setOrders(prev => prev.map(o =>
+      o.id === orderId
+        ? { ...o, paymentStatus: 'Void' as const, orderStatus: 'Completed' as const }
+        : o
+    ));
+
+    if (!currentUser?.id || !order.orderNumber) return;
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders/${encodeURIComponent(order.orderNumber)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          paymentStatus: 'VOIDED',
+          orderStatus: 'COMPLETED',
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? 'Unable to void order.');
+      }
+    } catch (error) {
+      setOrders(prev => prev.map(o => o.id === orderId ? order : o));
+      throw error;
+    }
+  };
+
   const removeFromQueue = (id: string) => {
     setOrders(prev => prev.map(o =>
       o.id === id ? { ...o, isQueued: false, queuePosition: undefined } : o
@@ -340,8 +375,12 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
     }
   };
 
-  const completePayment = (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string }) => {
-    // Update order to paid status
+  const completePayment = async (orderId: string, paymentData: { cashReceived: number; changeGiven: number; cashier?: string; paymentId?: string; receiptId?: string }) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    const paymentId = paymentData.paymentId ?? `PAY-${Date.now()}`;
+    const receiptId = paymentData.receiptId ?? `REC-${Date.now()}`;
+
     setOrders(prev => prev.map(o =>
       o.id === orderId
         ? {
@@ -351,14 +390,69 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
             cashReceived: paymentData.cashReceived,
             changeGiven: paymentData.changeGiven,
             cashier: paymentData.cashier,
-            paymentId: `PAY-${Date.now()}`,
-            receiptId: `REC-${Date.now()}`,
+            paymentId,
+            receiptId,
           }
         : o
     ));
 
-    // Signal that payment was completed (triggers table release)
+    if (currentUser?.id && order.orderNumber) {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders/${encodeURIComponent(order.orderNumber)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            orderStatus: 'COMPLETED',
+            paymentStatus: 'PAID',
+            payment: {
+              paymentNumber: paymentId,
+              method: 'Cash',
+              amountPaid: paymentData.cashReceived,
+              changeAmount: paymentData.changeGiven,
+            },
+          }),
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.message ?? 'Unable to complete payment.');
+        }
+      } catch (error) {
+        setOrders(prev => prev.map(o => o.id === orderId ? order : o));
+        throw error;
+      }
+    }
+
     setPaymentCompletedSignal(prev => prev + 1);
+  };
+
+  const completeTableOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    setOrders(prev => prev.map(o =>
+      o.id === orderId ? { ...o, orderStatus: 'Completed' as const } : o
+    ));
+
+    if (!currentUser?.id || !order.orderNumber) return;
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/admin/pos/orders/${encodeURIComponent(order.orderNumber)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: currentUser.id,
+          orderStatus: 'COMPLETED',
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message ?? 'Unable to release table.');
+      }
+    } catch (error) {
+      setOrders(prev => prev.map(o => o.id === orderId ? order : o));
+      throw error;
+    }
   };
 
   return (
@@ -371,6 +465,8 @@ export function OrderProvider({ children, currentUser }: { children: ReactNode; 
       removeFromQueue,
       assignQueuedOrderToTable,
       completePayment,
+      completeTableOrder,
+      voidOrder,
       paymentCompletedSignal,
     }}>
       {children}
@@ -394,7 +490,10 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     ?.map((label) => Number(label.match(/\d+/)?.[0]))
     .filter((value) => Number.isFinite(value));
   const partySize = Number(row.party_size ?? row.partySize ?? row.required_seats ?? 0);
-  const paymentStatus: Order['paymentStatus'] = row.payment_status === 'PAID' ? 'Paid' : 'Not Paid';
+  const paymentStatus: Order['paymentStatus'] =
+    row.payment_status === 'VOIDED' || row.payment_status === 'VOID' ? 'Void' :
+    row.payment_status === 'PAID' ? 'Paid' :
+    'Not Paid';
   const orderStatus: Order['orderStatus'] =
     row.order_status === 'PREPARING' ? 'Preparing' :
     row.order_status === 'READY' ? 'Ready' :
@@ -421,7 +520,7 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     discountType: row.discount_type ?? undefined,
     paymentStatus,
     orderStatus,
-    date: createdAt.toISOString().split('T')[0],
+    date: getLocalDateKey(createdAt),
     time: createdAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     items: items.map((item: any) => ({
       name: item.product_name,

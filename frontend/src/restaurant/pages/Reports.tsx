@@ -6,6 +6,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+<<<<<<< HEAD
+=======
+import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
+>>>>>>> 00b322f26d39c2e1ea1998060f567900e11d6c2b
 import { calculateVatBreakdown } from '../../shared/utils/vat';
 
 // Custom Peso Icon Component using ₱ symbol
@@ -39,14 +43,14 @@ interface ReportsProps {
 
 export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: ReportsProps) {
   const { orders } = useOrders();
-  const todayString = new Date().toISOString().split('T')[0];
+  const todayString = getLocalDateKey();
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilterMode>('today');
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showAllProducts, setShowAllProducts] = useState(false);
 
   const getFilterRange = () => {
-    const today = new Date(todayString);
+    const today = parseLocalDateKey(todayString);
     const start = new Date(today);
     const end = new Date(today);
 
@@ -71,8 +75,8 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     }
 
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: getLocalDateKey(start),
+      end: getLocalDateKey(end),
     };
   };
 
@@ -102,7 +106,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   const filteredOrders = getFilteredOrders();
   const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-  const todayOrders = paidOrders.filter(o => o.date === new Date().toISOString().split('T')[0]);
+  const todayOrders = paidOrders.filter(o => o.date === todayString);
   const todayRevenue = todayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
   const filteredRevenue = filteredOrders.reduce((sum, order) => sum + order.amountNumber, 0);
@@ -139,7 +143,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(today.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = getLocalDateKey(date);
       const dayOrders = paidOrders.filter(o => o.date === dateStr);
       const daySales = dayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
@@ -218,7 +222,11 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   ].filter(d => d.value > 0);
 
   const totalDiscountGiven = filteredOrders.reduce((sum, order) => sum + (order.discount || 0), 0);
+<<<<<<< HEAD
   const totalTaxCollected = filteredOrders.reduce((sum, order) => sum + calculateVatBreakdown(order.amountNumber).vatAmount, 0);
+=======
+  const totalVatCollected = filteredOrders.reduce((sum, order) => sum + calculateVatBreakdown(order.amountNumber).vatAmount, 0);
+>>>>>>> 00b322f26d39c2e1ea1998060f567900e11d6c2b
   const totalServiceFees = filteredOrders.reduce((sum, order) => sum + (order.serviceFee || 0), 0);
 
   const handlePrint = () => {
@@ -289,12 +297,12 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
             <div className="bg-card rounded-lg shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">Tax Collected</p>
+                <p className="text-sm text-muted-foreground">VAT Collected</p>
                 <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
                   <PesoIcon className="w-5 h-5 text-orange-600" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-primary mb-1">₱{totalTaxCollected.toFixed(2)}</h2>
+              <h2 className="text-2xl font-bold text-primary mb-1">₱{totalVatCollected.toFixed(2)}</h2>
               <div className="flex items-center text-xs text-orange-600">
                 <Calendar className="w-3 h-3 mr-1" />
                 <span>12% VAT</span>
@@ -351,8 +359,8 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
                   <span className="font-medium text-red-600">- ₱{totalDiscountGiven.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center pb-3 border-b border-border">
-                  <span className="text-sm text-muted-foreground">Tax Collected (12%)</span>
-                  <span className="font-medium">₱{totalTaxCollected.toFixed(2)}</span>
+                  <span className="text-sm text-muted-foreground">VAT Collected (12%)</span>
+                  <span className="font-medium">₱{totalVatCollected.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center pt-2">
                   <span className="font-medium">Net Revenue</span>

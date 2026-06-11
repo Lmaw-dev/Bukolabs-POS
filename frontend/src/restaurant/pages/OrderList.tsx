@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from '../../shared/components/Sidebar';
 import { Page, type StoreBrand } from '../../shared/App';
 import type { StaffType, StoreType } from '../../auth/types/auth';
@@ -8,6 +8,7 @@ import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
 
 interface OrderListProps {
   onNavigate: (page: Page) => void;
@@ -19,17 +20,22 @@ interface OrderListProps {
   staffType?: StaffType;
 }
 
-type ActiveModal = 'details' | 'payment' | 'payment-success' | 'receipt' | 'refund' | null;
+type ActiveModal = 'details' | 'payment' | 'payment-success' | 'receipt' | 'refund' | 'void' | null;
 
 const ORDER_TYPES = ['Dine-In', 'Takeout', 'Mixed'];
-const PAYMENT_STATUSES = ['Paid', 'Not Paid'];
+const PAYMENT_STATUSES = ['Paid', 'Not Paid', 'Void'];
+const ORDERS_PER_PAGE = 10;
 
 function generateId(prefix: string) {
   return `${prefix}-${Date.now().toString().slice(-6)}`;
 }
 
+function normalizeSearchValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, userName, storeType, staffType }: OrderListProps) {
-  const { orders, updateOrder, removeOrder, completePayment } = useOrders();
+  const { orders, removeOrder, completePayment, voidOrder } = useOrders();
   const { settings } = useStoreSettings();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All');
@@ -45,9 +51,15 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const [currentReceiptId, setCurrentReceiptId] = useState('');
   const [refundReason, setRefundReason] = useState('');
   const [refundingOrder, setRefundingOrder] = useState<Order | null>(null);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidingOrder, setVoidingOrder] = useState<Order | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isCompletingPayment, setIsCompletingPayment] = useState(false);
+  const showTableManagementColumns = settings.enable_table_management;
 
   const openModal = (order: Order, modal: ActiveModal) => {
     if (modal === 'refund' && !settings.enable_refund) return;
+    if (modal === 'void' && !settings.enable_void) return;
     setSelectedOrder(order);
     setActiveModal(modal);
   };
@@ -58,12 +70,14 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     setCashReceived('');
     setChangeAmount(0);
     setRefundReason('');
+    setVoidReason('');
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!selectedOrder) return;
     const cash = parseFloat(cashReceived);
     if (cash < selectedOrder.amountNumber) return;
+    if (isCompletingPayment) return;
 
     const change = cash - selectedOrder.amountNumber;
     const pId = generateId('PAY');
@@ -72,13 +86,18 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     setChangeAmount(change);
     setCurrentPaymentId(pId);
     setCurrentReceiptId(rId);
+    setIsCompletingPayment(true);
 
-    // Use completePayment to trigger table release and queue notifications
-    completePayment(selectedOrder.id, { cashReceived: cash, changeGiven: change, cashier: userName ?? undefined });
-
-    const updates = { paymentStatus: 'Paid' as const, orderStatus: 'Completed' as const, paymentId: pId, receiptId: rId, cashReceived: cash, changeGiven: change, cashier: userName ?? undefined };
-    setSelectedOrder(prev => prev ? { ...prev, ...updates } : null);
-    setActiveModal('payment-success');
+    try {
+      await completePayment(selectedOrder.id, { cashReceived: cash, changeGiven: change, cashier: userName ?? undefined, paymentId: pId, receiptId: rId });
+      const updates = { paymentStatus: 'Paid' as const, orderStatus: 'Completed' as const, paymentId: pId, receiptId: rId, cashReceived: cash, changeGiven: change, cashier: userName ?? undefined };
+      setSelectedOrder(prev => prev ? { ...prev, ...updates } : null);
+      setActiveModal('payment-success');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to complete payment.');
+    } finally {
+      setIsCompletingPayment(false);
+    }
   };
 
   const handleCloseReceiptAfterPayment = () => {
@@ -91,6 +110,12 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
     setRefundingOrder(selectedOrder);
   };
 
+  const handleVoidSubmit = () => {
+    if (!settings.enable_void) return;
+    if (!selectedOrder || !voidReason.trim()) return;
+    setVoidingOrder(selectedOrder);
+  };
+
   const handlePrintReceipt = () => {
     window.print();
   };
@@ -99,8 +124,8 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
   const isEnough = selectedOrder ? cashFloat >= selectedOrder.amountNumber : false;
 
   const isWithinDateFilter = (date: string) => {
-    const todayString = new Date().toISOString().split('T')[0];
-    const today = new Date(todayString);
+    const todayString = getLocalDateKey();
+    const today = parseLocalDateKey(todayString);
     const start = new Date(today);
 
     if (datePreset === 'all') {
@@ -123,23 +148,46 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
       start.setMonth(0, 1);
     }
 
-    const startString = start.toISOString().split('T')[0];
+    const startString = getLocalDateKey(start);
     return date >= startString && date <= todayString;
   };
 
   const filteredOrders = orders.filter(order => {
     const term = searchTerm.toLowerCase();
+    const normalizedTerm = normalizeSearchValue(searchTerm);
+    const normalizedOrderNumber = normalizeSearchValue(order.orderNumber || '');
+    const normalizedOrderId = normalizeSearchValue(order.id);
     const matchesSearch = !term ||
       order.id.toLowerCase().includes(term) ||
-      order.customer.toLowerCase().includes(term);
+      (order.orderNumber || '').toLowerCase().includes(term) ||
+      order.customer.toLowerCase().includes(term) ||
+      Boolean(normalizedTerm && (
+        normalizedOrderId.includes(normalizedTerm) ||
+        normalizedOrderNumber.includes(normalizedTerm)
+      ));
     const matchesType = typeFilter === 'All' || order.type === typeFilter;
     const matchesPayment = paymentFilter === 'All' || order.paymentStatus === paymentFilter;
     const matchesDate = isWithinDateFilter(order.date);
     return matchesSearch && matchesType && matchesPayment && matchesDate;
   });
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+  const pageStartIndex = (currentPage - 1) * ORDERS_PER_PAGE;
+  const paginatedOrders = filteredOrders.slice(pageStartIndex, pageStartIndex + ORDERS_PER_PAGE);
+  const visibleStart = filteredOrders.length === 0 ? 0 : pageStartIndex + 1;
+  const visibleEnd = Math.min(pageStartIndex + ORDERS_PER_PAGE, filteredOrders.length);
+  const tableColumnCount = showTableManagementColumns ? 10 : 7;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, paymentFilter, dateFilter, datePreset]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const getPaymentBadge = (status: string) => {
     if (status === 'Paid') return 'bg-[#dcfce7] text-[#15803d]';
+    if (status === 'Void') return 'bg-purple-50 text-purple-700 border-purple-200';
     return 'bg-[#fef2f2] text-[#ef4444]';
   };
 
@@ -226,15 +274,19 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
         {/* Table Card */}
         <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px]">
+            <table className={`w-full ${showTableManagementColumns ? 'min-w-[1180px]' : 'min-w-[880px]'}`}>
               <thead className="bg-muted/30">
                 <tr>
                   <th className="w-[13%] text-left px-5 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Order Number</th>
                   <th className="w-[10%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Customer</th>
                   <th className="w-[8%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Type</th>
-                  <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Table</th>
-                  <th className="w-[6%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Party</th>
-                  <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Queue</th>
+                  {showTableManagementColumns && (
+                    <>
+                      <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Table</th>
+                      <th className="w-[6%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Party</th>
+                      <th className="w-[7%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Queue</th>
+                    </>
+                  )}
                   <th className="w-[9%] text-right px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
                   <th className="w-[8%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Payments</th>
                   <th className="w-[9%] text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">Date and Time</th>
@@ -244,11 +296,11 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               <tbody className="divide-y divide-border">
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="text-center py-16 text-gray-400 text-sm">
+                    <td colSpan={tableColumnCount} className="text-center py-16 text-gray-400 text-sm">
                       No orders found matching your filters.
                     </td>
                   </tr>
-                ) : filteredOrders.map((order) => {
+                ) : paginatedOrders.map((order) => {
                   const waitingTime = order.isQueued ? Math.floor((new Date().getTime() - new Date(`${order.date} ${order.time}`).getTime()) / 60000) : 0;
 
                   return (<tr key={order.id} className="hover:bg-muted/20 transition-colors">
@@ -263,31 +315,35 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                         {order.type}
                       </span>
                     </td>
-                    <td className="px-4 py-5 text-sm text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis">
-                      {order.table}
-                    </td>
-                    <td className="px-4 py-5">
-                      {order.partySize ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium whitespace-nowrap">
-                          <Users className="w-3 h-3" />
-                          {order.partySize}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-5">
-                      {order.isQueued ? (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="inline-flex items-center justify-center w-fit px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full whitespace-nowrap">
-                            #{order.queuePosition}
-                          </span>
-                          <span className="text-xs text-gray-500 whitespace-nowrap">{waitingTime} min</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-gray-400">-</span>
-                      )}
-                    </td>
+                    {showTableManagementColumns && (
+                      <>
+                        <td className="px-4 py-5 text-sm text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis">
+                          {order.table}
+                        </td>
+                        <td className="px-4 py-5">
+                          {order.partySize ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium whitespace-nowrap">
+                              <Users className="w-3 h-3" />
+                              {order.partySize}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-5">
+                          {order.isQueued ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center justify-center w-fit px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded-full whitespace-nowrap">
+                                #{order.queuePosition}
+                              </span>
+                              <span className="text-xs text-gray-500 whitespace-nowrap">{waitingTime} min</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                      </>
+                    )}
                     <td className="px-4 py-5 text-sm text-right font-medium whitespace-nowrap">
                       <span className="text-primary">&#8369;{order.amountNumber.toFixed(2)}</span>
                     </td>
@@ -325,7 +381,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                         )}
 
                         {/* Receipt - only if Paid */}
-                        {settings.enable_refund && order.paymentStatus === 'Paid' && (
+                        {order.paymentStatus === 'Paid' && (
                           <button
                             onClick={() => openModal(order, 'receipt')}
                             title="View Receipt"
@@ -337,7 +393,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                         )}
 
                         {/* Refund - only if Paid */}
-                        {order.paymentStatus === 'Paid' && (
+                        {settings.enable_refund && order.paymentStatus === 'Paid' && (
                           <button
                             onClick={() => openModal(order, 'refund')}
                             title="Process Refund"
@@ -347,12 +403,49 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                             Refund
                           </button>
                         )}
+
+                        {settings.enable_void && order.paymentStatus === 'Paid' && (
+                          <button
+                            onClick={() => openModal(order, 'void')}
+                            title="Void Transaction"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Void
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>);
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>
+            Showing {visibleStart} to {visibleEnd} of {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-sm font-semibold text-primary">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -384,10 +477,12 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                     {selectedOrder.type}
                   </span>
                 </div>
-                <div className="bg-muted rounded-xl p-3">
-                  <p className="text-xs text-gray-400 mb-1">Table</p>
-                  <p className="text-sm text-gray-800">{selectedOrder.table}</p>
-                </div>
+                {selectedOrder.table !== '-' && selectedOrder.table !== '—' && (
+                  <div className="bg-muted rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">Table</p>
+                    <p className="text-sm text-gray-800">{selectedOrder.table}</p>
+                  </div>
+                )}
                 <div className="bg-muted rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-1">Date & Time</p>
                   <p className="text-sm text-gray-800">{selectedOrder.date} · {selectedOrder.time}</p>
@@ -451,10 +546,12 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                   <span>Subtotal</span>
                   <span>₱{selectedOrder.subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Service Fee (1%)</span>
-                  <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
-                </div>
+                {selectedOrder.serviceFee > 0 && (
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>Service Fee</span>
+                    <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
+                  </div>
+                )}
                 {selectedOrder.discount > 0 && (
                   <div className="flex justify-between text-xs text-red-500">
                     <span>Discount ({selectedOrder.discountType} 20%)</span>
@@ -508,10 +605,12 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                     <span>Subtotal</span>
                     <span>₱{selectedOrder.subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-gray-500">
-                    <span>Service Fee (1%)</span>
-                    <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
-                  </div>
+                  {selectedOrder.serviceFee > 0 && (
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>Service Fee</span>
+                      <span>₱{selectedOrder.serviceFee.toFixed(2)}</span>
+                    </div>
+                  )}
                   {selectedOrder.discount > 0 && (
                     <div className="flex justify-between text-xs text-red-500">
                       <span>Discount ({selectedOrder.discountType} 20%)</span>
@@ -560,11 +659,11 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
                 </button>
                 <button
                   onClick={handleConfirmPayment}
-                  disabled={!isEnough}
+                  disabled={!isEnough || isCompletingPayment}
                   className="flex-1 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{ fontWeight: 600 }}
                 >
-                  Confirm Payment
+                  {isCompletingPayment ? 'Processing...' : 'Confirm Payment'}
                 </button>
               </div>
             </div>
@@ -654,7 +753,7 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
               orderNumber={selectedOrder.orderNumber || selectedOrder.id}
               customerName={selectedOrder.customer}
               orderType={selectedOrder.type as 'Dine-In' | 'Takeout' | 'Mixed'}
-              table={selectedOrder.table !== '—' ? selectedOrder.table : undefined}
+              table={selectedOrder.table !== '-' && selectedOrder.table !== '—' ? selectedOrder.table : undefined}
               items={selectedOrder.items.map(item => ({
                 name: item.name,
                 quantity: item.quantity,
@@ -769,6 +868,69 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
           </div>
         </div>
       )}
+      {activeModal === 'void' && selectedOrder && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100">
+              <h2 className="text-base text-purple-700" style={{ fontWeight: 600 }}>Void Transaction</h2>
+              <button onClick={closeModal} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-purple-50 border border-purple-100 rounded-xl p-4">
+                <p className="text-sm text-purple-800 mb-1" style={{ fontWeight: 600 }}>Void Warning</p>
+                <p className="text-xs text-purple-600">This will mark the paid order as void in the transaction history.</p>
+              </div>
+
+              <div className="bg-muted rounded-xl p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Order #</span>
+                  <span className="text-gray-800 font-medium">{selectedOrder.orderNumber || selectedOrder.id}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Customer</span>
+                  <span className="text-gray-800">{selectedOrder.customer}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Amount</span>
+                  <span className="text-purple-700" style={{ fontWeight: 700 }}>₱{selectedOrder.amountNumber.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-2" style={{ fontWeight: 500 }}>Reason for Void *</label>
+                <textarea
+                  value={voidReason}
+                  onChange={e => setVoidReason(e.target.value)}
+                  placeholder="Enter the reason for voiding this transaction..."
+                  autoFocus
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 bg-muted resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleVoidSubmit}
+                  disabled={!voidReason.trim()}
+                  className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ fontWeight: 600 }}
+                >
+                  Void Transaction
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <DeleteConfirmDialog
         isOpen={Boolean(refundingOrder)}
         title="Confirm Delete"
@@ -779,6 +941,24 @@ export function OrderList({ onNavigate, onLogout, isAdmin = false, storeBrand, u
           removeOrder(refundingOrder.id);
           setRefundingOrder(null);
           closeModal();
+        }}
+      />
+      <DeleteConfirmDialog
+        isOpen={Boolean(voidingOrder)}
+        title="Confirm Void"
+        description={`Are you sure you want to void order ${voidingOrder?.orderNumber || voidingOrder?.id || ''}?`}
+        onCancel={() => setVoidingOrder(null)}
+        onConfirm={() => {
+          if (!voidingOrder) return;
+          void voidOrder(voidingOrder.id)
+            .then(() => {
+              setVoidingOrder(null);
+              closeModal();
+            })
+            .catch((error) => {
+              alert(error instanceof Error ? error.message : 'Unable to void order.');
+              setVoidingOrder(null);
+            });
         }}
       />
     </div>

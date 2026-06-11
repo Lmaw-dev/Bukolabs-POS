@@ -6,6 +6,7 @@ import { useOrders } from '../../shared/context/OrderContext';
 import { useTables } from '../../shared/context/TableContext';
 import { useStoreSettings } from '../../shared/context/StoreSettingsContext';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, X } from 'lucide-react';
 
@@ -41,7 +42,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
   const { orders, queuedOrders } = useOrders();
   const { tables, getAvailableTablesCount } = useTables();
   const { settings } = useStoreSettings();
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateKey();
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilterMode>('today');
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
@@ -178,7 +179,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
       return Array.from({ length: 7 }, (_, index) => {
         const date = new Date(now);
         date.setDate(now.getDate() - (6 - index));
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = getLocalDateKey(date);
         return {
           id: `day-${dateKey}`,
           label: date.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -195,7 +196,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
           label: date.toLocaleDateString('en-US', { month: 'short' }),
           sales: paidOrders
             .filter((order) => {
-              const orderDate = new Date(order.date);
+              const orderDate = parseLocalDateKey(order.date);
               return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === month;
             })
             .reduce((sum, order) => sum + order.amountNumber, 0),
@@ -209,7 +210,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
       label: `Week ${week + 1}`,
       sales: paidOrders
         .filter((order) => {
-          const orderDate = new Date(order.date);
+          const orderDate = parseLocalDateKey(order.date);
           return orderDate.getFullYear() === target.getFullYear()
             && orderDate.getMonth() === target.getMonth()
             && Math.floor((orderDate.getDate() - 1) / 7) === week;
@@ -396,7 +397,7 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                     <th className="px-4 py-3 text-left text-xs">Type</th>
                     <th className="px-4 py-3 text-left text-xs">Table</th>
                     <th className="px-4 py-3 text-left text-xs">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs">Time</th>
+                    <th className="px-4 py-3 text-left text-xs">Date & Time</th>
                     <th className="px-4 py-3 text-left text-xs">Status</th>
                   </tr>
                 </thead>
@@ -412,7 +413,10 @@ export function POSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand
                       <td className="px-4 py-3 text-sm">{order.type}</td>
                       <td className="px-4 py-3 text-sm">{order.table}</td>
                       <td className="px-4 py-3 text-sm">₱{order.amountNumber.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-4 py-3 text-sm">{order.time}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div>{order.date}</div>
+                        <div className="text-xs text-muted-foreground">{order.time}</div>
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs ${
                           order.orderStatus === 'Completed' ? 'bg-green-100 text-green-800' :

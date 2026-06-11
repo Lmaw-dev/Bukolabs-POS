@@ -10,6 +10,7 @@ import { ThermalReceipt } from '../../shared/components/ThermalReceipt';
 import { DeleteConfirmDialog } from '../../shared/components/DeleteConfirmDialog';
 import { getApiBaseUrl } from '../../auth/services/auth';
 import type { AuthenticatedUser } from '../../auth/types/auth';
+import { getLocalDateKey } from '../../shared/utils/date';
 import wagyuSteakImg from '../../imports/image-4.png';
 import trufflePastaImg from '../../imports/image-5.png';
 import lobsterThermidorImg from '../../imports/image-6.png';
@@ -261,6 +262,8 @@ function toOrderListFormat(order: any, paid: boolean) {
     ? order.tableNumbers.map((tableNumber: number) => `Table ${tableNumber}`).join(' + ')
     : order.isQueued ? 'Queue' : '—';
 
+  const hasAssignedTable = Boolean(order.tableNumber || (Array.isArray(order.tableNumbers) && order.tableNumbers.length > 0));
+
   return {
     orderNumber: order.orderNumber,
     customer: order.customerName,
@@ -272,8 +275,8 @@ function toOrderListFormat(order: any, paid: boolean) {
     discount: order.discount,
     discountType: discountTypeLabel,
     paymentStatus: paid ? 'Paid' as const : 'Not Paid' as const,
-    orderStatus: 'Pending' as const,
-    date: now.toISOString().split('T')[0],
+    orderStatus: paid ? (hasAssignedTable ? 'Served' as const : 'Completed' as const) : 'Pending' as const,
+    date: getLocalDateKey(now),
     time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     cashier: order.cashier,
     items: order.items.map((item: CartItem) => ({
@@ -782,7 +785,9 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         serviceFee: orderDetails.serviceFee,
         tax: orderDetails.tax,
         total: orderDetails.total,
-        orderStatus: paid && !orderDetails.isQueued ? 'COMPLETED' : 'PENDING',
+        orderStatus: paid && !orderDetails.isQueued
+          ? (orderDetails.tableNumber || (Array.isArray(orderDetails.tableNumbers) && orderDetails.tableNumbers.length > 0) ? 'SERVED' : 'COMPLETED')
+          : 'PENDING',
         paymentStatus: paid ? 'PAID' : 'NOT_PAID',
         items: orderDetails.items.map(serializeItemForOrder),
         payment: paid && payment ? {

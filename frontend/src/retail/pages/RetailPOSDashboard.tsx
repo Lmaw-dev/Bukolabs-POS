@@ -6,6 +6,7 @@ import { useOrders } from '../context/RetailOrderContext';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Calendar, ShoppingBag, X, TrendingUp } from 'lucide-react';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
 
 interface RetailPOSDashboardProps {
   onLogout: () => void;
@@ -37,7 +38,7 @@ function TopItemImage({ src, name }: { src?: string | null; name: string }) {
 
 export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, storeBrand, userName, storeType = 'RETAIL_STORE', staffType }: RetailPOSDashboardProps) {
   const { orders } = useOrders();
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateKey();
   const [selectedDate, setSelectedDate] = useState('');
   const [dateFilter, setDateFilter] = useState<DateFilterMode>('today');
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
@@ -166,7 +167,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       return Array.from({ length: 7 }, (_, index) => {
         const date = new Date(now);
         date.setDate(now.getDate() - (6 - index));
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = getLocalDateKey(date);
         return {
           id: `day-${dateKey}`,
           label: date.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -183,7 +184,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
           label: date.toLocaleDateString('en-US', { month: 'short' }),
           sales: paidOrders
             .filter((order) => {
-              const orderDate = new Date(order.date);
+              const orderDate = parseLocalDateKey(order.date);
               return orderDate.getFullYear() === now.getFullYear() && orderDate.getMonth() === month;
             })
             .reduce((sum, order) => sum + order.amountNumber, 0),
@@ -197,7 +198,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
       label: `Week ${week + 1}`,
       sales: paidOrders
         .filter((order) => {
-          const orderDate = new Date(order.date);
+          const orderDate = parseLocalDateKey(order.date);
           return orderDate.getFullYear() === target.getFullYear()
             && orderDate.getMonth() === target.getMonth()
             && Math.floor((orderDate.getDate() - 1) / 7) === week;

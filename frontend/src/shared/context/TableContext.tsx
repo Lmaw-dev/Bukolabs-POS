@@ -36,7 +36,7 @@ export interface TableHistoryEntry {
   partySize: number;
   timeOccupied: Date;
   timeReleased?: Date;
-  paymentStatus: 'Paid' | 'Not Paid';
+  paymentStatus: 'Paid' | 'Not Paid' | 'Void';
   totalAmount: number;
 }
 
@@ -70,6 +70,63 @@ interface TableContextType {
 }
 
 const TableContext = createContext<TableContextType | null>(null);
+const TABLES_STORAGE_KEY = 'bukolabs-pos-restaurant-tables-v1';
+const defaultSeatCounts = [2, 4, 4, 6, 2, 4, 4, 4, 2, 6, 4, 4, 2, 4, 6, 4, 2, 4, 4, 6];
+
+function createDefaultTables(): Table[] {
+  return Array.from({ length: 20 }, (_, i) => ({
+    id: i + 1,
+    number: i + 1,
+    status: 'available' as const,
+    seats: defaultSeatCounts[i],
+  }));
+}
+
+function loadStoredTables(): Table[] {
+  if (typeof window === 'undefined') {
+    return createDefaultTables();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(TABLES_STORAGE_KEY);
+    if (!raw) return createDefaultTables();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return createDefaultTables();
+
+    const tables = parsed
+      .map((table: Partial<Table>, index: number): Table | null => {
+        const number = Number(table.number);
+        const seats = Number(table.seats);
+        const id = Number(table.id);
+        const status = table.status === 'maintenance' || table.status === 'reserved' || table.status === 'occupied' ? table.status : 'available';
+        if (!Number.isFinite(number) || number < 1 || !Number.isFinite(seats) || seats < 1) return null;
+        return {
+          id: Number.isFinite(id) && id > 0 ? id : index + 1,
+          number,
+          seats,
+          status,
+          orderId: undefined,
+        };
+      })
+      .filter((table): table is Table => Boolean(table));
+
+    return tables.length > 0 ? tables : createDefaultTables();
+  } catch {
+    return createDefaultTables();
+  }
+}
+
+function saveStoredTables(tables: Table[]) {
+  if (typeof window === 'undefined') return;
+
+  const manualTables = tables.map(({ id, number, status, seats }) => ({
+    id,
+    number,
+    status: status === 'occupied' ? 'available' : status,
+    seats,
+  }));
+  window.localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(manualTables));
+}
 
 export function TableProvider({ children }: { children: ReactNode }) {
   const { orders, queuedOrders, updateOrder, assignQueuedOrderToTable } = useOrders();
@@ -86,19 +143,11 @@ export function TableProvider({ children }: { children: ReactNode }) {
   useEffect(() => { queuedOrdersRef.current = queuedOrders; }, [queuedOrders]);
   useEffect(() => { assignmentNotificationRef.current = assignmentNotification; }, [assignmentNotification]);
 
-  // Initialize 20 tables with varying seat counts
-  const [tables, setTables] = useState<Table[]>(
-    Array.from({ length: 20 }, (_, i) => {
-      // Distribute seats: 2-seaters, 4-seaters, and 6-seaters
-      const seatCounts = [2, 4, 4, 6, 2, 4, 4, 4, 2, 6, 4, 4, 2, 4, 6, 4, 2, 4, 4, 6];
-      return {
-        id: i + 1,
-        number: i + 1,
-        status: 'available' as const,
-        seats: seatCounts[i],
-      };
-    })
-  );
+  const [tables, setTables] = useState<Table[]>(loadStoredTables);
+
+  useEffect(() => {
+    saveStoredTables(tables);
+  }, [tables]);
 
   const orderUsesTable = (orderTable: string, tableNumber: number) => {
     const matches = orderTable.match(/Table\s+\d+/gi) ?? [];
@@ -135,14 +184,39 @@ export function TableProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      // Update table history with release time for newly available tables
+      // Record occupancy and release times as table status changes.
       newTables.forEach((newTable, idx) => {
         const oldTable = prevTables[idx];
+        if (oldTable.status !== 'occupied' && newTable.status === 'occupied' && newTable.orderId) {
+          const order = orders.find(o => o.id === newTable.orderId);
+          if (order) {
+            setTableHistory(prevHistory => {
+              const alreadyOpen = prevHistory.some(entry =>
+                entry.orderId === order.id &&
+                entry.tableNumber === newTable.number &&
+                !entry.timeReleased
+              );
+              if (alreadyOpen) return prevHistory;
+
+              return [{
+                id: `table-history-${order.id}-${newTable.number}-${Date.now()}`,
+                tableNumber: newTable.number,
+                customerName: order.customer,
+                orderId: order.orderNumber || order.id,
+                partySize: order.partySize || 0,
+                timeOccupied: new Date(`${order.date} ${order.time}`),
+                paymentStatus: order.paymentStatus,
+                totalAmount: order.amountNumber,
+              }, ...prevHistory];
+            });
+          }
+        }
+
         if (oldTable.status === 'occupied' && newTable.status === 'available' && oldTable.orderId) {
           // Update table history entries for this table's last order
           setTableHistory(prevHistory =>
             prevHistory.map(entry =>
-              entry.orderId === oldTable.orderId && entry.tableNumber === newTable.number && !entry.timeReleased
+              (entry.orderId === oldTable.orderId || orders.some(order => order.id === oldTable.orderId && order.orderNumber === entry.orderId)) && entry.tableNumber === newTable.number && !entry.timeReleased
                 ? { ...entry, timeReleased: new Date(), paymentStatus: 'Paid' }
                 : entry
             )
@@ -417,7 +491,27 @@ export function TableProvider({ children }: { children: ReactNode }) {
   };
 
   const getTableHistory = (tableNumber: number): TableHistoryEntry[] => {
-    return tableHistory.filter(h => h.tableNumber === tableNumber);
+    const savedOrderHistory: TableHistoryEntry[] = orders
+      .filter(order => orderUsesTable(order.table, tableNumber))
+      .map(order => ({
+        id: `order-history-${order.id}-${tableNumber}`,
+        tableNumber,
+        customerName: order.customer,
+        orderId: order.orderNumber || order.id,
+        partySize: order.partySize || 0,
+        timeOccupied: new Date(`${order.date} ${order.time}`),
+        timeReleased: order.orderStatus === 'Completed' ? new Date(`${order.date} ${order.time}`) : undefined,
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.amountNumber,
+      }));
+
+    const combined = [...tableHistory.filter(h => h.tableNumber === tableNumber), ...savedOrderHistory];
+    const unique = new Map<string, TableHistoryEntry>();
+    combined.forEach((entry) => {
+      unique.set(`${entry.tableNumber}-${entry.orderId}`, entry);
+    });
+
+    return Array.from(unique.values()).sort((a, b) => b.timeOccupied.getTime() - a.timeOccupied.getTime());
   };
 
   return (
