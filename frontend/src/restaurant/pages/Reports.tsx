@@ -6,10 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
 import { useOrders } from '../../shared/context/OrderContext';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
-<<<<<<< HEAD
-=======
 import { getLocalDateKey, parseLocalDateKey } from '../../shared/utils/date';
->>>>>>> 00b322f26d39c2e1ea1998060f567900e11d6c2b
 import { calculateVatBreakdown } from '../../shared/utils/vat';
 
 // Custom Peso Icon Component using ₱ symbol
@@ -222,11 +219,7 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   ].filter(d => d.value > 0);
 
   const totalDiscountGiven = filteredOrders.reduce((sum, order) => sum + (order.discount || 0), 0);
-<<<<<<< HEAD
-  const totalTaxCollected = filteredOrders.reduce((sum, order) => sum + calculateVatBreakdown(order.amountNumber).vatAmount, 0);
-=======
   const totalVatCollected = filteredOrders.reduce((sum, order) => sum + calculateVatBreakdown(order.amountNumber).vatAmount, 0);
->>>>>>> 00b322f26d39c2e1ea1998060f567900e11d6c2b
   const totalServiceFees = filteredOrders.reduce((sum, order) => sum + (order.serviceFee || 0), 0);
 
   const handlePrint = () => {
