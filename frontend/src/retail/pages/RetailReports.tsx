@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Printer, TrendingUp, TrendingDown, ShoppingCart, Calendar } from 'lucide-react';
 import { useOrders } from '../context/RetailOrderContext';
 import { DateFilterControl, type DateFilterMode } from '../../shared/components/DateFilterControl';
+import { calculateVatBreakdown } from '../../shared/utils/vat';
 
 // Custom Peso Icon Component using ₱ symbol
 const PesoIcon = ({ className }: { className?: string }) => (
@@ -204,7 +205,7 @@ export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBran
   ].filter(d => d.value > 0);
 
   const totalDiscountGiven = filteredOrders.reduce((sum, order) => sum + (order.discount || 0), 0);
-  const totalTaxCollected = filteredOrders.reduce((sum, order) => sum + (order.tax || 0), 0);
+  const totalTaxCollected = filteredOrders.reduce((sum, order) => sum + calculateVatBreakdown(order.amountNumber).vatAmount, 0);
   const averageOrderValue = filteredOrders.length > 0 ? filteredRevenue / filteredOrders.length : 0;
 
   const handlePrint = () => {

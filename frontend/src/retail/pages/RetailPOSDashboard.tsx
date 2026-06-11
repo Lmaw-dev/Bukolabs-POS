@@ -43,10 +43,13 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
   const [showTopItemsModal, setShowTopItemsModal] = useState(false);
 
   // Exclude void and fully refunded transactions from dashboard metrics
-  const todayOrders = orders.filter(o => o.date === today && (o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded'));
+  const countedOrders = orders.filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded');
+  const todayOrders = countedOrders.filter(o => o.date === today);
   const totalSalesToday = todayOrders.reduce((sum, o) => sum + o.amountNumber, 0);
   const totalTransactionsToday = todayOrders.length;
-  const recentTransactions = [...orders].filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded').slice(0, 5);
+  const totalCustomers = new Set(countedOrders.map((order) => order.customer?.trim()).filter(Boolean)).size
+    + countedOrders.filter((order) => !order.customer?.trim()).length;
+  const recentTransactions = [...countedOrders].slice(0, 5);
 
   // Top Selling Items (same design as restaurant POS)
   const allTopSellingItems = [
@@ -261,7 +264,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
                 <p className="text-sm text-muted-foreground">Total Customers</p>
                 <Calendar className="w-4 h-4 text-purple-500" />
               </div>
-              <h2 className="text-2xl text-primary">{new Set(orders.filter(o => (o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded') && o.customer).map(o => o.customer)).size}</h2>
+              <h2 className="text-2xl text-primary">{totalCustomers}</h2>
               <p className="text-xs text-muted-foreground mt-1">All-time unique customers</p>
             </div>
           </div>
@@ -347,7 +350,7 @@ export function RetailPOSDashboard({ onLogout, onNavigate, isAdmin = false, stor
                     recentTransactions.map((order) => (
                       <tr key={order.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                         <td className="py-2.5 text-xs">{order.id}</td>
-                        <td className="py-2.5 text-xs">{order.customer}</td>
+                        <td className="py-2.5 text-xs">{order.customer?.trim() || 'Walk-in Customer'}</td>
                         <td className="py-2.5 text-xs">{order.date}</td>
                         <td className="py-2.5 text-xs">{order.items.length} items</td>
                         <td className="py-2.5 text-xs text-right text-primary font-medium">
