@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../../shared/App';
 import { getLocalDateKey } from '../../shared/utils/date';
+import { getStoreLogoForWhiteBackground } from '../../shared/utils/defaultStoreLogo';
 import { calculateVatBreakdown, VAT_RATE } from '../../shared/utils/vat';
 
 interface ReceiptItem {
@@ -75,6 +76,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     const currentDate = date || getLocalDateKey();
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const vatBreakdown = calculateVatBreakdown(total);
+    const receiptLogo = getStoreLogoForWhiteBackground(storeBrand?.logo, 'RETAIL_STORE');
 
     return (
       <div
@@ -85,8 +87,8 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
         {/* Logo */}
         <div className="text-center mb-3">
           <div className="w-20 h-20 mx-auto mb-3 flex items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50">
-            {storeBrand?.logo && (
-              <img src={storeBrand.logo} alt={storeBrand?.name || 'Retail Store Logo'} className="w-full h-full object-contain p-2" />
+            {receiptLogo && (
+              <img src={receiptLogo} alt={storeBrand?.name || 'Retail Store Logo'} className="w-full h-full object-contain p-2" />
             )}
           </div>
         </div>

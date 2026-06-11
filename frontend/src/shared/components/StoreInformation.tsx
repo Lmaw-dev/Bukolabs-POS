@@ -7,7 +7,7 @@ import type { AuthenticatedUser } from '../../auth/types/auth';
 import { useStoreSettings } from '../context/StoreSettingsContext';
 import { ThermalReceipt } from './ThermalReceipt';
 import { ThermalReceipt as RetailThermalReceipt } from '../../retail/pages/RetailThermalReceipt';
-import { getDefaultStoreLogo } from '../utils/defaultStoreLogo';
+import { getDefaultStoreLogo, getStoreLogoForWhiteBackground } from '../utils/defaultStoreLogo';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface StoreInformationData {
@@ -152,7 +152,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
       onUserUpdate({ store_name: normalized.business_name });
       onStoreBrandUpdate({
         name: normalized.business_name,
-        logo: normalized.logo || defaultLogo,
+        logo: shouldUseStrictDefaultLogo(currentUser.store_type) ? defaultLogo : normalized.logo || defaultLogo,
         business_description: normalized.business_description,
         address: normalized.address,
         contact_number: normalized.contact_number,
@@ -170,8 +170,10 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
   };
 
   const displayLogo = storeInfo.logo || defaultLogo;
+  const enforcedDisplayLogo = shouldUseStrictDefaultLogo(currentUser?.store_type) ? defaultLogo : displayLogo;
+  const whiteBackgroundLogo = getStoreLogoForWhiteBackground(enforcedDisplayLogo, currentUser?.store_type);
   const logoPreview = (
-    <img src={displayLogo} alt={storeInfo.business_name} className="h-full w-full object-contain" />
+    <img src={whiteBackgroundLogo} alt={storeInfo.business_name} className="h-full w-full object-contain" />
   );
   const sampleSubtotal = 370;
   const sampleDiscount = settings.enable_discount ? 20 : 0;
@@ -183,7 +185,7 @@ export function StoreInformation({ currentUser, onLogout, onNavigate, onUserUpda
     ?? 'Senior Citizen';
   const previewStoreBrand = {
     name: storeInfo.business_name,
-    logo: displayLogo,
+    logo: enforcedDisplayLogo,
     business_description: storeInfo.business_description,
     address: storeInfo.address,
     contact_number: storeInfo.contact_number,
@@ -449,5 +451,9 @@ function normalizeStoreInfo(data: Partial<StoreInformationData>): StoreInformati
 function textOrNull(value: string | null) {
   const trimmed = value?.trim() ?? '';
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function shouldUseStrictDefaultLogo(storeType?: string | null) {
+  return storeType === 'RESTAURANT' || storeType === 'RETAIL_STORE';
 }
 

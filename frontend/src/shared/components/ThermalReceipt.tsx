@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import type { StoreBrand } from '../App';
 import { getLocalDateKey } from '../utils/date';
+import { getStoreLogoForWhiteBackground } from '../utils/defaultStoreLogo';
 import { calculateVatBreakdown, VAT_RATE } from '../utils/vat';
 
 interface ReceiptItem {
@@ -59,6 +60,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
     const currentDate = date || getLocalDateKey();
     const currentTime = time || new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const vatBreakdown = calculateVatBreakdown(total);
+    const receiptLogo = getStoreLogoForWhiteBackground(storeBrand?.logo, 'RESTAURANT');
 
     // Separate items by type for mixed orders
     const dineInItems = items.filter(i => i.itemType === 'dine-in');
@@ -74,8 +76,8 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
         {/* Header */}
         <div className="text-center mb-4">
           <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50">
-            {storeBrand?.logo && (
-              <img src={storeBrand.logo} alt={storeBrand?.name ?? 'Restaurant logo'} className="h-full w-full object-contain p-2" />
+            {receiptLogo && (
+              <img src={receiptLogo} alt={storeBrand?.name ?? 'Restaurant logo'} className="h-full w-full object-contain p-2" />
             )}
           </div>
           <p className="text-sm" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>{storeBrand?.name || 'N&Ns RESTAURANT'}</p>

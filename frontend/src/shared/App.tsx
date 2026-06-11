@@ -94,6 +94,7 @@ export default function App() {
       }
 
       const defaultLogo = getDefaultStoreLogo(currentUser.store_type);
+      const shouldUseStrictDefaultLogo = currentUser.store_type === 'RESTAURANT' || currentUser.store_type === 'RETAIL_STORE';
 
       try {
         const response = await fetch(`${getApiBaseUrl()}/admin/store-information?admin_user_id=${currentUser.id}`);
@@ -102,7 +103,7 @@ export default function App() {
         if (response.ok) {
           setStoreBrand({
             name: data.business_name ?? currentUser.store_name ?? null,
-            logo: data.logo || defaultLogo,
+            logo: shouldUseStrictDefaultLogo ? defaultLogo : data.logo || defaultLogo,
             business_description: data.business_description ?? null,
             address: data.address ?? null,
             contact_number: data.contact_number ?? null,
