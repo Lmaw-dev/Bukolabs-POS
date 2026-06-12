@@ -51,6 +51,10 @@ export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBran
     const start = new Date(today);
     const end = new Date(today);
 
+    if (dateFilter === 'all') {
+      return { start: '', end: '' };
+    }
+
     if (dateFilter === 'today') {
       return { start: todayString, end: todayString };
     }
@@ -78,6 +82,7 @@ export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBran
     if (dateFilter === 'date') return selectedDate || 'Select Date';
     if (dateFilter === 'week') return 'This Week';
     if (dateFilter === 'month') return 'This Month';
+    if (dateFilter === 'all') return 'All Time';
     return 'This Year';
   };
 
@@ -97,12 +102,6 @@ export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBran
 
   // Calculate metrics from filtered orders
   const filteredOrders = getFilteredOrders();
-  // Only include paid and partially refunded transactions (exclude void, fully refunded, and not paid)
-  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid' || o.paymentStatus === 'Partially Refunded');
-  const totalRevenue = paidOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-  const todayOrders = paidOrders.filter(o => o.date === todayString);
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-
   const filteredRevenue = filteredOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
   // Calculate payment method breakdown
@@ -116,28 +115,22 @@ export function RetailReports({ onNavigate, onLogout, isAdmin = false, storeBran
   const gcashRevenue = gcashOrders.reduce((sum, order) => sum + order.amountNumber, 0);
   const paymayaRevenue = paymayaOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
-  // Generate daily sales data from real orders (last 7 days)
   const generateDailySalesData = () => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const result = [];
-    const today = new Date();
+    const salesByDate: Record<string, { sales: number; orders: number }> = {};
+    filteredOrders.forEach((order) => {
+      salesByDate[order.date] = salesByDate[order.date] ?? { sales: 0, orders: 0 };
+      salesByDate[order.date].sales += order.amountNumber;
+      salesByDate[order.date].orders += 1;
+    });
 
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateStr = getLocalDateKey(date);
-      const dayOrders = paidOrders.filter(o => o.date === dateStr);
-      const daySales = dayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-
-      result.push({
-        id: `daily-${i}`,
-        day: days[date.getDay()],
-        sales: daySales,
-        orders: dayOrders.length
-      });
-    }
-
-    return result;
+    return Object.entries(salesByDate)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, data]) => ({
+        id: `daily-${date}`,
+        day: date,
+        sales: data.sales,
+        orders: data.orders,
+      }));
   };
 
   const dailySalesData = generateDailySalesData();

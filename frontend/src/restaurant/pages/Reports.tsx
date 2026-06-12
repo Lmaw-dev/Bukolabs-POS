@@ -101,11 +101,6 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
 
   // Calculate metrics from filtered orders
   const filteredOrders = getFilteredOrders();
-  const paidOrders = orders.filter(o => o.paymentStatus === 'Paid');
-  const totalRevenue = paidOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-  const todayOrders = paidOrders.filter(o => o.date === todayString);
-  const todayRevenue = todayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-
   const filteredRevenue = filteredOrders.reduce((sum, order) => sum + order.amountNumber, 0);
 
   const getItemAmount = (item: (typeof filteredOrders)[number]['items'][number]) =>
@@ -131,28 +126,22 @@ export function Reports({ onNavigate, onLogout, isAdmin = false, storeBrand, use
   const dineInRevenue = filteredOrders.reduce((sum, order) => sum + getOrderRevenueByItemType(order, 'dine-in'), 0);
   const takeoutRevenue = filteredOrders.reduce((sum, order) => sum + getOrderRevenueByItemType(order, 'takeout'), 0);
 
-  // Generate daily sales data from real orders (last 7 days)
   const generateDailySalesData = () => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const result = [];
-    const today = new Date();
+    const salesByDate: Record<string, { sales: number; orders: number }> = {};
+    filteredOrders.forEach((order) => {
+      salesByDate[order.date] = salesByDate[order.date] ?? { sales: 0, orders: 0 };
+      salesByDate[order.date].sales += order.amountNumber;
+      salesByDate[order.date].orders += 1;
+    });
 
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - i);
-      const dateStr = getLocalDateKey(date);
-      const dayOrders = paidOrders.filter(o => o.date === dateStr);
-      const daySales = dayOrders.reduce((sum, order) => sum + order.amountNumber, 0);
-
-      result.push({
-        id: `daily-${i}`,
-        day: days[date.getDay()],
-        sales: daySales,
-        orders: dayOrders.length
-      });
-    }
-
-    return result;
+    return Object.entries(salesByDate)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, data]) => ({
+        id: `daily-${date}`,
+        day: date,
+        sales: data.sales,
+        orders: data.orders,
+      }));
   };
 
   const dailySalesData = generateDailySalesData();
