@@ -333,12 +333,8 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
   const [selectedTableNumber, setSelectedTableNumber] = useState<number | null>(null);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [partySize, setPartySize] = useState<string>('');
-<<<<<<< HEAD
-=======
   const [occupancyType, setOccupancyType] = useState<OccupancyType | ''>('');
   const [billingSetup, setBillingSetup] = useState<BillingSetup>('single-bill');
-  const [showBillingSetupModal, setShowBillingSetupModal] = useState(false);
->>>>>>> 8252381334f2c40a2ac827537019aefe39d0bf97
   const [discountType, setDiscountType] = useState<string>('none');
   const [customDiscountPercent, setCustomDiscountPercent] = useState<number>(0);
   const [discountIdNumber, setDiscountIdNumber] = useState<string>('');
@@ -1392,8 +1388,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
         {tableManagementEnabled && diningOption === 'dine-in' && (
           <div className="mb-4 space-y-2">
             <div>
-<<<<<<< HEAD
-=======
               <label className="block text-xs text-muted-foreground mb-1.5">Occupancy Type:</label>
               <select
                 value={occupancyType}
@@ -1418,30 +1412,43 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
               </select>
             </div>
 
-            {occupancyType && (
-              <div>
-                <label className="block text-xs text-muted-foreground mb-1.5">Billing Setup:</label>
-                {occupancyType === 'whole-table' ? (
-                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-                    Single Bill only for Whole Table occupancy
-                  </div>
-                ) : (
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <label className="block text-xs text-muted-foreground mb-1.5">Billing Setup:</label>
+              {occupancyType === 'whole-table' ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  Single Bill only for Whole Table occupancy
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={() => setShowBillingSetupModal(true)}
-                    className="flex w-full items-center justify-between rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-left text-xs text-blue-800 transition-colors hover:bg-blue-100"
+                    onClick={() => setBillingSetup('single-bill')}
+                    className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
+                      billingSetup === 'single-bill'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-white hover:bg-muted'
+                    }`}
                   >
-                    <span>
-                      <strong>Billing:</strong> {getBillingSetupLabel(billingSetup)}
-                    </span>
-                    <span className="font-medium text-primary">Change</span>
+                    <strong>Single Bill</strong>
+                    <p className="mt-1 text-xs text-muted-foreground">Per-seat occupancy, but one customer or group pays for all seats.</p>
                   </button>
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => setBillingSetup('separate-bills')}
+                    className={`rounded-lg border px-3 py-2 text-sm text-left transition-colors ${
+                      billingSetup === 'separate-bills'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-white hover:bg-muted'
+                    }`}
+                  >
+                    <strong>Separate Bills</strong>
+                    <p className="mt-1 text-xs text-muted-foreground">Each seat or customer can have an individual bill and payment transaction.</p>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div>
->>>>>>> 8252381334f2c40a2ac827537019aefe39d0bf97
               <label className="block text-xs text-muted-foreground mb-1.5">Number of Customers (Pila mo kabuok?):</label>
               <input
                 type="number"
@@ -2506,60 +2513,6 @@ export function CreateOrder({ currentUser, onNavigate, onOrderCreated, onLogout,
                   Apply Discount
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Billing Setup Modal */}
-      {showBillingSetupModal && occupancyType === 'per-seat' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-primary">Billing Setup</h2>
-                <p className="text-xs text-muted-foreground">Choose how this per-seat order will be paid.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowBillingSetupModal(false)}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 p-5">
-              <button
-                type="button"
-                onClick={() => {
-                  setBillingSetup('single-bill');
-                  setShowBillingSetupModal(false);
-                }}
-                className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
-                  billingSetup === 'single-bill'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border bg-white hover:bg-muted'
-                }`}
-              >
-                <strong className="text-sm">Single Bill</strong>
-                <p className="mt-1 text-xs text-muted-foreground">Per-seat occupancy, but one customer or group pays for all seats.</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setBillingSetup('separate-bills');
-                  setShowBillingSetupModal(false);
-                }}
-                className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
-                  billingSetup === 'separate-bills'
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-border bg-white hover:bg-muted'
-                }`}
-              >
-                <strong className="text-sm">Separate Bills</strong>
-                <p className="mt-1 text-xs text-muted-foreground">Each seat or customer can have an individual bill and payment transaction.</p>
-              </button>
             </div>
           </div>
         </div>
