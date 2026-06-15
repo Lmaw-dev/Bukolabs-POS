@@ -1,12 +1,21 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
-import { useOrders } from './OrderContext';
+import { useOrders, type Order } from './OrderContext';
 
 export interface Table {
   id: number;
   number: number;
-  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  status: 'available' | 'partially-occupied' | 'occupied' | 'reserved' | 'maintenance';
   orderId?: string;
   seats: number;
+}
+
+export interface TableOccupancySummary {
+  tableNumber: number;
+  state: 'available' | 'partially-occupied' | 'fully-occupied' | 'reserved' | 'maintenance';
+  occupiedSeats: number;
+  availableSeats: number;
+  activeOrders: Order[];
+  occupancyType: 'whole-table' | 'per-seat' | null;
 }
 
 export interface TableNotification {
@@ -67,6 +76,7 @@ interface TableContextType {
   assignToTable: (orderId: string, tableNumbers: number[]) => Promise<void>;
   skipQueueCustomer: (orderId: string) => void;
   getTableHistory: (tableNumber: number) => TableHistoryEntry[];
+  getTableOccupancy: (tableNumber: number) => TableOccupancySummary;
 }
 
 const TableContext = createContext<TableContextType | null>(null);
@@ -98,7 +108,13 @@ function loadStoredTables(): Table[] {
         const number = Number(table.number);
         const seats = Number(table.seats);
         const id = Number(table.id);
-        const status = table.status === 'maintenance' || table.status === 'reserved' || table.status === 'occupied' ? table.status : 'available';
+        const status =
+          table.status === 'maintenance' ||
+          table.status === 'reserved' ||
+          table.status === 'occupied' ||
+          table.status === 'partially-occupied'
+            ? table.status
+            : 'available';
         if (!Number.isFinite(number) || number < 1 || !Number.isFinite(seats) || seats < 1) return null;
         return {
           id: Number.isFinite(id) && id > 0 ? id : index + 1,
@@ -122,7 +138,7 @@ function saveStoredTables(tables: Table[]) {
   const manualTables = tables.map(({ id, number, status, seats }) => ({
     id,
     number,
-    status: status === 'occupied' ? 'available' : status,
+    status: status === 'occupied' || status === 'partially-occupied' ? 'available' : status,
     seats,
   }));
   window.localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(manualTables));
@@ -154,40 +170,144 @@ export function TableProvider({ children }: { children: ReactNode }) {
     return matches.some((label) => Number(label.match(/\d+/)?.[0]) === tableNumber);
   };
 
+  const resolveOrderOccupancyType = (order: Order, table: Table): 'whole-table' | 'per-seat' => {
+    if (order.occupancyType === 'whole-table' || order.occupancyType === 'per-seat') {
+      return order.occupancyType;
+    }
+
+    const assignedTableCount = Array.isArray(order.tableNumbers) && order.tableNumbers.length > 0
+      ? order.tableNumbers.length
+      : (order.table.match(/Table\s+\d+/gi)?.length ?? 0);
+    const partySize = Math.max(order.partySize || 0, 0);
+
+    if (partySize > 0 && partySize < table.seats && assignedTableCount <= 1) {
+      return 'per-seat';
+    }
+
+    return 'whole-table';
+  };
+
+  const getTableOccupancy = (tableNumber: number): TableOccupancySummary => {
+    const table = tables.find(t => t.number === tableNumber);
+    const activeOrders = orders.filter(order =>
+      orderUsesTable(order.table, tableNumber) &&
+      order.orderStatus !== 'Completed' &&
+      order.paymentStatus !== 'Void'
+    );
+
+    if (!table) {
+      return {
+        tableNumber,
+        state: 'available',
+        occupiedSeats: 0,
+        availableSeats: 0,
+        activeOrders,
+        occupancyType: null,
+      };
+    }
+
+    if (table.status === 'reserved') {
+      return {
+        tableNumber,
+        state: 'reserved',
+        occupiedSeats: 0,
+        availableSeats: table.seats,
+        activeOrders,
+        occupancyType: null,
+      };
+    }
+
+    if (table.status === 'maintenance') {
+      return {
+        tableNumber,
+        state: 'maintenance',
+        occupiedSeats: 0,
+        availableSeats: 0,
+        activeOrders,
+        occupancyType: null,
+      };
+    }
+
+    if (activeOrders.length === 0) {
+      return {
+        tableNumber,
+        state: 'available',
+        occupiedSeats: 0,
+        availableSeats: table.seats,
+        activeOrders,
+        occupancyType: null,
+      };
+    }
+
+    const resolvedOccupancyTypes = activeOrders.map(order => resolveOrderOccupancyType(order, table));
+    const hasWholeTableOrder = resolvedOccupancyTypes.includes('whole-table');
+    const occupiedSeats = Math.min(
+      table.seats,
+      activeOrders.reduce((sum, order) => sum + Math.max(order.partySize || 1, 1), 0),
+    );
+    const availableSeats = Math.max(table.seats - occupiedSeats, 0);
+
+    if (hasWholeTableOrder || availableSeats === 0) {
+      return {
+        tableNumber,
+        state: 'fully-occupied',
+        occupiedSeats: hasWholeTableOrder ? occupiedSeats : table.seats,
+        availableSeats: 0,
+        activeOrders,
+        occupancyType: hasWholeTableOrder ? 'whole-table' : 'per-seat',
+      };
+    }
+
+    return {
+      tableNumber,
+      state: 'partially-occupied',
+      occupiedSeats,
+      availableSeats,
+      activeOrders,
+      occupancyType: 'per-seat',
+    };
+  };
+
   // Sync tables with orders
   useEffect(() => {
     setTables(prevTables => {
       const newTables = prevTables.map(table => {
-        // Find active order for this table
-        const order = orders.find(o =>
-          orderUsesTable(o.table, table.number) &&
-          o.orderStatus !== 'Completed'
-        );
+        const occupancy = getTableOccupancy(table.number);
+        const order = occupancy.activeOrders[0];
 
         // Preserve manually set maintenance and reserved status
-        if ((table.status === 'maintenance' || table.status === 'reserved') && !order) {
+        if ((table.status === 'maintenance' || table.status === 'reserved') && occupancy.activeOrders.length === 0) {
           return table;
         }
 
-        if (order) {
+        if (occupancy.state === 'fully-occupied') {
           return {
             ...table,
             status: 'occupied' as const,
-            orderId: order.id,
+            orderId: order?.id,
             seats: table.seats, // Preserve seats count
           };
-        } else {
-          // If was occupied, make available; otherwise keep current status
-          return table.status === 'occupied'
-            ? { ...table, status: 'available' as const, orderId: undefined, seats: table.seats }
-            : table;
         }
+
+        if (occupancy.state === 'partially-occupied') {
+          return {
+            ...table,
+            status: 'partially-occupied' as const,
+            orderId: order?.id,
+            seats: table.seats,
+          };
+        }
+
+        // If was occupied, make available; otherwise keep current status
+        return table.status === 'occupied' || table.status === 'partially-occupied'
+          ? { ...table, status: 'available' as const, orderId: undefined, seats: table.seats }
+          : table;
       });
 
       // Record occupancy and release times as table status changes.
       newTables.forEach((newTable, idx) => {
         const oldTable = prevTables[idx];
-        if (oldTable.status !== 'occupied' && newTable.status === 'occupied' && newTable.orderId) {
+        if ((oldTable.status === 'available' || oldTable.status === 'partially-occupied') && (newTable.status === 'occupied' || newTable.status === 'partially-occupied') && newTable.orderId) {
           const order = orders.find(o => o.id === newTable.orderId);
           if (order) {
             setTableHistory(prevHistory => {
@@ -212,7 +332,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        if (oldTable.status === 'occupied' && newTable.status === 'available' && oldTable.orderId) {
+        if ((oldTable.status === 'occupied' || oldTable.status === 'partially-occupied') && newTable.status === 'available' && oldTable.orderId) {
           // Update table history entries for this table's last order
           setTableHistory(prevHistory =>
             prevHistory.map(entry =>
@@ -261,7 +381,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
 
     const newlyAvailable = tables.filter(t => {
       const prev = prevTables.find(p => p.id === t.id);
-      return prev?.status === 'occupied' && t.status === 'available';
+      return (prev?.status === 'occupied' || prev?.status === 'partially-occupied') && t.status === 'available';
     });
 
     prevTablesRef.current = tables;
@@ -319,7 +439,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
   };
 
   const getAvailableTablesCount = () => {
-    return tables.filter(t => t.status === 'available').length;
+    return tables.filter(t => t.status === 'available' || t.status === 'partially-occupied').length;
   };
 
   const dismissNotification = (id: string) => {
@@ -531,6 +651,7 @@ export function TableProvider({ children }: { children: ReactNode }) {
       assignToTable,
       skipQueueCustomer,
       getTableHistory,
+      getTableOccupancy,
     }}>
       {children}
     </TableContext.Provider>

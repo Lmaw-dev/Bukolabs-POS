@@ -41,6 +41,8 @@ export interface Order {
   partySize?: number;
   tableNumbers?: number[];
   requiredSeats?: number;
+  occupancyType?: 'whole-table' | 'per-seat';
+  billingSetup?: 'single-bill' | 'separate-bills';
 }
 
 export interface QueuedOrder {
@@ -57,7 +59,7 @@ export interface QueuedOrder {
 
 export interface TableStatus {
   number: number;
-  status: 'available' | 'occupied' | 'reserved' | 'maintenance';
+  status: 'available' | 'partially-occupied' | 'occupied' | 'reserved' | 'maintenance';
   orderId?: string;
 }
 
@@ -540,6 +542,18 @@ function mapDatabaseRestaurantOrder(row: any): Order {
     queuePosition: isQueued && queueMatch?.[1] ? Number(queueMatch[1]) : undefined,
     partySize: partySize > 0 ? partySize : undefined,
     requiredSeats: partySize > 0 ? partySize : undefined,
+    occupancyType:
+      row.occupancy_type === 'PER_SEAT' || row.occupancy_type === 'per-seat'
+        ? 'per-seat'
+        : row.occupancy_type === 'WHOLE_TABLE' || row.occupancy_type === 'whole-table'
+        ? 'whole-table'
+        : undefined,
+    billingSetup:
+      row.billing_setup === 'SEPARATE_BILLS' || row.billing_setup === 'separate-bills'
+        ? 'separate-bills'
+        : row.billing_setup === 'SINGLE_BILL' || row.billing_setup === 'single-bill'
+        ? 'single-bill'
+        : undefined,
     tableNumbers,
   };
 }

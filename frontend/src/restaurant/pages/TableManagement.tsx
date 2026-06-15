@@ -35,6 +35,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     assignToTable,
     skipQueueCustomer,
     getTableHistory,
+    getTableOccupancy,
   } = useTables();
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [tables, setTables] = useState(contextTables);
@@ -93,7 +94,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
   };
 
   const handleTableClick = (table: typeof tables[0]) => {
-    if (table.status === 'occupied') {
+    if (table.status === 'occupied' || table.status === 'partially-occupied') {
       // Select/deselect occupied table
       if (selectedTableId === table.id) {
         setSelectedTableId(null);
@@ -103,25 +104,29 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     }
   };
 
-  const handleStatusChange = async (tableNumber: number, newStatus: 'available' | 'occupied' | 'reserved' | 'maintenance') => {
-    // Check if table has an active order
-    const table = tables.find(t => t.number === tableNumber);
-    if (table?.orderId && newStatus !== 'occupied') {
-      const order = orders.find(o => o.id === table.orderId);
-      if (newStatus === 'available' && order?.paymentStatus === 'Paid') {
+  const handleStatusChange = async (tableNumber: number, newStatus: 'available' | 'occupied' | 'partially-occupied' | 'reserved' | 'maintenance') => {
+    if (newStatus === 'partially-occupied') {
+      return;
+    }
+
+    const occupancy = getTableOccupancy(tableNumber);
+    if (occupancy.activeOrders.length > 0 && newStatus !== 'occupied') {
+      const allPaid = occupancy.activeOrders.every(order => order.paymentStatus === 'Paid');
+      if (newStatus === 'available' && allPaid) {
         try {
-          await completeTableOrder(table.orderId);
+          await Promise.all(occupancy.activeOrders.map(order => completeTableOrder(order.id)));
         } catch (error) {
           alert(error instanceof Error ? error.message : 'Unable to release table.');
         }
         return;
       }
 
-      alert('Cannot change status: Table has an active order. Only paid orders can be manually released to available.');
+      alert('Cannot change status: Table still has active customers. Only fully paid tables can be manually released.');
       return;
     }
 
     // Cannot manually set to occupied - must create order
+    const table = tables.find(t => t.number === tableNumber);
     if (newStatus === 'occupied' && !table?.orderId) {
       alert('Cannot set to Occupied manually. Create an order to occupy a table.');
       return;
@@ -133,23 +138,18 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     }
   };
 
-  const handlePaymentComplete = (tableId: number) => {
-    const table = tables.find(t => t.id === tableId);
-    if (table?.orderId) {
-      // Update order to paid status
-      updateOrder(table.orderId, { paymentStatus: 'Paid', orderStatus: 'Completed' });
-      setSelectedTableId(null);
-    }
+  const handlePaymentComplete = (orderId: string) => {
+    updateOrder(orderId, { paymentStatus: 'Paid', orderStatus: 'Served' });
   };
 
   const getTableOrder = (table: typeof tables[0]): Order | undefined => {
-    if (!table.orderId) return undefined;
-    return orders.find(o => o.id === table.orderId);
+    return getTableOccupancy(table.number).activeOrders[0];
   };
 
   const getTableColor = (status: string) => {
     switch (status) {
       case 'available': return 'bg-gradient-to-br from-green-400 to-green-600';
+      case 'partially-occupied': return 'bg-gradient-to-br from-amber-400 to-amber-600';
       case 'occupied': return 'bg-gradient-to-br from-orange-400 to-orange-600';
       case 'reserved': return 'bg-gradient-to-br from-blue-400 to-blue-600';
       case 'maintenance': return 'bg-gradient-to-br from-gray-400 to-gray-600';
@@ -168,6 +168,16 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
           label: 'text-emerald-700',
           surface: 'linear-gradient(145deg, #f8fafc 0%, #eef4f7 100%)',
           frame: '#dce7ec',
+        };
+      case 'partially-occupied':
+        return {
+          accent: '#f59e0b',
+          accentSoft: 'rgba(245, 158, 11, 0.16)',
+          border: 'rgba(245, 158, 11, 0.7)',
+          glow: 'rgba(245, 158, 11, 0.22)',
+          label: 'text-amber-700',
+          surface: 'linear-gradient(145deg, #fffbeb 0%, #fff7d6 100%)',
+          frame: '#f4d7a5',
         };
       case 'occupied':
         return {
@@ -335,7 +345,7 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
     }
   };
 
-  const renderChairIcon = (key: string, side: ChairSide, offset: number, accent: string, rectangular: boolean) => (
+  const renderChairIcon = (key: string, side: ChairSide, offset: number, accent: string, rectangular: boolean, occupied: boolean) => (
     <div
       key={key}
       className="absolute h-10 w-10 drop-shadow-[0_6px_10px_rgba(15,23,42,0.14)]"
@@ -344,9 +354,9 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
       <svg viewBox="0 0 48 48" className="h-full w-full">
         <path d="M12 13c-3.5 3-5.5 7-5.5 11s2 8 5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
         <path d="M36 13c3.5 3 5.5 7 5.5 11s-2 8-5.5 11" fill="none" stroke="#4b5563" strokeWidth="2.2" strokeLinecap="round" />
-        <rect x="14" y="10" width="20" height="5" rx="2.5" fill="#525b67" />
-        <rect x="12" y="14" width="24" height="21" rx="7" fill="#626c79" />
-        <rect x="15" y="17" width="18" height="12" rx="5" fill={accent} opacity="0.9" />
+        <rect x="14" y="10" width="20" height="5" rx="2.5" fill={occupied ? "#525b67" : "#9ca3af"} />
+        <rect x="12" y="14" width="24" height="21" rx="7" fill={occupied ? "#626c79" : "#d1d5db"} />
+        <rect x="15" y="17" width="18" height="12" rx="5" fill={occupied ? accent : "#f8fafc"} opacity={occupied ? "0.9" : "1"} />
         <rect x="16" y="31" width="16" height="4" rx="2" fill="#d8dee6" />
       </svg>
     </div>
@@ -494,12 +504,23 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
 
               <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mb-6">
                 {tables.map(table => {
+                  const occupancy = getTableOccupancy(table.number);
                   const order = getTableOrder(table);
-                  const isPaidOccupiedTable = table.status === 'occupied' && order?.paymentStatus === 'Paid';
+                  const isPaidOccupiedTable = (table.status === 'occupied' || table.status === 'partially-occupied') && occupancy.activeOrders.length > 0 && occupancy.activeOrders.every(activeOrder => activeOrder.paymentStatus === 'Paid');
                   const theme = getTableTheme(table.status);
                   const rectangular = table.seats > 4;
                   const chairs = getChairLayout(table.seats, rectangular);
                   const displayedChairs = chairs.slice(0, 8);
+                  const statusText =
+                    occupancy.state === 'partially-occupied'
+                      ? `Partially Occupied - ${occupancy.availableSeats} seat${occupancy.availableSeats === 1 ? '' : 's'} available`
+                      : occupancy.state === 'fully-occupied'
+                      ? 'Fully Occupied'
+                      : table.status === 'available'
+                      ? 'Available'
+                      : table.status === 'reserved'
+                      ? 'Reserved'
+                      : 'Maintenance';
                   return (
                     <div
                       key={table.id}
@@ -571,7 +592,14 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                         className="relative h-32 w-full rounded-[18px] focus:outline-none transition-transform hover:scale-[1.01]"
                       >
                         {displayedChairs.map((chair, index) =>
-                          renderChairIcon(`chair-${table.id}-${index}`, chair.side, chair.offset, theme.accent, rectangular)
+                          renderChairIcon(
+                            `chair-${table.id}-${index}`,
+                            chair.side,
+                            chair.offset,
+                            theme.accent,
+                            rectangular,
+                            index < occupancy.occupiedSeats,
+                          )
                         )}
 
                         <div
@@ -621,6 +649,17 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                         )}
                       </button>
 
+                      <div className="relative z-10 text-center text-[11px] text-gray-600 -mt-1">
+                        <p className={`font-medium ${occupancy.state === 'partially-occupied' ? 'text-amber-700' : occupancy.state === 'fully-occupied' ? 'text-orange-700' : 'text-gray-700'}`}>
+                          {statusText}
+                        </p>
+                        {(table.status === 'occupied' || table.status === 'partially-occupied') && (
+                          <p className="text-xs text-slate-500">
+                            {occupancy.occupiedSeats}/{table.seats} seats occupied
+                          </p>
+                        )}
+                      </div>
+
                       <div className="relative z-10">
                         <span
                           className="pointer-events-none absolute left-3 top-1/2 z-10 h-2.5 w-2.5 -translate-y-1/2 rounded-full"
@@ -634,29 +673,33 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                           }}
                           className={`w-full appearance-none px-7 pr-8 py-1.5 rounded-xl text-[13px] font-medium border focus:outline-none focus:ring-2 focus:ring-primary transition-colors ${
                             table.status === 'available' ? 'border-green-200 bg-green-50/70 text-green-700' :
+                            table.status === 'partially-occupied' ? `border-amber-200 bg-amber-50/80 text-amber-700 ${isPaidOccupiedTable ? 'cursor-pointer' : 'cursor-not-allowed'}` :
                             table.status === 'occupied' ? `border-orange-200 bg-orange-50/80 text-orange-700 ${isPaidOccupiedTable ? 'cursor-pointer' : 'cursor-not-allowed'}` :
                             table.status === 'reserved' ? 'border-blue-200 bg-blue-50/80 text-blue-700' :
                             'border-gray-200 bg-gray-50 text-gray-700'
                           }`}
-                          disabled={table.status === 'occupied' && !isPaidOccupiedTable}
+                          disabled={(table.status === 'occupied' || table.status === 'partially-occupied') && !isPaidOccupiedTable}
                         >
                           <option value="available">Available</option>
                           <option value="occupied">Occupied</option>
-                          <option value="reserved" disabled={table.status === 'occupied'}>Reserved</option>
-                          <option value="maintenance" disabled={table.status === 'occupied'}>Maintenance</option>
+                          <option value="partially-occupied" disabled>Partially Occupied</option>
+                          <option value="reserved" disabled={table.status === 'occupied' || table.status === 'partially-occupied'}>Reserved</option>
+                          <option value="maintenance" disabled={table.status === 'occupied' || table.status === 'partially-occupied'}>Maintenance</option>
                         </select>
                       </div>
 
                       {/* Show order info if occupied */}
                       {order && (
                         <div className="relative z-10 w-full text-center text-[10px] text-gray-500 -mt-1">
-                          {order.paymentStatus === 'Paid' && table.status === 'occupied' && (
+                          {order.paymentStatus === 'Paid' && (table.status === 'occupied' || table.status === 'partially-occupied') && (
                             <div className="mb-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
                               Already Paid - Set Available
                             </div>
                           )}
-                          <p className="font-medium truncate">{order.customer}</p>
-                          {order.partySize ? (
+                          <p className="font-medium truncate">{occupancy.activeOrders.length > 1 ? `${occupancy.activeOrders.length} active customers/groups` : order.customer}</p>
+                          {table.status === 'partially-occupied' ? (
+                            <p className="text-amber-700">Only {occupancy.availableSeats} seat{occupancy.availableSeats === 1 ? '' : 's'} available</p>
+                          ) : order.partySize ? (
                             <p className="text-primary">{order.partySize} {order.partySize === 1 ? 'person' : 'people'}</p>
                           ) : (
                             <p className="text-gray-400">—</p>
@@ -671,49 +714,98 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
               {/* Selected Table Details */}
               {selectedTableId && (() => {
                 const selectedTable = tables.find(t => t.id === selectedTableId);
-                const selectedOrder = selectedTable ? getTableOrder(selectedTable) : undefined;
-                return selectedOrder ? (
-                  <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
+                const selectedOccupancy = selectedTable ? getTableOccupancy(selectedTable.number) : undefined;
+                const selectedOrders = selectedOccupancy?.activeOrders ?? [];
+                if (!selectedTable || !selectedOccupancy || selectedOrders.length === 0) {
+                  return null;
+                }
+                const panelClasses = selectedOccupancy.state === 'partially-occupied'
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-orange-50 border-orange-200';
+                return (
+                  <div className={`mb-6 border rounded-lg p-4 ${panelClasses}`}>
+                    <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <h3 className="font-medium">Table {selectedTable?.number} - {selectedOrder.customer}</h3>
-                        <p className="text-sm text-muted-foreground">Order {selectedOrder.id}</p>
+                        <h3 className="font-medium text-slate-900">Table {selectedTable.number}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedOccupancy.state === 'partially-occupied'
+                            ? `Partially occupied. Only ${selectedOccupancy.availableSeats} seat${selectedOccupancy.availableSeats === 1 ? '' : 's'} available.`
+                            : 'Fully occupied. No remaining seats available.'}
+                        </p>
                       </div>
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        selectedOrder.orderStatus === 'Served' ? 'bg-green-100 text-green-700' :
-                        selectedOrder.orderStatus === 'Preparing' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {selectedOrder.orderStatus}
-                      </span>
+                      <div className="text-sm text-slate-600">
+                        {selectedOccupancy.occupiedSeats}/{selectedTable.seats} seats occupied
+                      </div>
                     </div>
-                    <div className="space-y-1 mb-3">
-                      {selectedOrder.items.map((item, idx) => (
-                        <div key={idx} className="text-sm flex justify-between">
-                          <span>{item.quantity}x {item.name}</span>
-                          <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                    <div className="space-y-3">
+                      {selectedOrders.map((order) => (
+                        <div key={order.id} className="rounded-lg border border-white/70 bg-white/80 p-4 shadow-sm">
+                          <div className="flex flex-col gap-2 mb-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h4 className="font-medium text-slate-900">{order.customer}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Order {order.orderNumber || order.id}
+                                {order.partySize ? ` - ${order.partySize} ${order.partySize === 1 ? 'person' : 'people'}` : ''}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.paymentStatus === 'Paid'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {order.paymentStatus}
+                              </span>
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                order.orderStatus === 'Served'
+                                  ? 'bg-green-100 text-green-700'
+                                  : order.orderStatus === 'Preparing'
+                                  ? 'bg-yellow-100 text-yellow-700'
+                                  : order.orderStatus === 'Ready'
+                                  ? 'bg-blue-100 text-blue-700'
+                                  : 'bg-gray-100 text-gray-700'
+                              }`}>
+                                {order.orderStatus}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 mb-3">
+                            {order.items.map((item, idx) => (
+                              <div key={`${order.id}-${idx}`} className="text-sm flex justify-between gap-3">
+                                <span>{item.quantity}x {item.name}</span>
+                                <span>₱{(item.price * item.quantity).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="border-t border-slate-200 pt-2 flex items-center justify-between gap-3">
+                            <div className="font-medium text-slate-900">
+                              Total: ₱{order.amountNumber.toFixed(2)}
+                            </div>
+                            {order.paymentStatus !== 'Paid' ? (
+                              <button
+                                onClick={() => handlePaymentComplete(order.id)}
+                                className="rounded-lg bg-green-500 px-3 py-2 text-sm text-white transition-colors hover:bg-green-600"
+                              >
+                                Mark Bill as Paid
+                              </button>
+                            ) : (
+                              <span className="text-xs text-emerald-700">
+                                Paid. Release table when all active bills are settled.
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <div className="border-t border-orange-200 pt-2 mb-3">
-                      <div className="flex justify-between font-medium">
-                        <span>Total</span>
-                        <span>₱{selectedOrder.amountNumber.toFixed(2)}</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handlePaymentComplete(selectedTableId)}
-                      className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg transition-colors"
-                    >
-                      Mark as Paid & Free Table
-                    </button>
                   </div>
-                ) : null;
+                );
               })()}
 
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Status Legend</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
                       #
@@ -724,12 +816,21 @@ export function TableManagement({ onNavigate, currentOrder, onLogout, storeBrand
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      #
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Partially Occupied</p>
+                      <p className="text-xs text-gray-500">Per seat with seats left</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-sm shadow-md">
                       #
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">Occupied</p>
-                      <p className="text-xs text-gray-500">Has order</p>
+                      <p className="text-sm font-medium text-gray-800">Fully Occupied</p>
+                      <p className="text-xs text-gray-500">All seats or whole table</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
