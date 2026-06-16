@@ -128,25 +128,39 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
 
   return (
     <div
-      className={`sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden text-white transition-[width] duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-80'}`}
+      className={`sticky top-0 flex h-screen shrink-0 flex-col text-white transition-[width] duration-300 ease-in-out ${isCollapsed ? 'w-20 overflow-visible' : 'w-80 overflow-hidden'}`}
       style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
     >
-      <div className={`relative shrink-0 border-b border-white/10 transition-all duration-300 ease-in-out ${isCollapsed ? 'px-3 pb-14 pt-4' : 'px-6 pb-4 pt-5'}`}>
+      <div className={`relative shrink-0 border-b border-white/10 transition-all duration-300 ease-in-out ${isCollapsed ? 'px-3 py-4' : 'px-6 pb-4 pt-5'}`}>
         <button
           type="button"
           onClick={() => setIsCollapsed((value) => !value)}
-          className={`absolute z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15 ${
-            isCollapsed ? 'bottom-3 left-1/2 -translate-x-1/2' : 'right-3 top-3'
+          className={`z-10 inline-flex items-center justify-center text-slate-300 transition hover:text-slate-100 ${
+            isCollapsed ? 'group relative left-1/2 h-10 w-10 -translate-x-1/2' : 'absolute right-3 top-3 h-9 w-9'
           }`}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {isCollapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}
+          {isCollapsed ? (
+            <>
+              <img src={storeBrand?.logo || defaultLogo} alt={headerTitle} className="h-full w-full object-contain transition-opacity duration-150 group-hover:opacity-0" />
+              <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} />
+              </span>
+              <span className="pointer-events-none absolute left-full top-1/2 ml-6 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                Open sidebar
+              </span>
+            </>
+          ) : (
+            <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />
+          )}
         </button>
         <div className="text-center">
-          <div className={`mx-auto flex items-center justify-center overflow-hidden bg-transparent transition-all duration-300 ease-in-out ${isCollapsed ? 'mb-0 h-10 w-10' : 'mb-2 h-16 w-16'}`}>
-            <img src={storeBrand?.logo || defaultLogo} alt={headerTitle} className="h-full w-full object-contain" />
-          </div>
+          {!isCollapsed && (
+            <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center overflow-hidden bg-transparent transition-all duration-300 ease-in-out">
+              <img src={storeBrand?.logo || defaultLogo} alt={headerTitle} className="h-full w-full object-contain" />
+            </div>
+          )}
           <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isCollapsed ? 'max-h-0 opacity-0' : 'max-h-14 opacity-100'}`}>
             <h2 className="truncate text-lg font-semibold tracking-tight text-white">{headerTitle}</h2>
             <p className="mt-0.5 text-sm leading-tight text-slate-200">{userRoleLabel}</p>

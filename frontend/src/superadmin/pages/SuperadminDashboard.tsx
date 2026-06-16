@@ -379,23 +379,39 @@ export function SuperadminDashboard({ currentUser, onLogout }: SuperadminDashboa
   return (
     <div className="min-h-screen bg-[#f8fafc] text-[#007a5e]">
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex flex-col overflow-y-auto text-white transition-[width] duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-80'}`}
+        className={`fixed inset-y-0 left-0 z-30 flex flex-col text-white transition-[width] duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20 overflow-visible' : 'w-80 overflow-y-auto'}`}
         style={{ background: 'linear-gradient(180deg, #003534 0%, #007a5e 100%)' }}
       >
-        <div className={`relative border-b border-white/10 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3 pb-3 pt-4' : 'px-4 pb-4 pt-5'}`}>
+        <div className={`relative border-b border-white/10 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'px-3 py-4' : 'px-4 pb-4 pt-5'}`}>
           <button
             type="button"
             onClick={() => setIsSidebarCollapsed((value) => !value)}
-            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15"
+            className={`z-10 inline-flex items-center justify-center text-slate-300 transition hover:text-slate-100 ${
+              isSidebarCollapsed ? 'group relative left-1/2 h-10 w-10 -translate-x-1/2' : 'absolute right-3 top-3 h-9 w-9'
+            }`}
             aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {isSidebarCollapsed ? <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} /> : <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />}
+            {isSidebarCollapsed ? (
+              <>
+                <img src={logoImage} alt="N&Ns logo" className="h-full w-full object-contain transition-opacity duration-150 group-hover:opacity-0" />
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                  <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} />
+                </span>
+                <span className="pointer-events-none absolute left-full top-1/2 ml-6 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+                  Open sidebar
+                </span>
+              </>
+            ) : (
+              <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />
+            )}
           </button>
           <div className="text-center">
-            <div className={`mx-auto flex items-center justify-center transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'mb-0 h-10 w-10' : 'mb-1 h-24 w-24'}`}>
-              <img src={logoImage} alt="N&Ns logo" className={`object-contain transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'h-10 w-10' : 'h-20 w-20'}`} />
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="mx-auto mb-1 flex h-24 w-24 items-center justify-center transition-all duration-300 ease-in-out">
+                <img src={logoImage} alt="N&Ns logo" className="h-20 w-20 object-contain transition-all duration-300 ease-in-out" />
+              </div>
+            )}
             <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'max-h-0 opacity-0' : 'max-h-16 opacity-100'}`}>
               <h1 className="truncate text-xl font-semibold tracking-tight text-white">Unified POS</h1>
               <p className="mt-1 text-lg leading-tight text-slate-200">Super Admin</p>
