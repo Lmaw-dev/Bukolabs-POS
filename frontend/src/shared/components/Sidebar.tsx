@@ -147,9 +147,6 @@ export function Sidebar({ currentPage, onNavigate, onLogout, isAdmin = false, st
               <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                 <PanelLeftOpen className="h-5 w-5" strokeWidth={1.8} />
               </span>
-              <span className="pointer-events-none absolute left-full top-1/2 ml-6 -translate-y-1/2 whitespace-nowrap rounded-md bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
-                Open sidebar
-              </span>
             </>
           ) : (
             <PanelLeftClose className="h-5 w-5" strokeWidth={1.8} />
