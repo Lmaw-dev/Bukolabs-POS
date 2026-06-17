@@ -48,15 +48,22 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     const connectionString = process.env.DATABASE_URL;
+    const maxPoolConnections = Number(process.env.DB_POOL_MAX ?? 3);
+    const poolOptions = {
+      max: Number.isFinite(maxPoolConnections) && maxPoolConnections > 0 ? maxPoolConnections : 3,
+      idleTimeoutMillis: Number(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? 10000),
+      connectionTimeoutMillis: Number(process.env.DB_POOL_CONNECTION_TIMEOUT_MS ?? 10000),
+    };
 
     this.pool = connectionString
-      ? new Pool({ connectionString })
+      ? new Pool({ connectionString, ...poolOptions })
       : new Pool({
           host: process.env.DB_HOST ?? 'localhost',
           port: Number(process.env.DB_PORT ?? 5432),
           user: process.env.DB_USER ?? 'postgres',
           password: process.env.DB_PASSWORD ?? '',
           database: process.env.DB_NAME ?? 'bukolabs_pos',
+          ...poolOptions,
         });
   }
 
@@ -73,8 +80,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       const result = await this.pool.query<T>(sql, params);
       return result.rows;
     } catch (error) {
-      const databaseError = error as { code?: string };
-      const connectionErrorCodes = new Set(['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', '28P01', '3D000']);
+      const databaseError = error as { code?: string; message?: string };
+      const connectionErrorCodes = new Set(['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', '28P01', '3D000', 'XX000']);
+
+      if (databaseError.code === 'XX000') {
+        if (databaseError.message?.includes('max clients reached')) {
+          throw new ServiceUnavailableException('PostgreSQL connection limit reached. Stop extra backend processes or lower DB_POOL_MAX.');
+        }
+
+        throw error;
+      }
 
       if (databaseError.code && !connectionErrorCodes.has(databaseError.code)) {
         throw error;
@@ -2662,10 +2677,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       return this.schemaColumns;
     }
 
-    const [users, stores] = await Promise.all([
-      this.query<ColumnInfo>(`SELECT column_name FROM information_schema.columns WHERE table_name = 'users'`),
-      this.query<ColumnInfo>(`SELECT column_name FROM information_schema.columns WHERE table_name = 'stores'`),
-    ]);
+    const columns = await this.query<ColumnInfo & { table_name: string }>(
+      `
+        SELECT table_name, column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name IN ('users', 'stores')
+      `,
+    );
+    const users = columns.filter((column) => column.table_name === 'users');
+    const stores = columns.filter((column) => column.table_name === 'stores');
 
     this.schemaColumns = {
       users: new Set(users.map((column) => column.column_name.toLowerCase())),
