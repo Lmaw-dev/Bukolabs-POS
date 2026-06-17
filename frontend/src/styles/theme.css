@@ -208,6 +208,28 @@
   --color-alert-error-border: var(--alert-error-border);
 }
 
+button.bg-primary,
+button.bg-green-500,
+button.bg-green-600,
+button.bg-emerald-700,
+button.bg-\[\#008967\],
+button.bg-\[\#00a7a5\] {
+  background-color: transparent;
+  background-image: linear-gradient(to right, #008967, #005656);
+  color: #ffffff;
+}
+
+button.bg-primary:hover,
+button.bg-green-500:hover,
+button.bg-green-600:hover,
+button.bg-emerald-700:hover,
+button.bg-\[\#008967\]:hover,
+button.bg-\[\#00a7a5\]:hover {
+  background-color: transparent;
+  background-image: linear-gradient(to right, #008967, #005656);
+  opacity: 0.95;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
